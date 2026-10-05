@@ -54,6 +54,16 @@ export function Background({ settings }: { settings: ClientSettings }) {
         />
       ) : gradient === "aero" ? (
         <AeroSky />
+      ) : gradient === "nebula" ? (
+        <div className="bg-nebula absolute inset-0">
+          <div className="nebula-stars far" />
+          <div className="nebula-stars" />
+        </div>
+      ) : gradient === "synthwave" ? (
+        <div className="bg-synthwave absolute inset-0">
+          <div className="synth-sun" />
+          <div className="synth-floor" />
+        </div>
       ) : (
         <div className="bg-preset absolute inset-0" style={{ "--preset-base": preset.base } as CSSProperties}>
           {preset.blobs.map((color, i) => (

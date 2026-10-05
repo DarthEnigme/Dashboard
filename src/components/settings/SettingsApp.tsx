@@ -7,7 +7,7 @@ import { AlertTriangle, ArrowLeft, Check, Download, FileUp, Search, X } from "lu
 import { fetcher, sendJson } from "@/lib/fetcher";
 import { gradientPresets, stylePresets, type Settings } from "@/lib/config/schema";
 import type { ClientSettings } from "@/lib/config/sanitize";
-import { gradientColors, lookPresets } from "@/lib/theme";
+import { gradientColors, lookPresets, themeAttrs, type LookPreset } from "@/lib/theme";
 import type { FieldSpec } from "@/integrations/fields";
 import { Background } from "../Background";
 import { LiveReload } from "../LiveReload";
@@ -67,13 +67,19 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
   }, []);
 
   // Live preview of theme, style and accent on the page itself; the saved look is restored when leaving.
+  // `theme` holds the setting (dark, oled…); data-theme/data-tone are derived from it.
   const restore = useRef<{ theme?: string; style?: string; glow?: string; accent: string }>(undefined);
   useEffect(() => {
     const root = document.documentElement;
-    restore.current = { theme: root.dataset.theme, style: root.dataset.style, glow: root.dataset.glow, accent: root.style.getPropertyValue("--accent") };
+    restore.current = {
+      theme: root.dataset.tone === "oled" ? "oled" : root.dataset.tone === "sepia" ? "sepia" : root.dataset.theme,
+      style: root.dataset.style,
+      glow: root.dataset.glow,
+      accent: root.style.getPropertyValue("--accent"),
+    };
     return () => {
       const r = restore.current!;
-      root.dataset.theme = r.theme;
+      applyTheme(root, r.theme ?? "dark");
       root.dataset.style = r.style;
       root.dataset.glow = r.glow;
       root.style.setProperty("--accent", r.accent);
@@ -81,7 +87,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
   }, []);
   useEffect(() => {
     const root = document.documentElement;
-    root.dataset.theme = preview.theme;
+    applyTheme(root, preview.theme);
     root.dataset.style = preview.style;
     root.dataset.glow = preview.glow;
     if (HEX.test(preview.accent)) root.style.setProperty("--accent", preview.accent);
@@ -258,7 +264,8 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                     draft={draft}
                     onApply={(look) =>
                       setDraft((cur) => {
-                        let next = setPath(cur, "style", look.style);
+                        let next = look.theme ? setPath(cur, "theme", look.theme) : cur;
+                        next = setPath(next, "style", look.style);
                         next = setPath(next, "background.gradient", look.gradient);
                         next = setPath(next, "accent", look.accent);
                         return setPath(next, "glow", look.glow);
@@ -348,10 +355,21 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
   );
 }
 
+function applyTheme(root: HTMLElement, theme: string) {
+  const a = themeAttrs(theme);
+  root.dataset.theme = a.theme;
+  if (a.tone) root.dataset.tone = a.tone;
+  else delete root.dataset.tone;
+}
+
 const styleNotes: Record<(typeof stylePresets)[number], string> = {
   glass: "Frosted",
   liquid: "Liquid glass",
   aero: "Frutiger Aero",
+  neon: "Glowing edges",
+  brutal: "Bold & flat",
+  soft: "Neumorphic",
+  retro: "Windows 98",
   minimal: "Light touch",
   solid: "Opaque",
 };
@@ -361,7 +379,7 @@ function StylePicker({ value, onChange }: { value: string; onChange: (v: string)
   return (
     <fieldset className="flex flex-col gap-1.5">
       <legend className="mb-1.5 text-xs font-medium text-muted">Card style</legend>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {stylePresets.map((s) => (
           <label key={s} data-style={s} className="cursor-pointer">
             <input type="radio" name="style" value={s} checked={value === s} onChange={() => onChange(s)} className="peer sr-only" />
@@ -400,9 +418,12 @@ function GradientPicker({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 /** One-click looks: style, background, accent and glow together (still only a draft until saved). */
-function LookPicker({ draft, onApply }: { draft: Obj; onApply: (look: (typeof lookPresets)[number]) => void }) {
-  const current = (l: (typeof lookPresets)[number]) =>
-    getPath(draft, "style") === l.style && (getPath(draft, "background.gradient") ?? "aurora") === l.gradient && getPath(draft, "accent") === l.accent;
+function LookPicker({ draft, onApply }: { draft: Obj; onApply: (look: LookPreset) => void }) {
+  const current = (l: LookPreset) =>
+    getPath(draft, "style") === l.style &&
+    (getPath(draft, "background.gradient") ?? "aurora") === l.gradient &&
+    getPath(draft, "accent") === l.accent &&
+    (!l.theme || getPath(draft, "theme") === l.theme);
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-xs font-medium text-muted">Looks</span>

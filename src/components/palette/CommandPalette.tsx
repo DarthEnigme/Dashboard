@@ -23,7 +23,7 @@ import {
 import { fetcher, sendJson } from "@/lib/fetcher";
 import { scoreItem } from "@/lib/fuzzy";
 import { listTabs } from "@/lib/tabs";
-import { glowLevels, stylePresets } from "@/lib/config/schema";
+import { glowLevels, stylePresets, themes } from "@/lib/config/schema";
 import type { ClientConfig, ClientService } from "@/lib/config/sanitize";
 import type { ClientAuth } from "@/lib/auth";
 import type { ServiceAction } from "@/integrations/types";
@@ -208,7 +208,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           }
         },
       });
-      for (const t of ["dark", "light", "system"]) if (config.settings.theme !== t) items.push(command(`cmd:theme:${t}`, `Theme: ${t}`, "theme", t, Palette));
+      for (const t of themes) if (config.settings.theme !== t) items.push(command(`cmd:theme:${t}`, `Theme: ${t}`, "theme", t, Palette));
       for (const s of stylePresets) if (config.settings.style !== s) items.push(command(`cmd:style:${s}`, `Card style: ${s}`, "style", s, Palette));
       for (const g of glowLevels) if (config.settings.glow !== g) items.push(command(`cmd:glow:${g}`, `Hover glow: ${g}`, "glow", g, Palette));
     }

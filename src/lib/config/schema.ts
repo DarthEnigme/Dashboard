@@ -1,7 +1,9 @@
 import { z } from "zod";
 
-export const gradientPresets = ["aurora", "sunset", "ocean", "midnight", "forest", "aero"] as const;
-export const stylePresets = ["glass", "liquid", "aero", "minimal", "solid"] as const;
+export const gradientPresets = ["aurora", "sunset", "ocean", "midnight", "forest", "aero", "dawn", "lagoon", "graphite", "nebula", "synthwave"] as const;
+export const stylePresets = ["glass", "liquid", "aero", "neon", "brutal", "soft", "retro", "minimal", "solid"] as const;
+/** oled and sepia are tones of dark and light (see themeAttrs in lib/theme.ts). */
+export const themes = ["dark", "light", "system", "oled", "sepia"] as const;
 export const glowLevels = ["none", "subtle", "strong"] as const;
 export const tileSizes = ["small", "wide", "tall", "large"] as const;
 export const visibilities = ["public", "users", "admins"] as const;
@@ -73,7 +75,7 @@ export const settingsSchema = z
   .object({
     title: z.string().default("Page"),
     description: z.string().optional(),
-    theme: z.enum(["dark", "light", "system"]).default("dark"),
+    theme: z.enum(themes).default("dark"),
     style: z.enum(stylePresets).default("glass"),
     accent: z.string().default("#8b5cf6"), // a colour, or "auto" to take it from the wallpaper
     /** Edge light and accent glow on hovered cards. */

@@ -39,6 +39,20 @@ test.describe.serial("settings page", () => {
     await expect(page.locator('html[data-style="aero"]')).toHaveCount(0);
   });
 
+  test("a look can set the theme too, and discard undoes it", async ({ page }) => {
+    await page.goto("/settings#appearance");
+    await page.getByRole("button", { name: "Paper" }).click();
+    await expect(page.locator('html[data-style="soft"][data-theme="light"][data-tone="sepia"]')).toBeAttached();
+    await expect(page.locator(".bg-preset")).toBeAttached();
+    await shot(page, "64-settings-look-paper", { fullPage: false });
+    await page.getByRole("button", { name: "Synthwave" }).click();
+    await expect(page.locator('html[data-style="neon"][data-theme="dark"]:not([data-tone])')).toBeAttached();
+    await expect(page.locator(".synth-sun")).toBeAttached();
+    await page.getByRole("button", { name: "Discard" }).click();
+    await expect(page.locator("html[data-tone]")).toHaveCount(0);
+    await expect(page.locator('html[data-style="neon"]')).toHaveCount(0);
+  });
+
   test("validates before saving and can discard", async ({ page }) => {
     await page.goto("/settings#refresh");
     const field = page.getByLabel("Widget refresh (seconds)");

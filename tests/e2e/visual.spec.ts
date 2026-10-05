@@ -50,7 +50,7 @@ test.describe.serial("visual", () => {
   });
 
   // The pointer light is off under reduced motion (the default for these tests).
-  for (const style of ["glass", "liquid", "aero"]) {
+  for (const style of ["glass", "liquid", "aero", "neon", "brutal"]) {
     test(`hover glow, ${style}`, async ({ page }) => {
       setSetting("style", style);
       setSetting("glow", "strong");
@@ -68,6 +68,51 @@ test.describe.serial("visual", () => {
       setSetting("style", "glass");
     });
   }
+
+  // New card styles, dark and light, each over a background that suits it.
+  for (const [style, gradient] of [
+    ["neon", "synthwave"],
+    ["brutal", "graphite"],
+    ["soft", "dawn"],
+    ["retro", "lagoon"],
+  ] as const) {
+    test(`style ${style}`, async ({ page }) => {
+      setSetting("style", style);
+      setSetting("background", `{ gradient: ${gradient} }`);
+      await page.goto("/");
+      await expect(page.locator(`html[data-style="${style}"]`)).toBeAttached();
+      await shot(page, `05-style-${style}-dark`, { fullPage: false });
+      setSetting("theme", "light");
+      await page.goto("/");
+      await shot(page, `05-style-${style}-light`, { fullPage: false });
+      setSetting("theme", "dark");
+      setSetting("style", "glass");
+      setSetting("background", "{ gradient: aurora }");
+    });
+  }
+
+  for (const gradient of ["nebula", "dawn", "lagoon", "graphite"]) {
+    test(`background ${gradient}`, async ({ page }) => {
+      setSetting("background", `{ gradient: ${gradient} }`);
+      await page.goto("/");
+      if (gradient === "nebula") await expect(page.locator(".nebula-stars")).toHaveCount(2);
+      await shot(page, `06-bg-${gradient}`, { fullPage: false });
+      setSetting("background", "{ gradient: aurora }");
+    });
+  }
+
+  test("oled and sepia themes", async ({ page }) => {
+    setSetting("theme", "oled");
+    await page.goto("/");
+    await expect(page.locator('html[data-theme="dark"][data-tone="oled"]')).toBeAttached();
+    await expect(page.locator("body")).toHaveCSS("background-color", "rgb(0, 0, 0)");
+    await shot(page, "07-theme-oled", { fullPage: false });
+    setSetting("theme", "sepia");
+    await page.goto("/");
+    await expect(page.locator('html[data-theme="light"][data-tone="sepia"]')).toBeAttached();
+    await shot(page, "07-theme-sepia", { fullPage: false });
+    setSetting("theme", "dark");
+  });
 
   test("light theme", async ({ page }) => {
     setSetting("style", "glass");

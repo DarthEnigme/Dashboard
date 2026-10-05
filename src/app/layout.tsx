@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import { loadConfig } from "@/lib/config/load";
-import { serverAccent } from "@/lib/theme";
+import { serverAccent, themeAttrs } from "@/lib/theme";
 import { buildInfo } from "@/lib/version";
 import { PwaRegister } from "@/components/PwaRegister";
 import { PointerLight } from "@/components/PointerLight";
 import { PaletteLauncher } from "@/components/palette/PaletteLauncher";
 import "./globals.css";
+import "./looks.css";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +25,12 @@ export const viewport: Viewport = { themeColor: "#0b0b14", viewportFit: "cover" 
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const { settings } = loadConfig();
+  const look = themeAttrs(settings.theme);
   return (
     <html
       lang="en"
-      data-theme={settings.theme}
+      data-theme={look.theme}
+      data-tone={look.tone}
       data-style={settings.style}
       data-glow={settings.glow}
       data-build={buildInfo().buildId}
