@@ -1,8 +1,10 @@
 services:
   page:
-    build: .
-    # Or use the image built by CI once the repo is on GitHub:
-    # image: ghcr.io/<your-github-user>/page:latest
+    # The image CI publishes for github.com/DarthEnigme/Dashboard (amd64 and arm64).
+    # Settings -> Updates installs new releases in place; the Docker socket below is needed for that.
+    image: ghcr.io/darthenigme/dashboard:latest
+    # Or build it yourself from this folder instead:
+    # build: .
     container_name: page
     restart: unless-stopped
     ports:

@@ -37,12 +37,12 @@ A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Hom
 ## Run with Docker
 
 ```sh
-docker compose up -d --build
+docker compose up -d
 ```
 
 Open http://localhost:3000 and choose **Set up** to create the admin account (or set `HOMEPAGE_ADMIN_PASSWORD` to create user `admin` automatically). On first start, example config files are written to `./config`. History, users and finance data are stored in `./data`.
 
-Once the repository is on GitHub, CI publishes a multi-arch image (amd64 and arm64) to `ghcr.io/<you>/page`; use `image:` instead of `build:` in `docker-compose.yml`.
+`docker-compose.yml` runs the image CI publishes to `ghcr.io/darthenigme/dashboard` (amd64 and arm64): `:latest` follows `main`, and every release also gets its version tag (`:0.4.0`). To build from source instead, swap `image:` for `build: .` and run `docker compose up -d --build`.
 
 ## Updating
 
