@@ -4,6 +4,22 @@ export const gradientColors: Record<string, { base: string; blobs: [string, stri
   ocean: { base: "#04111d", blobs: ["#0ea5e9", "#2563eb", "#14b8a6"] },
   midnight: { base: "#05060b", blobs: ["#4f46e5", "#1e3a8a", "#9333ea"] },
   forest: { base: "#06120b", blobs: ["#16a34a", "#65a30d", "#0d9488"] },
+  dawn: { base: "#1a1020", blobs: ["#fb7185", "#fdba74", "#c4b5fd"] },
+  lagoon: { base: "#03161a", blobs: ["#2dd4bf", "#f472b6", "#22d3ee"] },
+  graphite: { base: "#0d0d10", blobs: ["#52525b", "#3f3f46", "#71717a"] },
+  // Drawn by Background.tsx with their own layers (blobs are only used for "auto" accents).
+  nebula: {
+    base: "#05030f",
+    blobs: ["#a78bfa", "#3b82f6", "#ec4899"],
+    swatch:
+      "radial-gradient(circle at 20% 30%, #fff 0 1px, transparent 2px), radial-gradient(circle at 70% 65%, #fff 0 1px, transparent 2px), radial-gradient(circle at 45% 20%, #fff 0 1px, transparent 2px), radial-gradient(60% 50% at 30% 40%, #7c3aed99, transparent 70%), radial-gradient(50% 50% at 75% 70%, #db277799, transparent 70%), #05030f",
+  },
+  synthwave: {
+    base: "#1a0533",
+    blobs: ["#ff3ea5", "#7c3aed", "#22d3ee"],
+    swatch:
+      "radial-gradient(circle at 50% 62%, #ffd23f 0 18%, #ff3ea5 30%, transparent 31%), linear-gradient(transparent 62%, #2b0b4f 62%), repeating-linear-gradient(90deg, transparent 0 9px, #ff3ea566 9px 10px), linear-gradient(#1a0533, #6b1d7a 60%)",
+  },
   // Frutiger Aero: sky, water and grass. Drawn by Background.tsx with its own layers, not blobs.
   aero: {
     base: "#0a3a63",
@@ -13,12 +29,38 @@ export const gradientColors: Record<string, { base: string; blobs: [string, stri
   },
 };
 
+export interface LookPreset {
+  id: string;
+  label: string;
+  style: string;
+  gradient: string;
+  accent: string;
+  glow: string;
+  /** Some looks only work in one theme (Paper is sepia, Brutalist is light). */
+  theme?: string;
+}
+
 /** One-click looks in the settings: a card style, a background and an accent that belong together. */
-export const lookPresets = [
+export const lookPresets: LookPreset[] = [
   { id: "aero", label: "Frutiger Aero", style: "aero", gradient: "aero", accent: "#1ea7e1", glow: "subtle" },
   { id: "liquid", label: "Liquid Glass", style: "liquid", gradient: "aurora", accent: "#8b5cf6", glow: "subtle" },
+  { id: "synthwave", label: "Synthwave", style: "neon", gradient: "synthwave", accent: "#ff3ea5", glow: "strong", theme: "dark" },
+  { id: "nebula", label: "Nebula", style: "liquid", gradient: "nebula", accent: "#a78bfa", glow: "subtle", theme: "oled" },
+  { id: "brutalist", label: "Brutalist", style: "brutal", gradient: "graphite", accent: "#facc15", glow: "none", theme: "light" },
+  { id: "paper", label: "Paper", style: "soft", gradient: "dawn", accent: "#c2410c", glow: "subtle", theme: "sepia" },
+  { id: "retro", label: "Retro 98", style: "retro", gradient: "lagoon", accent: "#000080", glow: "none", theme: "light" },
   { id: "classic", label: "Classic", style: "glass", gradient: "aurora", accent: "#8b5cf6", glow: "subtle" },
-] as const;
+];
+
+/**
+ * The attributes for a theme setting: oled and sepia are tones on top of dark and light, so every
+ * light/dark rule (and each style's light variant) keeps applying.
+ */
+export function themeAttrs(theme: string): { theme: string; tone?: string } {
+  if (theme === "oled") return { theme: "dark", tone: "oled" };
+  if (theme === "sepia") return { theme: "light", tone: "sepia" };
+  return { theme };
+}
 
 export const DEFAULT_ACCENT = "#8b5cf6";
 

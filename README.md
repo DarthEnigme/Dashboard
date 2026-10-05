@@ -94,12 +94,12 @@ Config lives in `./config` (override with `HOMEPAGE_CONFIG_DIR`); history lives 
 ```yaml
 title: Homelab
 description: Optional subtitle
-theme: dark            # dark | light | system
-style: glass           # glass | liquid | aero | minimal | solid
+theme: dark            # dark | light | system | oled (pure black) | sepia (warm paper)
+style: glass           # glass | liquid | aero | neon | brutal | soft | retro | minimal | solid
 accent: "#8b5cf6"      # or "auto" to take it from the wallpaper
 glow: subtle           # none | subtle | strong: edge light and accent glow on hovered cards
 background:
-  gradient: aurora     # aurora | sunset | ocean | midnight | forest | aero
+  gradient: aurora     # aurora | sunset | ocean | midnight | forest | aero | dawn | lagoon | graphite | nebula | synthwave
   image: https://...   # optional; overrides the gradient
   blur: 0              # px, image only
   brightness: 0.7      # 0-1, image only
@@ -469,6 +469,7 @@ Open the page in Chrome, Edge or Safari and choose **Install** / **Add to Home S
 
 Admins open `/settings` from the gear next to the search box, or from the account menu. The page has:
 - **Sections:** General, Appearance, Background, Layout, Refresh, Monitoring & alerts, Accounts & sign-in, Docker, Finance, and Backup & history. Each section has its own URL, e.g. `/settings#appearance`, and a search box finds any setting across all of them.
+- **Looks:** one click sets a card style, background, accent and glow that belong together, and sometimes the theme: Frutiger Aero, Liquid Glass, Synthwave, Nebula, Brutalist, Paper, Retro 98, Classic. Like everything else on the page, it's only kept once you save.
 - **Live preview:** theme, card style, accent colour and background change on screen as you edit. Nothing is written until you **Save**, and **Discard** puts everything back.
 - **Checks before saving:** values are validated as you type and problems are shown next to the field. Sections with unsaved changes or problems are marked in the sidebar.
 - **Backup:** **Download config** saves all YAML files as a zip. They're exactly as on disk, so secrets that aren't in env vars are included. The page also has the version history and **Import from Homepage**.

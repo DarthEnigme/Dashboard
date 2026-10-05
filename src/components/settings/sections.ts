@@ -1,5 +1,5 @@
 import { Activity, Archive, ArrowUpCircle, Container, LayoutGrid, Palette, PiggyBank, RefreshCw, Settings2, Users, Wallpaper, type LucideIcon } from "lucide-react";
-import { glowLevels, gradientPresets, stylePresets } from "@/lib/config/schema";
+import { glowLevels, gradientPresets, stylePresets, themes } from "@/lib/config/schema";
 import type { FieldSpec } from "@/integrations/fields";
 
 /** Panels with their own UI next to (or instead of) the fields. */
@@ -33,7 +33,7 @@ export const sections: Section[] = [
     icon: Palette,
     description: "Theme, card style and accent colour. Changes preview immediately; save to keep them.",
     fields: [
-      { key: "theme", label: "Theme", kind: "select", options: ["dark", "light", "system"], required: true },
+      { key: "theme", label: "Theme", kind: "select", options: [...themes], required: true, help: "oled: pure black. sepia: warm paper." },
       { key: "style", label: "Card style", kind: "select", options: [...stylePresets] },
       { key: "accent", label: "Accent colour", kind: "color", help: "Type “auto” to take it from the wallpaper." },
       { key: "glow", label: "Hover glow", kind: "select", options: [...glowLevels], placeholder: "subtle", help: "Edge light that follows the pointer, and an accent glow on hovered cards." },
