@@ -1,0 +1,7 @@
+{
+  "balance-in-EUR": { "monetary_value": -120, "currency_code": "EUR", "value_parsed": "-€120.00" },
+  "spent-in-EUR": { "monetary_value": -900, "currency_code": "EUR", "value_parsed": "-€900.00" },
+  "earned-in-EUR": { "monetary_value": 780, "currency_code": "EUR", "value_parsed": "€780.00" },
+  "net-worth-in-EUR": { "monetary_value": 15000, "currency_code": "EUR", "value_parsed": "€15,000.00" },
+  "spent-in-USD": { "monetary_value": -50, "currency_code": "USD", "value_parsed": "$50.00" }
+}

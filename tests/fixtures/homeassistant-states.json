@@ -1,0 +1,8 @@
+[
+  { "entity_id": "sensor.living_room_temperature", "state": "21.46", "attributes": { "friendly_name": "Living room", "unit_of_measurement": "°C" } },
+  { "entity_id": "binary_sensor.front_door", "state": "off", "attributes": { "friendly_name": "Front door" } },
+  { "entity_id": "light.kitchen", "state": "on", "attributes": { "friendly_name": "Kitchen" } },
+  { "entity_id": "light.hall", "state": "off", "attributes": { "friendly_name": "Hall" } },
+  { "entity_id": "switch.heater", "state": "on", "attributes": { "friendly_name": "Heater" } },
+  { "entity_id": "sensor.garage", "state": "unavailable", "attributes": { "friendly_name": "Garage" } }
+]

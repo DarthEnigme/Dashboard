@@ -1,0 +1,10 @@
+# External APIs (weather, markets) are left out so runs are deterministic.
+- type: greeting
+  name: Tester
+- type: resources
+- type: prometheus
+  url: http://localhost:4010/prom
+  label: Cluster
+  queries:
+    - { label: Pods, query: 'count(pods)' }
+    - { label: Alerts, query: 'count(alerts)', warn: 1 }

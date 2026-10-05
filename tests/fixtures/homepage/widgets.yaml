@@ -1,0 +1,14 @@
+- resources:
+    cpu: true
+    memory: true
+    disk: /mnt/data
+- openmeteo:
+    label: Paris
+    latitude: 48.85
+    longitude: 2.35
+    units: metric
+- datetime:
+    format:
+      timeStyle: short
+- search:
+    provider: duckduckgo

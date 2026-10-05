@@ -1,0 +1,10 @@
+{
+  "success": true,
+  "data": [
+    { "id": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0", "names": ["/traefik"], "image": "traefik:v3", "state": "running", "status": "Up 3 days", "updateInfo": { "hasUpdate": true, "updateType": "tag" } },
+    { "id": "1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b", "names": ["/vaultwarden"], "image": "vaultwarden/server", "state": "running", "status": "Up 3 days (healthy)", "updateInfo": { "hasUpdate": false } },
+    { "id": "2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c", "names": ["/old-app"], "image": "nginx", "state": "exited", "status": "Exited (137) 2 days ago" }
+  ],
+  "counts": { "runningContainers": 2, "stoppedContainers": 1, "totalContainers": 3 },
+  "pagination": { "totalPages": 1, "totalItems": 3, "currentPage": 1, "itemsPerPage": 1000 }
+}

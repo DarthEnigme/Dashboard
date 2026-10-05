@@ -1,0 +1,25 @@
+# e2e fixture: every integration points at scripts/mock-server.mjs
+title: Homelab
+description: End-to-end fixture
+theme: dark
+style: glass
+accent: "#8b5cf6"
+pingInterval: 5
+metricsInterval: 10
+refreshInterval: 10
+tabs: [Home, Network]
+alerts:
+  webhook: http://localhost:4010/webhook
+  threshold: 2
+auth:
+  providers:
+    - id: mock
+      type: oidc
+      name: Mock SSO
+      issuer: http://localhost:4010/oidc
+      clientId: page
+      clientSecret: mock-secret
+      signup: false
+finance:
+  currency: EUR
+  fireflyService: money.firefly

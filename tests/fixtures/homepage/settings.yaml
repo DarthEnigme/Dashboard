@@ -1,0 +1,17 @@
+title: My Homelab
+theme: dark
+color: emerald
+target: _self
+background:
+  image: https://images.example.com/wall.jpg
+  blur: sm
+  brightness: 50
+layout:
+  Infrastructure:
+    tab: Home
+    columns: 3
+  Media:
+    tab: Media
+    initiallyCollapsed: true
+quicklaunch:
+  searchDescriptions: true

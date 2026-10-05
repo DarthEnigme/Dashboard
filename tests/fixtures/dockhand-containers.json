@@ -1,0 +1,6 @@
+[
+  { "id": "a1b2c3d4e5f6", "name": "immich_server", "image": "ghcr.io/immich-app/immich-server:release", "state": "running", "status": "Up 2 hours (healthy)" },
+  { "id": "b2c3d4e5f6a1", "name": "immich_ml", "image": "ghcr.io/immich-app/immich-machine-learning:release", "state": "running", "status": "Up 2 hours (unhealthy)" },
+  { "id": "c3d4e5f6a1b2", "name": "jellyfin", "image": "jellyfin/jellyfin", "state": "running", "status": "Up 5 days" },
+  { "id": "d4e5f6a1b2c3", "name": "backup", "image": "restic/restic", "state": "exited", "status": "Exited (0) 3 hours ago" }
+]

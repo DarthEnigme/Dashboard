@@ -1,0 +1,5 @@
+{
+  "queries": { "total": 12345, "blocked": 1901, "percent_blocked": 15.4, "unique_domains": 2000 },
+  "clients": { "active": 9, "total": 14 },
+  "gravity": { "domains_being_blocked": 150000 }
+}

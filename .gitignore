@@ -1,0 +1,11 @@
+node_modules
+.next
+next-env.d.ts
+*.tsbuildinfo
+/config/*.yaml
+/data
+!/config/.gitkeep
+test-results
+playwright-report
+/tests/e2e/.data
+/tests/e2e/.config

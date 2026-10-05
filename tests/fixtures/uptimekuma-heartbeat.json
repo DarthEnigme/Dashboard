@@ -1,0 +1,12 @@
+{
+  "heartbeatList": {
+    "1": [{ "status": 0 }, { "status": 1 }],
+    "2": [{ "status": 1 }, { "status": 0 }],
+    "3": [{ "status": 1 }]
+  },
+  "uptimeList": {
+    "1_24": 0.99,
+    "2_24": 0.92,
+    "3_24": 1
+  }
+}

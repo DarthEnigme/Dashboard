@@ -1,0 +1,7 @@
+{
+  "utilization": { "cpu": { "user_load": 12, "system_load": 5, "other_load": 3 }, "memory": { "real_usage": 81 } },
+  "volumes": [
+    { "vol_path": "/volume1", "status": "normal", "size": { "total": "4000000000000", "used": "3000000000000" } },
+    { "vol_path": "/volume2", "status": "degraded", "size": { "total": "1000000000000", "used": "100000000000" } }
+  ]
+}

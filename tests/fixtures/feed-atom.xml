@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Release notes</title>
+<entry><title type="html">v2.0 released</title><link rel="alternate" href="https://example.com/v2"/><link rel="self" href="https://example.com/v2.atom"/><updated>2026-10-03T08:00:00Z</updated></entry>
+</feed>

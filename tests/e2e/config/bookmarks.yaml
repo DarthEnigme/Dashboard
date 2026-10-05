@@ -1,0 +1,14 @@
+- name: Developer
+  links:
+    - name: GitHub
+      href: https://github.com
+      icon: github
+    - name: MDN
+      href: https://developer.mozilla.org
+      icon: si-mdnwebdocs
+- name: Network docs
+  tab: Network
+  links:
+    - name: Pi-hole docs
+      href: https://docs.pi-hole.net
+      icon: pi-hole

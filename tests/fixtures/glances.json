@@ -1,0 +1,17 @@
+{
+  "quicklook": { "cpu": 23.4, "mem": 61.2, "swap": 3.1, "load": 12.5, "cpu_name": "AMD Ryzen 7 5700G" },
+  "mem": { "total": 33554432000, "used": 20535312384, "percent": 61.2 },
+  "fs": [
+    { "device_name": "/dev/nvme0n1p2", "fs_type": "ext4", "mnt_point": "/", "size": 500000000000, "used": 210000000000, "free": 290000000000, "percent": 42.0 },
+    { "device_name": "tank", "fs_type": "zfs", "mnt_point": "/mnt/tank", "size": 8000000000000, "used": 7400000000000, "free": 600000000000, "percent": 92.5 },
+    { "device_name": "tmpfs", "fs_type": "tmpfs", "mnt_point": "/run", "size": 3355443200, "used": 1000000, "free": 3354443200, "percent": 0.0 }
+  ],
+  "sensors": [
+    { "label": "Composite", "value": 41, "unit": "C", "type": "temperature_core" },
+    { "label": "Tctl", "value": 78.4, "unit": "C", "type": "temperature_core" },
+    { "label": "fan1", "value": 1200, "unit": "R", "type": "fan_speed" }
+  ],
+  "uptime": "12 days, 3:04:05",
+  "load": { "min1": 1.2, "min5": 0.98, "min15": 0.75, "cpucore": 16 },
+  "cpuHistory": { "total": [["2026-10-04T08:00:00", 12.0], ["2026-10-04T08:00:02", 18.5], ["2026-10-04T08:00:04", 23.4]] }
+}

@@ -1,0 +1,10 @@
+{
+  "status": "success",
+  "data": {
+    "alerts": [
+      { "labels": { "alertname": "DiskFull", "instance": "nas" }, "annotations": { "summary": "Disk almost full" }, "state": "Alerting", "activeAt": "2026-10-04T06:00:00Z", "value": "93" },
+      { "labels": { "alertname": "HighLoad" }, "annotations": {}, "state": "Pending", "activeAt": "2026-10-04T07:58:00Z", "value": "5.1" },
+      { "labels": { "alertname": "Watchdog" }, "annotations": {}, "state": "Normal", "value": "" }
+    ]
+  }
+}

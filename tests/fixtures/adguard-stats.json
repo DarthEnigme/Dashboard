@@ -1,0 +1,7 @@
+{
+  "num_dns_queries": 10000,
+  "num_blocked_filtering": 2000,
+  "num_replaced_safebrowsing": 60,
+  "num_replaced_parental": 40,
+  "avg_processing_time": 0.0125
+}

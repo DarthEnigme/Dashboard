@@ -1,0 +1,131 @@
+# demo services
+- name: Infra
+  services:
+    - name: Proxmox
+      href: http://localhost:4010/pve
+      size: large
+      widget: { type: proxmox, url: http://localhost:4010/pve, username: "api@pam!page", password: secret }
+    - name: Portainer
+      widget: { type: portainer, url: http://localhost:4010/portainer, key: ptr_key }
+      ping: { type: tcp, host: localhost, port: 4010 }
+    - name: Kuma
+      size: wide
+      widget: { type: uptimekuma, url: http://localhost:4010/kuma, slug: home }
+      ping: { type: http, url: "http://localhost:4010/custom/stats", jsonPath: data.users }
+    - name: Flaky
+      href: http://localhost:4010/flaky
+      ping: true
+      size: tall
+    - name: Custom
+      widget:
+        type: customapi
+        url: http://localhost:4010/custom/stats
+        record: true
+        thresholds: { Load: { above: 30 } }
+        mappings:
+          - { label: Users, field: data.users, format: number }
+          - { label: Storage, field: data.storage.used, format: bytes }
+          - { label: Load, field: data.load, format: percent }
+    - name: PBS
+      widget: { type: pbs, url: http://localhost:4010/pbs, username: "page@pbs!dash", password: pbs-secret }
+- name: DNS
+  tab: Network
+  services:
+    - name: Pi-hole
+      widget: { type: pihole, url: http://localhost:4010/pihole, key: pihole-pw }
+    - name: AdGuard
+      widget: { type: adguard, url: http://localhost:4010/adguard, username: admin, password: adg }
+    - name: UniFi
+      widget: { type: unifi, url: http://localhost:4010/unifi, username: page, password: unifi-pw }
+- name: Money
+  visible: users
+  services:
+    - name: Firefly
+      widget: { type: firefly, url: http://localhost:4010/firefly, token: ff-token }
+    - name: Ghostfolio
+      widget: { type: ghostfolio, url: http://localhost:4010/ghostfolio, token: gf-token, currency: USD }
+
+- name: Home
+  services:
+    - name: Home Assistant
+      size: wide
+      widget: { type: homeassistant, url: http://localhost:4010/ha, token: ha-token, entities: [sensor.living_room_temperature, binary_sensor.front_door, sensor.garage] }
+    - name: TrueNAS
+      widget: { type: truenas, url: http://localhost:4010/truenas, key: tn-key }
+    - name: Synology
+      widget: { type: synology, url: http://localhost:4010/syno, username: page, password: syno-pw }
+    - name: Calendar
+      size: tall
+      icon: mdi-calendar
+      widget: { type: calendar, sources: [{ type: ical, url: "http://localhost:4010/calendar.ics" }] }
+    - name: News
+      size: wide
+      icon: mdi-rss
+      widget: { type: rss, urls: ["http://localhost:4010/feed.xml"] }
+    - name: Budget
+      size: large
+      icon: mdi-wallet
+      widget: { type: finance, period: month }
+
+- name: Monitoring
+  tab: Monitoring
+  services:
+    - name: Prometheus
+      size: large
+      icon: prometheus
+      widget:
+        type: prometheus
+        url: http://localhost:4010/prom
+        targets: true
+        queries:
+          - { label: CPU, query: 'avg(cpu)', format: percent, warn: 40, error: 90, chart: true }
+          - { label: Memory, query: 'mem_ratio', format: ratio, chart: true }
+          - { label: Pods, query: 'count(pods)' }
+    - name: Grafana
+      size: large
+      icon: grafana
+      widget: { type: grafana, url: http://localhost:4010/grafana, token: glsa_token }
+    - name: Glances
+      size: large
+      icon: glances
+      widget: { type: glances, url: http://localhost:4010/glances }
+    - name: Netdata
+      size: wide
+      icon: netdata
+      widget: { type: netdata, url: http://localhost:4010/netdata }
+    - name: Beszel
+      widget:
+        type: metric
+        url: http://localhost:4010/metric/stats
+        metrics:
+          - { label: Load, path: 'data.load[0]', decimals: 2, warn: 2 }
+          - { label: Uptime, path: data.uptime, format: duration }
+          - { label: Temp, path: 'data.temps[4]', suffix: "°C", chart: data.temps }
+    - name: Dockhand
+      size: large
+      icon: docker
+      widget: { type: dockhand, url: http://localhost:4010/dockhand, token: dh_token, env: 1 }
+    - name: Arcane
+      size: large
+      icon: docker
+      widget: { type: arcane, url: http://localhost:4010/arcane, key: arc_key }
+- name: Apps
+  tab: Apps
+  services:
+    - name: Jellyfin
+      widget: { type: jellyfin, url: http://localhost:4010/jellyfin, key: jf-key }
+    - name: Sonarr
+      widget: { type: arr, app: sonarr, url: http://localhost:4010/sonarr, key: sonarr-key }
+    - name: qBittorrent
+      widget: { type: qbittorrent, url: http://localhost:4010/qbt, username: admin, password: qbt-pw }
+    - name: Immich
+      widget: { type: immich, url: http://localhost:4010/immich, key: immich-key }
+    - name: Traefik
+      widget: { type: traefik, url: http://localhost:4010/traefik }
+    - name: Proxy Manager
+      size: large
+      widget: { type: npm, url: http://localhost:4010/npm, username: admin@example.com, password: npm-pw }
+    - name: Tailscale
+      widget: { type: tailscale, url: http://localhost:4010/tailscale, key: ts-key }
+    - name: Disks
+      widget: { type: scrutiny, url: http://localhost:4010/scrutiny }

@@ -1,0 +1,11 @@
+{
+  "pools": [
+    { "name": "tank", "status": "ONLINE", "healthy": true, "size": 8000000000000, "allocated": 6000000000000 },
+    { "name": "fast", "status": "DEGRADED", "healthy": false, "size": 1000000000000, "allocated": 200000000000 }
+  ],
+  "alerts": [
+    { "level": "WARNING", "dismissed": false },
+    { "level": "CRITICAL", "dismissed": true },
+    { "level": "INFO", "dismissed": false }
+  ]
+}

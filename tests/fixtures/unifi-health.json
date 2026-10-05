@@ -1,0 +1,9 @@
+{
+  "meta": { "rc": "ok" },
+  "data": [
+    { "subsystem": "wlan", "status": "ok", "num_user": 24, "num_adopted": 3, "num_disconnected": 1 },
+    { "subsystem": "wan", "status": "ok", "wan_ip": "203.0.113.4", "num_adopted": 1 },
+    { "subsystem": "www", "status": "ok", "latency": 14 },
+    { "subsystem": "lan", "status": "ok", "num_user": 7, "num_adopted": 2, "num_disconnected": 0 }
+  ]
+}

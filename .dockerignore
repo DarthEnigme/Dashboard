@@ -1,0 +1,8 @@
+node_modules
+.next
+config
+data
+scripts
+!scripts/updater.mjs
+.git
+tests

@@ -1,0 +1,67 @@
+---
+# Sample gethomepage.dev config
+- Infrastructure:
+    - Proxmox:
+        icon: proxmox.png
+        href: https://pve.lan:8006
+        description: Hypervisor
+        siteMonitor: https://pve.lan:8006
+        widget:
+          type: proxmox
+          url: https://pve.lan:8006
+          username: api@pam!homepage
+          password: "{{HOMEPAGE_VAR_PROXMOX_SECRET}}"
+          node: pve
+    - Pi-hole:
+        icon: pi-hole.svg
+        href: http://pihole.lan/admin
+        ping: pihole.lan
+        widget:
+          type: pihole
+          url: http://pihole.lan
+          version: 6
+          key: "{{HOMEPAGE_VAR_PIHOLE}}"
+    - Network:
+        - UniFi:
+            icon: sh-unifi
+            href: https://unifi.lan
+            widget:
+              type: unifi
+              url: https://unifi.lan
+              key: abc123
+- Media:
+    - Jellyfin:
+        icon: jellyfin.png
+        href: http://jellyfin.lan:8096
+        server: nas
+        container: jellyfin
+    - Sonarr:
+        icon: sonarr.png
+        href: http://sonarr.lan:8989
+        widget:
+          type: sonarr
+          url: http://sonarr.lan:8989
+          key: sonarr-key
+    - Calendar:
+        widget:
+          type: calendar
+          integrations:
+            - type: sonarr
+              service_group: Media
+              service_name: Sonarr
+            - type: ical
+              url: https://example.com/family.ics
+              name: Family
+    - Stats:
+        widget:
+          type: customapi
+          url: http://stats.lan/api
+          headers:
+            X-Token: "{{HOMEPAGE_VAR_STATS}}"
+          mappings:
+            - field: { data: { users: count } }
+              label: Users
+              format: number
+            - field: uptime
+              label: Up since
+              format: relativeDate

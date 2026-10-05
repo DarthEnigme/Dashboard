@@ -1,0 +1,30 @@
+services:
+  page:
+    build: .
+    # Or use the image built by CI once the repo is on GitHub:
+    # image: ghcr.io/<your-github-user>/page:latest
+    container_name: page
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data           # status history (SQLite)
+      # Optional: enables the "docker" integration for containers on this host.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Optional: disks to show in the "resources" widget (list them as /mnt/host/... in widgets.yaml).
+      # - /:/mnt/host/root:ro
+    # The container runs as the unprivileged "node" user (uid 1000). To read the Docker
+    # socket it needs the socket's group: find it with `stat -c %g /var/run/docker.sock`.
+    group_add:
+      - "${DOCKER_GID:-0}"
+    environment:
+      # Optional: creates an "admin" account on first start. Without it, open the page and use
+      # "Set up" to create the first admin. More users and SSO are managed in the editor.
+      HOMEPAGE_ADMIN_PASSWORD: ${HOMEPAGE_ADMIN_PASSWORD:-}
+      # Optional: session signing key (otherwise one is generated into ./data/secret.key).
+      # HOMEPAGE_SECRET: change-me-to-a-long-random-string
+      # Secrets referenced from services.yaml as {{HOMEPAGE_VAR_...}}
+      # HOMEPAGE_VAR_PROXMOX_SECRET: xxxxxxxx-xxxx
+      # HOMEPAGE_VAR_PORTAINER_KEY: ptr_xxx
+      # HOMEPAGE_VAR_DISCORD_WEBHOOK: https://discord.com/api/webhooks/...

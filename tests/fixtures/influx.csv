@@ -1,0 +1,8 @@
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,double,string,string
+#group,false,false,true,true,false,false,true,true
+#default,_result,,,,,,,
+,result,table,_start,_stop,_time,_value,_field,_measurement
+,,0,2026-10-04T07:00:00Z,2026-10-04T08:00:00Z,2026-10-04T07:20:00Z,410.5,watts,power
+,,0,2026-10-04T07:00:00Z,2026-10-04T08:00:00Z,2026-10-04T07:40:00Z,388,watts,power
+,,0,2026-10-04T07:00:00Z,2026-10-04T08:00:00Z,2026-10-04T08:00:00Z,452.25,watts,power
+

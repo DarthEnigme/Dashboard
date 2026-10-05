@@ -1,0 +1,104 @@
+{
+  "data": [
+    {
+      "type": "node",
+      "node": "pve1",
+      "status": "online",
+      "cpu": 0.1,
+      "maxcpu": 8,
+      "mem": 8589934592,
+      "maxmem": 17179869184,
+      "uptime": 266400,
+      "disk": 21474836480,
+      "maxdisk": 107374182400
+    },
+    {
+      "type": "node",
+      "node": "pve2",
+      "status": "online",
+      "cpu": 0.5,
+      "maxcpu": 8,
+      "mem": 8589934592,
+      "maxmem": 17179869184,
+      "uptime": 266400,
+      "disk": 21474836480,
+      "maxdisk": 107374182400
+    },
+    {
+      "type": "qemu",
+      "node": "pve1",
+      "status": "running",
+      "template": 0,
+      "name": "home-assistant",
+      "vmid": 102
+    },
+    {
+      "type": "qemu",
+      "node": "pve1",
+      "status": "stopped",
+      "template": 0,
+      "name": "win11",
+      "vmid": 103
+    },
+    {
+      "type": "qemu",
+      "node": "pve2",
+      "status": "running",
+      "name": "truenas",
+      "vmid": 104
+    },
+    {
+      "type": "qemu",
+      "node": "pve1",
+      "status": "stopped",
+      "template": 1,
+      "name": "template-debian",
+      "vmid": 105
+    },
+    {
+      "type": "lxc",
+      "node": "pve1",
+      "status": "running",
+      "name": "pihole",
+      "vmid": 106
+    },
+    {
+      "type": "lxc",
+      "node": "pve1",
+      "status": "stopped",
+      "name": "jellyfin",
+      "vmid": 107
+    },
+    {
+      "type": "storage",
+      "node": "pve1",
+      "status": "available",
+      "storage": "local",
+      "content": "backup,iso,vztmpl",
+      "shared": 0,
+      "disk": 322122547200,
+      "maxdisk": 1073741824000,
+      "plugintype": "dir"
+    },
+    {
+      "type": "storage",
+      "node": "pve1",
+      "status": "available",
+      "storage": "nas-backup",
+      "content": "backup",
+      "shared": 1,
+      "disk": 2199023255552,
+      "maxdisk": 4398046511104
+    },
+    {
+      "type": "storage",
+      "node": "pve2",
+      "status": "available",
+      "storage": "nas-backup",
+      "content": "backup",
+      "shared": 1,
+      "disk": 2199023255552,
+      "maxdisk": 4398046511104
+    }
+  ]
+}

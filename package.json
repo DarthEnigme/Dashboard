@@ -1,0 +1,54 @@
+{
+  "name": "page",
+  "version": "0.3.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "mock": "node scripts/mock-server.mjs",
+    "e2e": "playwright test",
+    "e2e:visual": "playwright test visual",
+    "import:homepage": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/import-homepage.mjs"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "diff": "^8.0.4",
+    "dockerode": "^4.0.7",
+    "fast-xml-parser": "^5.11.2",
+    "framer-motion": "^12.23.0",
+    "jose": "^6.2.12",
+    "ldapts": "^8.2.0",
+    "lucide-react": "^0.540.0",
+    "net-snmp": "^3.29.1",
+    "next": "^15.5.0",
+    "node-ical": "^0.20.1",
+    "openid-client": "^6.8.8",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "swr": "^2.3.6",
+    "systeminformation": "^5.33.15",
+    "undici": "^7.15.0",
+    "yaml": "^2.8.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/postcss": "^4.1.12",
+    "@types/dockerode": "^3.3.43",
+    "@types/net-snmp": "^3.23.0",
+    "@types/node": "^22.17.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "tailwindcss": "^4.1.12",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
