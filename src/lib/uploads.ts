@@ -4,7 +4,7 @@ import path from "node:path";
 import { DATA_DIR } from "./db";
 
 /** Images people upload (wallpapers, profile pictures), kept in data/uploads/<kind>/. */
-export const UPLOAD_KINDS = { backgrounds: 15 * 1024 * 1024, avatars: 2 * 1024 * 1024 } as const;
+export const UPLOAD_KINDS = { backgrounds: 15 * 1024 * 1024, avatars: 2 * 1024 * 1024, logos: 2 * 1024 * 1024 } as const;
 export type UploadKind = keyof typeof UPLOAD_KINDS;
 
 export const isUploadKind = (k: string): k is UploadKind => Object.hasOwn(UPLOAD_KINDS, k);

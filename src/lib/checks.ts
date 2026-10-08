@@ -1,3 +1,4 @@
+import dgram from "node:dgram";
 import net from "node:net";
 import tls from "node:tls";
 import dns from "node:dns";
@@ -5,6 +6,7 @@ import { spawn } from "node:child_process";
 import { http } from "./http";
 import { cached } from "./cache";
 import { snmpGet } from "./snmp";
+import { mcStatus } from "./minecraft";
 import type { CheckSpec, Service } from "./config/schema";
 
 export interface CertInfo {
@@ -48,6 +50,10 @@ export function describeCheck(c: CheckSpec): string {
       return c.url ?? "";
     case "tcp":
       return `tcp ${c.host}:${c.port}`;
+    case "udp":
+      return `udp ${c.host}:${c.port}`;
+    case "minecraft":
+      return `minecraft ${c.edition} ${c.host}${c.port ? `:${c.port}` : ""}`;
     case "icmp":
       return `icmp ${c.host}`;
     case "dns":
@@ -169,6 +175,48 @@ function checkTcp(c: Extract<CheckSpec, { type: "tcp" }>): Promise<PingResult> {
   });
 }
 
+/** "0x0102ff" as bytes, anything else as UTF-8 text; empty: one zero byte. */
+export function udpPayload(p: string | undefined): Buffer {
+  if (!p) return Buffer.from([0]);
+  if (/^0x([0-9a-f]{2})+$/i.test(p)) return Buffer.from(p.slice(2), "hex");
+  return Buffer.from(p, "utf8");
+}
+
+/**
+ * UDP has no handshake: a service is up when it answers. Many only answer their own protocol
+ * (set `payload`); a closed port usually comes back as "ECONNREFUSED" (ICMP port unreachable).
+ */
+function checkUdp(c: Extract<CheckSpec, { type: "udp" }>): Promise<PingResult> {
+  const start = performance.now();
+  const at = Date.now();
+  return new Promise((resolve) => {
+    const socket = dgram.createSocket(net.isIPv6(c.host) ? "udp6" : "udp4");
+    const finish = (r: PingResult) => {
+      clearTimeout(timer);
+      socket.close();
+      resolve(r);
+    };
+    const timer = setTimeout(() => finish({ up: false, error: "no reply", at }), 5000);
+    socket.on("message", (msg) => {
+      if (c.expect && !msg.toString("latin1").includes(c.expect)) return finish({ up: false, error: "reply without the expected text", at });
+      finish({ up: true, latencyMs: Math.max(1, Math.round(performance.now() - start)), at });
+    });
+    socket.on("error", (e) => finish({ up: false, error: errCode(e), at }));
+    // connect() so the OS reports "port unreachable" back to us as ECONNREFUSED.
+    socket.connect(c.port, c.host, () => socket.send(udpPayload(c.payload)));
+  });
+}
+
+async function checkMinecraft(c: Extract<CheckSpec, { type: "minecraft" }>): Promise<PingResult> {
+  const at = Date.now();
+  try {
+    const s = await mcStatus(c.edition, c.host, c.port);
+    return { up: true, latencyMs: Math.max(1, s.latencyMs), at };
+  } catch (e) {
+    return { up: false, error: errCode(e), at };
+  }
+}
+
 /** Round-trip time from ping's output ("time=12.3 ms", "time<1ms", "Zeit=4ms"). */
 export function parsePingTime(out: string): number | undefined {
   const m = out.match(/(?:time|zeit|temps|tiempo)[=<]\s*([\d.,]+)\s*ms/i);
@@ -236,6 +284,10 @@ export function runCheck(c: CheckSpec): Promise<PingResult> {
       return checkHttp(c);
     case "tcp":
       return checkTcp(c);
+    case "udp":
+      return checkUdp(c);
+    case "minecraft":
+      return checkMinecraft(c);
     case "icmp":
       return checkIcmp(c);
     case "dns":

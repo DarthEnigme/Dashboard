@@ -1,0 +1,6 @@
+[
+  { "id": "4d1e", "name": "Phone", "enabled": true, "address": "10.8.0.2", "publicKey": "a=", "createdAt": "2026-01-02T10:00:00.000Z", "latestHandshakeAt": "__RECENT__", "transferRx": 52428800, "transferTx": 314572800, "endpoint": "203.0.113.7:51820" },
+  { "id": "7b2a", "name": "Laptop", "enabled": true, "address": "10.8.0.3", "publicKey": "b=", "createdAt": "2026-01-02T10:00:00.000Z", "latestHandshakeAt": "2026-10-08T07:00:00.000Z", "transferRx": 1048576, "transferTx": 2097152 },
+  { "id": "9c3f", "name": "Old tablet", "enabled": false, "address": "10.8.0.4", "publicKey": "c=", "createdAt": "2026-01-02T10:00:00.000Z", "latestHandshakeAt": null, "transferRx": null, "transferTx": null },
+  { "id": "1e5d", "name": "NAS", "enabled": true, "ipv4Address": "10.8.0.5", "publicKey": "d=", "createdAt": "2026-01-02T10:00:00.000Z", "latestHandshakeAt": null, "transferRx": 0, "transferTx": 0 }
+]

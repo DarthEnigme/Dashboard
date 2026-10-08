@@ -96,6 +96,7 @@ title: Homelab
 description: Optional subtitle
 theme: dark            # dark | light | system | oled (pure black) | sepia (warm paper)
 style: glass           # glass | liquid | aero | neon | brutal | soft | retro | minimal | solid
+logo: /api/uploads/logos/…png   # optional: next to the title, on the sign-in page, and the app icon
 accent: "#8b5cf6"      # or "auto" to take it from the wallpaper
 glow: subtle           # none | subtle | strong: edge light and accent glow on hovered cards
 background:
@@ -294,6 +295,9 @@ When no icon is set or it fails to load, the tile shows the service's initials.
 | `scrutiny` | `url` | Disks, failing disks, hottest disk; every disk on large tiles |
 | `gotify` | `url`, `key` (client token) | Apps, clients, recent messages |
 | `ntfy` | `url` | Messages sent and rate (from `/v1/stats`) |
+| `wireguard` | `url` (wg-easy), `password`, `username` (wg-easy 15+; empty for 14), `onlineMinutes` (default 3) | Connected peers (handshake within the last few minutes), enabled/total, traffic; each peer with when it was last seen |
+| `pelican` | `url` (panel), `key` (client API key, `ptlc_…`) | Game servers running/offline, CPU and memory; each server's state. Start, stop, restart and kill buttons (also works with Pterodactyl) |
+| `minecraft` | `host`, `edition` (`java`/`bedrock`), `port` | Players online/max, version, ping, the MOTD and who is online (Java). Talks the game's own status protocol: no plugin or query port needed |
 | `snmp` | `host`, `preset` (`system`, `interface`, `storage`, `printer`, `custom`), `interface`, `community`, `version` (`2c`/`1`), `oids` | Switches, routers, NAS, UPS and printers. system: uptime, CPU, name. interface: link state, in/out rate with sparklines, speed. storage: RAM and the fullest disk, every volume on large tiles. printer: supply levels. `oids` adds any value (`scale`, `rate: true` for counters, `format`, `warn`/`error`) |
 
 **Prometheus:** each query should return a single value (wrap it in `sum()`, `avg()` or `max()`). It also works with Thanos, Mimir and VictoriaMetrics.
@@ -421,10 +425,14 @@ Raw checks are kept 7 days; hourly summaries are kept `history.retentionDays` (d
 ping: { type: http, url: https://app/health, expect: [200], keyword: "OK" }      # status codes, text in the body
 ping: { type: http, jsonPath: "$.status", equals: ok }                            # a JSON value (url defaults to the link)
 ping: { type: tcp, host: 10.0.0.5, port: 22 }                                     # a port accepts connections
+ping: { type: udp, host: 10.0.0.5, port: 51820, payload: "0x00", expect: "" }      # something answers on a UDP port
+ping: { type: minecraft, host: mc.example.com, edition: java }                    # a Minecraft server answers its status ping (bedrock: UDP 19132)
 ping: { type: icmp, host: 10.0.0.1 }                                              # ping (needs ping permission in the container)
 ping: { type: dns, host: nas.home.arpa, server: 10.0.0.53, record: A, expect: 10.0.0.20 }
 ping: { type: snmp, host: 10.0.0.2, community: public, oid: 1.3.6.1.2.1.1.3.0 }   # any value back = up
 ```
+
+**UDP:** there is no handshake, so a UDP check sends `payload` (text, or bytes as `0x…` hex; default one zero byte) and is up when anything answers (and the answer contains `expect`, if set). A closed port usually reports `ECONNREFUSED`. Many services only answer their own protocol: WireGuard, for one, stays silent to strangers, so watch it through the `wireguard` widget or a TCP check on its web UI instead.
 
 **Certificates:** HTTPS checks also read the server's certificate (at most every 6 hours). When it gets within `alerts.certDays` days of expiry (default 14, `0` turns this off), the tile shows a `cert 9d` badge and the alert channels get one message a day.
 
@@ -489,6 +497,8 @@ Open the page in Chrome, Edge or Safari and choose **Install** / **Add to Home S
 
 Admins open `/settings` from the gear next to the search box, or from the account menu. The page has:
 - **Sections:** General, Appearance, Background, Layout, Refresh, Monitoring & alerts, Accounts & sign-in, Docker, Finance, and Backup & history. Each section has its own URL, e.g. `/settings#appearance`, and a search box finds any setting across all of them.
+- **Logo:** under General, upload an image or give a URL. It is shown next to the title and on the sign-in page, and becomes the browser and installed-app icon (PNG or JPEG for the icon; other formats keep the letter icon).
+- **Liquid Glass:** in Chrome and Edge, raised panes (search, menus, dialogs, the panel) and the hovered tile bend what is behind them at the rim, like the edge of a thick lens, with a faint colour fringe. Each pane gets a lens made for its own size and corner radius, so a small button and a wide card both bend the same few pixels at the edge and stay clear in the middle. Other browsers get the frosted version.
 - **Looks:** one click sets a card style, background, accent and glow that belong together, and sometimes the theme: Frutiger Aero, Liquid Glass, Synthwave, Nebula, Brutalist, Paper, Retro 98, Classic. Like everything else on the page, it's only kept once you save.
 - **Live preview:** theme, card style, accent colour and background change on screen as you edit. Nothing is written until you **Save**, and **Discard** puts everything back.
 - **Checks before saving:** values are validated as you type and problems are shown next to the field. Sections with unsaved changes or problems are marked in the sidebar.

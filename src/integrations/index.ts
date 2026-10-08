@@ -33,6 +33,9 @@ import { cloudflare } from "./cloudflare";
 import { authentik, gitea, immich, nextcloud, paperless, speedtest } from "./apps";
 import { arr, jellyfin, overseerr, plex, qbittorrent, sabnzbd, tautulli, transmission } from "./media";
 import { frigate, gotify, ntfy, scrutiny } from "./homelab";
+import { minecraft } from "./minecraft";
+import { pelican } from "./pelican";
+import { wireguard } from "./wireguard";
 
 // To add an integration: create a file exporting an Integration, register it here,
 // and describe its fields in ./fields.ts for the editor.
@@ -45,5 +48,6 @@ export const integrations: Record<string, Integration> = Object.fromEntries(
     immich, nextcloud, gitea, speedtest, paperless, authentik,
     jellyfin, plex, tautulli, arr, overseerr, qbittorrent, transmission, sabnzbd,
     frigate, scrutiny, gotify, ntfy,
+    wireguard, pelican, minecraft,
   ].map((i) => [i.type, i as Integration]),
 );

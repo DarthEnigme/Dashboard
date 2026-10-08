@@ -357,7 +357,8 @@ body {
 }
 /* Refraction is costly: only on raised surfaces and the tile under the pointer. */
 [data-style="liquid"][data-refract] :is(.glass-lens, .glass-interactive:hover, [role="dialog"].glass, [role="dialog"] .glass) {
-  backdrop-filter: url(#liquid-refract) var(--glass-filter);
+  /* --lens: a filter made for this pane's size and corners (components/liquidLens.ts). */
+  backdrop-filter: var(--lens, url(#liquid-refract)) var(--glass-filter);
 }
 [data-style="liquid"] .glass-interactive {
   transition:

@@ -1,0 +1,18 @@
+{
+  "servers": {
+    "object": "list",
+    "data": [
+      { "object": "server", "attributes": { "identifier": "1a7ce997", "uuid": "1a7ce997-259b-452e-8b4e-cecc464142ca", "name": "Survival", "node": "node-1", "is_suspended": false, "status": null } },
+      { "object": "server", "attributes": { "identifier": "5f2b8c10", "uuid": "5f2b8c10-1111-4222-8333-944455556666", "name": "Creative", "node": "node-1", "is_suspended": false, "status": null } },
+      { "object": "server", "attributes": { "identifier": "9d3e4f20", "uuid": "9d3e4f20-aaaa-4bbb-8ccc-dddeeeff0011", "name": "Valheim", "node": "node-2", "is_suspended": false, "status": "installing" } },
+      { "object": "server", "attributes": { "identifier": "c0ffee01", "uuid": "c0ffee01-0000-4000-8000-000000000001", "name": "Old world", "node": "node-2", "is_suspended": true, "status": null } }
+    ],
+    "meta": { "pagination": { "total": 4, "count": 4, "per_page": 100, "current_page": 1, "total_pages": 1 } }
+  },
+  "resources": {
+    "1a7ce997": { "object": "stats", "attributes": { "current_state": "running", "is_suspended": false, "resources": { "memory_bytes": 3221225472, "cpu_absolute": 42.7, "disk_bytes": 2147483648, "network_rx_bytes": 1000, "network_tx_bytes": 2000, "uptime": 7380000 } } },
+    "5f2b8c10": { "object": "stats", "attributes": { "current_state": "offline", "is_suspended": false, "resources": { "memory_bytes": 0, "cpu_absolute": 0, "disk_bytes": 1073741824, "uptime": 0 } } },
+    "9d3e4f20": { "object": "stats", "attributes": { "current_state": "offline", "is_suspended": false, "resources": { "memory_bytes": 0, "cpu_absolute": 0, "disk_bytes": 0, "uptime": 0 } } },
+    "c0ffee01": { "object": "stats", "attributes": { "current_state": "offline", "is_suspended": true, "resources": { "memory_bytes": 0, "cpu_absolute": 0, "disk_bytes": 0, "uptime": 0 } } }
+  }
+}

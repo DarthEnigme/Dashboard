@@ -129,3 +129,8 @@
       widget: { type: tailscale, url: http://localhost:4010/tailscale, key: ts-key }
     - name: Disks
       widget: { type: scrutiny, url: http://localhost:4010/scrutiny }
+    - name: Game servers
+      size: wide
+      widget: { type: pelican, url: http://localhost:4010/pelican, key: ptlc_key }
+    - name: VPN
+      widget: { type: wireguard, url: http://localhost:4010/wg, password: wg-pass }

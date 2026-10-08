@@ -6,6 +6,8 @@ import { Command, Pencil, Search, Settings, Wallet, X } from "lucide-react";
 
 interface Props {
   title: string;
+  /** settings.logo: shown before the title. */
+  logo?: string;
   description?: string;
   query: string;
   onQuery: (q: string) => void;
@@ -23,7 +25,7 @@ interface Props {
   account?: ReactNode;
 }
 
-export function Header({ title, description, query, onQuery, onSubmit, onEdit, showSettings, updateAvailable, showFinance, monitor, account }: Props) {
+export function Header({ title, logo, description, query, onQuery, onSubmit, onEdit, showSettings, updateAvailable, showFinance, monitor, account }: Props) {
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -42,11 +44,17 @@ export function Header({ title, description, query, onQuery, onSubmit, onEdit, s
 
   return (
     <header className="relative z-30 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0">
-        <h1 className="bg-gradient-to-r from-fg to-fg/60 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
-          {title}
-        </h1>
-        {description && <p className="mt-1 text-muted">{description}</p>}
+      <div className="flex min-w-0 items-center gap-4">
+        {logo && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logo} alt="" className="h-12 w-12 shrink-0 rounded-2xl object-contain sm:h-14 sm:w-14" />
+        )}
+        <div className="min-w-0">
+          <h1 className="bg-gradient-to-r from-fg to-fg/60 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
+            {title}
+          </h1>
+          {description && <p className="mt-1 text-muted">{description}</p>}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

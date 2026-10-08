@@ -94,6 +94,7 @@ export function Dashboard({ config, auth, tabs, version }: { config: ClientConfi
       {settings.liveReload && <LiveReload version={version} />}
       <Header
         title={settings.title}
+        logo={settings.logo}
         description={settings.description}
         query={query}
         onQuery={setQuery}

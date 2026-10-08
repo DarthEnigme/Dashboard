@@ -25,6 +25,14 @@ export const sections: Section[] = [
     fields: [
       { key: "title", label: "Title", required: true },
       { key: "description", label: "Subtitle" },
+      {
+        key: "logo",
+        label: "Logo",
+        kind: "image",
+        upload: "/api/uploads/logos",
+        placeholder: "https://… or upload a file",
+        help: "Next to the title, on the sign-in page, and as the browser and app icon (PNG or JPEG for the icon; square works best). Up to 2 MB.",
+      },
       { key: "target", label: "Open links in", kind: "select", options: ["_blank", "_self"], help: "_blank opens a new tab." },
       { key: "tabs", label: "Tab order", kind: "list", placeholder: "Home, Media, Infra", help: "Groups pick their tab in the group settings." },
     ],

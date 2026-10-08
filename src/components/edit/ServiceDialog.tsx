@@ -58,6 +58,23 @@ const checkFields: Record<string, { label: string; fields: FieldSpec[] }> = {
       { key: "port", label: "Port", kind: "number", required: true, placeholder: "22" },
     ],
   },
+  udp: {
+    label: "UDP port",
+    fields: [
+      { key: "host", label: "Host", required: true, placeholder: "10.0.0.5" },
+      { key: "port", label: "Port", kind: "number", required: true, placeholder: "51820" },
+      { key: "payload", label: "Send", placeholder: "0x00", help: "Text, or bytes as 0x… hex. Up when anything answers; many services only answer their own protocol." },
+      { key: "expect", label: "Reply must contain", placeholder: "optional" },
+    ],
+  },
+  minecraft: {
+    label: "Minecraft server",
+    fields: [
+      { key: "host", label: "Host", required: true, placeholder: "mc.example.com" },
+      { key: "edition", label: "Edition", kind: "select", options: ["java", "bedrock"], placeholder: "java" },
+      { key: "port", label: "Port", kind: "number", placeholder: "25565 (Java) / 19132 (Bedrock)" },
+    ],
+  },
   icmp: {
     label: "ICMP ping",
     fields: [{ key: "host", label: "Host", required: true, placeholder: "10.0.0.1", help: "Needs ping permission in the container; a TCP check works everywhere." }],

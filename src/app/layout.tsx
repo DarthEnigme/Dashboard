@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { loadConfig } from "@/lib/config/load";
 import { serverAccent, themeAttrs } from "@/lib/theme";
 import { buildInfo } from "@/lib/version";
+import { iconVersion } from "@/lib/logo";
 import { PwaRegister } from "@/components/PwaRegister";
 import { PointerLight } from "@/components/PointerLight";
 import { PaletteLauncher } from "@/components/palette/PaletteLauncher";
@@ -17,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: settings.title,
     description: settings.description,
     appleWebApp: { capable: true, title: settings.title, statusBarStyle: "black-translucent" },
-    icons: { icon: "/pwa-icon/192", apple: "/pwa-icon/180" },
+    icons: { icon: `/pwa-icon/192?v=${iconVersion(settings)}`, apple: `/pwa-icon/180?v=${iconVersion(settings)}` },
   };
 }
 

@@ -11,12 +11,13 @@ const providerIcon = (type: string) => (type === "google" ? "si-google" : type =
 
 interface Props {
   title: string;
+  logo?: string;
   methods: ClientAuth["methods"];
   error?: string;
   canGoBack: boolean;
 }
 
-export function LoginForm({ title, methods, error: initialError, canGoBack }: Props) {
+export function LoginForm({ title, logo, methods, error: initialError, canGoBack }: Props) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -52,6 +53,10 @@ export function LoginForm({ title, methods, error: initialError, canGoBack }: Pr
 
   return (
     <div className="glass w-full max-w-sm rounded-3xl p-7">
+      {logo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logo} alt="" className="mb-4 h-14 w-14 rounded-2xl object-contain" />
+      )}
       <h1 className="text-2xl font-bold tracking-tight">Sign in</h1>
       <p className="mb-6 text-sm text-muted">to {title}</p>
 

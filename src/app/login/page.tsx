@@ -17,7 +17,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <>
       <Background settings={settings} />
       <main className="grid min-h-dvh place-items-center px-4 py-10">
-        <LoginForm title={settings.title} methods={auth.methods} error={error} canGoBack={auth.publicView} />
+        <LoginForm title={settings.title} logo={settings.logo} methods={auth.methods} error={error} canGoBack={auth.publicView} />
       </main>
     </>
   );

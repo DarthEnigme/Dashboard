@@ -82,6 +82,8 @@ export const settingsSchema = z
   .object({
     title: z.string().default("Page"),
     description: z.string().optional(),
+    /** Image shown next to the title, on the sign-in page and as the app icon (URL or an upload). */
+    logo: z.string().optional(),
     theme: z.enum(themes).default("dark"),
     style: z.enum(stylePresets).default("glass"),
     accent: z.string().default("#8b5cf6"), // a colour, or "auto" to take it from the wallpaper
@@ -178,7 +180,7 @@ export const settingsSchema = z
 
 export const widgetSchema = z.object({ type: z.string().min(1) }).passthrough();
 
-export const checkTypes = ["http", "tcp", "icmp", "dns", "snmp"] as const;
+export const checkTypes = ["http", "tcp", "udp", "icmp", "dns", "snmp", "minecraft"] as const;
 
 /** `ping:` as an object: a typed status check (true / a URL stay the HTTP shorthand). */
 export const checkSchema = z.discriminatedUnion("type", [
@@ -198,7 +200,23 @@ export const checkSchema = z.discriminatedUnion("type", [
     insecure: z.boolean().default(true),
   }),
   z.object({ type: z.literal("tcp"), host: z.string().min(1), port: z.coerce.number().int().min(1).max(65535) }),
+  z.object({
+    type: z.literal("udp"),
+    host: z.string().min(1),
+    port: z.coerce.number().int().min(1).max(65535),
+    /** What to send: text, or bytes as hex ("0x…"). Default: one zero byte. Up = any reply. */
+    payload: z.string().optional(),
+    /** The reply must contain this text. */
+    expect: z.string().optional(),
+  }),
   z.object({ type: z.literal("icmp"), host: z.string().min(1) }),
+  z.object({
+    type: z.literal("minecraft"),
+    host: z.string().min(1),
+    /** Default 25565 (Java) or 19132 (Bedrock). */
+    port: z.coerce.number().int().min(1).max(65535).optional(),
+    edition: z.enum(["java", "bedrock"]).default("java"),
+  }),
   z.object({
     type: z.literal("dns"),
     /** Name to resolve. */

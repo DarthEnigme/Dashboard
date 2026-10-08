@@ -13,6 +13,11 @@ const PORT = Number(process.env.MOCK_PORT ?? 4010);
 const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "tests", "fixtures");
 const fixture = (name) => JSON.parse(fs.readFileSync(path.join(fixtures, name), "utf8"));
 const apps = fixture("apps.json");
+const pelicanData = fixture("pelican.json");
+const pelicanCalls = [];
+/** wg-easy clients, with "__RECENT__" handshakes set to a moment ago so they count as connected. */
+const wgClients = () =>
+  fixture("wgeasy-clients.json").map((c) => ({ ...c, latestHandshakeAt: c.latestHandshakeAt === "__RECENT__" ? new Date(Date.now() - 30_000).toISOString() : c.latestHandshakeAt }));
 
 const webhooks = [];
 const pveCalls = [];
@@ -302,6 +307,21 @@ const routes = {
   "GET /metric/stats": (_q, res) => json(res, 200, { data: { load: [0.82, 0.7], uptime: 864000, temps: [41, 43, 47, 44, 45] } }),
   "GET /dockhand/api/containers": (req, res) =>
     req.headers.authorization === "Bearer dh_token" ? json(res, 200, fixture("dockhand-containers.json")) : json(res, 401, { error: "Unauthorized" }),
+  // Pelican Panel client API (Bearer ptlc_key).
+  "GET /pelican/api/client": (req, res) =>
+    req.headers.authorization === "Bearer ptlc_key" ? json(res, 200, pelicanData.servers) : json(res, 401, { errors: [{ detail: "Unauthenticated." }] }),
+  "GET /pelican/_calls": (_q, res) => json(res, 200, pelicanCalls),
+  // wg-easy 14: password → session cookie → clients.
+  "POST /wg/api/session": async (req, res) => {
+    const body = JSON.parse((await readBody(req)) || "{}");
+    if (body.password !== "wg-pass") return json(res, 401, { error: "Incorrect Password" });
+    json(res, 200, { success: true }, { "Set-Cookie": "connect.sid=s%3Amock; Path=/; HttpOnly" });
+  },
+  "GET /wg/api/wireguard/client": (req, res) =>
+    /connect\.sid=s%3Amock/.test(req.headers.cookie ?? "") ? json(res, 200, wgClients()) : json(res, 401, { error: "Not Logged In" }),
+  // wg-easy 15: Basic auth.
+  "GET /wg15/api/client": (req, res) =>
+    req.headers.authorization === `Basic ${Buffer.from("admin:wg-pass").toString("base64")}` ? json(res, 200, wgClients()) : json(res, 401, { message: "Unauthorized" }),
   "GET /dockhand/api/stacks": (_q, res) => json(res, 200, [{ name: "immich" }, { name: "media" }]),
   "GET /arcane/api/environments/0/containers": (req, res) =>
     req.headers["x-api-key"] === "arc_key" ? json(res, 200, fixture("arcane-containers.json")) : json(res, 401, { success: false }),
@@ -401,6 +421,26 @@ const patterns = [
     "POST",
     /^\/dockhand\/api\/containers\/([a-f0-9]+)\/(start|stop|restart)$/,
     (req, res) => (req.headers.authorization === "Bearer dh_token" ? json(res, 200, { success: true }) : json(res, 401, { error: "Unauthorized" })),
+  ],
+  [
+    "GET",
+    /^\/pelican\/api\/client\/servers\/([0-9a-f]{8})\/resources$/,
+    (req, res, m) =>
+      req.headers.authorization !== "Bearer ptlc_key"
+        ? json(res, 401, { errors: [{ detail: "Unauthenticated." }] })
+        : pelicanData.resources[m[1]]
+          ? json(res, 200, pelicanData.resources[m[1]])
+          : json(res, 404, { errors: [{ detail: "Not found" }] }),
+  ],
+  [
+    "POST",
+    /^\/pelican\/api\/client\/servers\/([0-9a-f]{8})\/power$/,
+    async (req, res, m) => {
+      if (req.headers.authorization !== "Bearer ptlc_key") return json(res, 401, { errors: [{ detail: "Unauthenticated." }] });
+      pelicanCalls.push({ server: m[1], ...JSON.parse((await readBody(req)) || "{}") });
+      res.writeHead(204);
+      res.end();
+    },
   ],
   [
     "POST",

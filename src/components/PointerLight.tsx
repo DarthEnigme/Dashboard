@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { LensCache } from "./liquidLens";
 
+// Fallback for panes without their own lens yet (see liquidLens.ts).
 // Displacement map: neutral grey in the middle, pushing inward along each edge (red = x, green = y),
 // so the backdrop is magnified and bent at the rim of every pane like the edge of a lens.
 const map = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -35,9 +37,49 @@ const channels = [
  * in the settings applies without a reload.
  */
 export function PointerLight() {
+  const svg = useRef<SVGSVGElement>(null);
+
+  // Liquid style in Chromium: every raised pane (dialogs, menus, the search field…) gets a lens of its own size.
   useEffect(() => {
     const root = document.documentElement;
-    if (canRefract()) root.dataset.refract = "";
+    if (!canRefract() || !svg.current) return;
+    root.dataset.refract = "";
+    const lenses = new LensCache(svg.current);
+    (window as Window & { __pageLens?: LensCache }).__pageLens = lenses;
+    const RAISED = ".glass-lens, [role='dialog'].glass, [role='dialog'] .glass";
+    const sized = new ResizeObserver((entries) => {
+      if (root.dataset.style === "liquid") for (const e of entries) lenses.apply(e.target as HTMLElement);
+    });
+    const watched = new WeakSet<Element>();
+    let frame = 0;
+    const scan = () => {
+      frame = 0;
+      if (root.dataset.style !== "liquid") return;
+      for (const pane of document.querySelectorAll<HTMLElement>(RAISED)) {
+        lenses.apply(pane);
+        if (!watched.has(pane)) {
+          watched.add(pane);
+          sized.observe(pane);
+        }
+      }
+    };
+    const later = () => (frame ||= requestAnimationFrame(scan));
+    const mo = new MutationObserver(later);
+    mo.observe(document.body, { childList: true, subtree: true });
+    // A style picked in the settings preview applies without a reload.
+    const styleMo = new MutationObserver(later);
+    styleMo.observe(root, { attributes: true, attributeFilter: ["data-style"] });
+    later();
+    return () => {
+      mo.disconnect();
+      styleMo.disconnect();
+      sized.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     let frame = 0;
@@ -51,6 +93,10 @@ export function PointerLight() {
       }
       lit = el;
       if (lit) lit.dataset.lit = "";
+      // The hovered tile refracts too: give it a lens of its size.
+      if (lit && root.dataset.style === "liquid" && lit.classList.contains("glass-interactive")) {
+        (window as Window & { __pageLens?: LensCache }).__pageLens?.apply(lit);
+      }
     };
     const update = () => {
       frame = 0;
@@ -83,7 +129,7 @@ export function PointerLight() {
   }, []);
 
   return (
-    <svg aria-hidden width="0" height="0" style={{ position: "absolute", pointerEvents: "none" }}>
+    <svg ref={svg} aria-hidden width="0" height="0" style={{ position: "absolute", pointerEvents: "none" }}>
       <filter id="liquid-refract" x="0" y="0" width="1" height="1" primitiveUnits="objectBoundingBox" colorInterpolationFilters="sRGB">
         <feImage href={mapUrl} x="0" y="0" width="1" height="1" preserveAspectRatio="none" result="map" />
         {channels.map((c, i) => (

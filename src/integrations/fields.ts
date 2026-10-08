@@ -23,7 +23,7 @@ export interface FieldSpec {
 }
 
 /** Integration types that offer admin actions (start/stop…); kept in sync with the registry by a test. */
-export const ACTION_TYPES = new Set(["docker", "proxmox", "dockhand", "arcane"]);
+export const ACTION_TYPES = new Set(["docker", "proxmox", "dockhand", "arcane", "pelican"]);
 
 const promQueriesPlaceholder =
   '- label: CPU\n  query: 100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))\n  format: percent\n  warn: 75\n  error: 90\n  chart: true\n- label: Memory\n  query: sum(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)\n  format: bytes';
@@ -281,6 +281,32 @@ export const integrationFields: Record<string, { label: string; fields: FieldSpe
       { key: "token", label: "API token", secret: true, help: "Profile → API tokens (dh_…). Not needed when Dockhand authentication is off." },
       { key: "env", label: "Environment ID", kind: "number", placeholder: "1" },
       { key: "insecure", label: "Allow self-signed TLS", kind: "boolean" },
+    ],
+  },
+  pelican: {
+    label: "Pelican Panel",
+    fields: [
+      { key: "url", label: "Panel URL", placeholder: "https://panel.example.com", required: true },
+      { key: "key", label: "Client API key", secret: true, required: true, help: "Account → API Credentials (ptlc_… or pacc_…). Pterodactyl works too." },
+      { key: "insecure", label: "Allow self-signed TLS", kind: "boolean" },
+    ],
+  },
+  wireguard: {
+    label: "WireGuard (wg-easy)",
+    fields: [
+      { key: "url", label: "wg-easy URL", placeholder: "http://wg-easy:51821", required: true },
+      { key: "username", label: "Username", help: "wg-easy 15 and later. Leave empty for wg-easy 14 (password only)." },
+      { key: "password", label: "Password", secret: true, required: true },
+      { key: "onlineMinutes", label: "Connected = handshake within (minutes)", kind: "number", placeholder: "3" },
+      { key: "insecure", label: "Allow self-signed TLS", kind: "boolean" },
+    ],
+  },
+  minecraft: {
+    label: "Minecraft server",
+    fields: [
+      { key: "host", label: "Host", placeholder: "mc.example.com", required: true },
+      { key: "edition", label: "Edition", kind: "select", options: ["java", "bedrock"], placeholder: "java" },
+      { key: "port", label: "Port", kind: "number", placeholder: "25565 (Java) / 19132 (Bedrock)" },
     ],
   },
   arcane: {
