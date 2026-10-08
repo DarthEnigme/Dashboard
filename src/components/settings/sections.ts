@@ -142,6 +142,13 @@ export const sections: Section[] = [
       { key: "auth.publicView", label: "Anyone can view the dashboard without signing in", kind: "boolean", default: true },
       { key: "auth.local.enabled", label: "Allow username/password sign-in", kind: "boolean", default: true },
       { key: "auth.defaultRole", label: "Role for new accounts", kind: "select", options: ["user", "admin"] },
+      {
+        key: "auth.userPermissions",
+        label: "Every signed-in user may",
+        kind: "list",
+        placeholder: "finance",
+        help: "Comma-separated: finance (the finance tracker), actions (start/stop buttons). Empty field = finance. Groups below can add more.",
+      },
       { key: "auth.baseUrl", label: "Public URL (for SSO redirects)", placeholder: "https://home.example.com" },
       {
         key: "auth.providers",

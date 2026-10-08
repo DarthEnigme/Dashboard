@@ -58,15 +58,14 @@ export interface ClientConfig {
 const withoutSecrets = (o: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(o).filter(([k]) => !isSecretKey(k) && k !== "headers"));
 
-const RANK: Record<Visibility, number> = { public: 0, users: 1, admins: 2 };
-
-/** The most restrictive of several visibilities (a group's applies to everything in it). */
-export const strictest = (...v: (Visibility | undefined)[]): Visibility =>
-  v.reduce<Visibility>((a, b) => (RANK[b ?? "public"] > RANK[a] ? (b ?? "public") : a), "public");
-
-/** Effective visibility of a service: its group's and its own; personal finance data defaults to signed-in users. */
-export const serviceVisibility = (group: { visible?: Visibility }, s: { visible?: Visibility; widget?: { type: string } }) =>
-  strictest(group.visible, s.visible ?? (s.widget?.type === "finance" ? "users" : undefined));
+/**
+ * Who must be able to see a service: its group's audience and its own (both apply); personal finance
+ * data defaults to signed-in users.
+ */
+export const serviceVisibility = (group: { visible?: Visibility }, s: { visible?: Visibility; widget?: { type: string } }): Visibility[] => [
+  group.visible ?? "public",
+  s.visible ?? (s.widget?.type === "finance" ? "users" : "public"),
+];
 
 /**
  * What the browser is allowed to see: no widget config, ping targets, alert hooks, docker hosts
@@ -79,10 +78,10 @@ export function sanitize(cfg: LoadedConfig, canSee: (v: Visibility) => boolean =
   const { alerts, docker, auth, ...settings } = cfg.settings;
   return {
     settings,
-    bookmarks: cfg.bookmarks.filter((g) => canSee(strictest(g.visible))),
+    bookmarks: cfg.bookmarks.filter((g) => canSee(g.visible ?? "public")),
     widgets: cfg.widgets
       .map((w, index) => ({ ...withoutSecrets(w), index }) as ClientInfoWidget)
-      .filter((w) => canSee(strictest(w.visible as Visibility | undefined))),
+      .filter((w) => canSee((w.visible as Visibility | undefined) ?? "public")),
     // Config errors can mention file contents: admins only.
     errors: canSee("admins") ? cfg.errors : [],
     services: cfg.services
@@ -90,9 +89,9 @@ export function sanitize(cfg: LoadedConfig, canSee: (v: Visibility) => boolean =
         g,
         visible: g.services
           .map((s, si) => ({ s, id: ids[gi][si] }))
-          .filter(({ s }) => canSee(serviceVisibility(g, s))),
+          .filter(({ s }) => serviceVisibility(g, s).every(canSee)),
       }))
-      .filter(({ g, visible }) => canSee(strictest(g.visible)) && visible.length > 0)
+      .filter(({ g, visible }) => canSee(g.visible ?? "public") && visible.length > 0)
       .map(({ g, visible }) => ({
         name: g.name,
         icon: g.icon,

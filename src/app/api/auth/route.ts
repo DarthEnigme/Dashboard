@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { loadConfig } from "@/lib/config/load";
-import { clientAuth, ensureBootstrap, sameOrigin } from "@/lib/auth";
+import { clientAuth, ensureBootstrap, sameOrigin, viewer } from "@/lib/auth";
 import { ldapAuthenticate } from "@/lib/auth/ldap";
 import { resolveIdentity } from "@/lib/auth/identity";
 import { burnPasswordCheck, verifyPassword } from "@/lib/auth/password";
 import { clearFailures, clientIp, isLimited, recordFailure } from "@/lib/auth/ratelimit";
-import { cookieOptions, isHttps, SESSION_COOKIE, sessionToken } from "@/lib/auth/session";
+import { SESSION_COOKIE, signToken } from "@/lib/auth/session";
+import { revokeSession, startSession } from "@/lib/auth/sessions";
+import { syncSsoGroups } from "@/lib/auth/groups";
 import * as users from "@/lib/auth/users";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +21,7 @@ const fail = (error: string, status = 401) => NextResponse.json({ error }, { sta
 /** Username/password login: a local password first, then LDAP if enabled. */
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail("Cross-site request refused", 403);
-  const { username = "", password = "" } = ((await req.json().catch(() => ({}))) ?? {}) as { username?: string; password?: string };
+  const { username = "", password = "", remember = true } = ((await req.json().catch(() => ({}))) ?? {}) as { username?: string; password?: string; remember?: boolean };
   const name = username.trim();
   if (!name || !password) return fail("Enter a username and password", 400);
 
@@ -44,7 +46,10 @@ export async function POST(req: Request) {
           adminGroup: auth.ldap.adminGroup,
           trustUsername: true,
         });
-        if (r.ok) user = r.user;
+        if (r.ok) {
+          user = r.user;
+          syncSsoGroups(user.id, identity.groups);
+        }
         else error = r.error;
       }
     } catch (e) {
@@ -61,14 +66,22 @@ export async function POST(req: Request) {
   }
 
   clearFailures(limitKey);
-  users.audit(user.username, "login");
+  const method = local?.hasPassword ? "password" : "ldap";
+  // Second factor: a short-lived ticket proves the password step; /api/auth/2fa trades it for a session.
+  if (user.twoFactor) {
+    const ticket = await signToken({ kind: "2fa", method, remember: !!remember }, String(user.id), "5m");
+    return NextResponse.json({ twoFactor: true, ticket });
+  }
+  users.audit(user.username, "login", { method });
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, await sessionToken(user.id), cookieOptions(isHttps(req)));
+  await startSession(res, req, user.id, method, !!remember);
   return res;
 }
 
 export async function DELETE(req: Request) {
   if (!sameOrigin(req)) return fail("Cross-site request refused", 403);
+  const v = await viewer();
+  if (v.user && v.sessionId) revokeSession(v.sessionId, v.user.id);
   const res = NextResponse.json({ ok: true });
   res.cookies.delete(SESSION_COOKIE);
   return res;

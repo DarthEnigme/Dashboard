@@ -18,6 +18,7 @@ import {
   Search,
   Settings2,
   Wallet,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
@@ -117,7 +118,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             : details.run,
           alt: details,
         });
-        if (isAdmin && s.actions) {
+        if (auth?.user?.permissions.includes("actions") && s.actions) {
           items.push({
             id: `act:${s.id}`,
             title: `Actions for ${s.name}…`,
@@ -154,7 +155,14 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       for (const t of tabs) items.push({ id: `tab:${t.slug}`, title: t.name, subtitle: "Tab", group: "Go to", icon: LayoutGrid, run: () => go(`/${t.slug}`) });
     }
     if (pathname !== "/" || tabs.length < 2) items.push({ id: "page:/", title: "Dashboard", group: "Go to", icon: LayoutGrid, run: () => go("/") });
-    if (auth?.user) items.push({ id: "page:/finance", title: "Finance", group: "Go to", icon: Wallet, keywords: "money budget spending", run: () => go("/finance") });
+    if (onDashboard) {
+      items.push({ id: "panel:monitor", title: "Monitoring", subtitle: "Status of every checked service (m)", group: "Go to", icon: Activity, keywords: "status uptime down", run: () => {
+          onClose();
+          window.dispatchEvent(new Event("page:monitor"));
+        },
+      });
+    }
+    if (auth?.user?.permissions.includes("finance")) items.push({ id: "page:/finance", title: "Finance", group: "Go to", icon: Wallet, keywords: "money budget spending", run: () => go("/finance") });
     if (auth?.canEdit) {
       for (const sec of sections) {
         items.push({

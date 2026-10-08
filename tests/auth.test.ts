@@ -27,8 +27,8 @@ describe("sessions", () => {
 
   it("round-trips and rejects tampered or expired tokens", async () => {
     const { sessionToken, signToken, verifyToken } = await import("@/lib/auth/session");
-    const t = await sessionToken(42);
-    expect((await verifyToken(t))?.sub).toBe("42");
+    const t = await sessionToken(42, "sid-1");
+    expect(await verifyToken(t)).toMatchObject({ sub: "42", sid: "sid-1", kind: "session" });
     expect(await verifyToken(t.slice(0, -2) + "xx")).toBeNull();
     expect(await verifyToken(await signToken({}, "1", "-1s"))).toBeNull();
     expect(await verifyToken(undefined)).toBeNull();
@@ -50,6 +50,7 @@ function fakeRepo(seed: Partial<User & { identities: string[] }>[] = []) {
     hasPassword: false,
     createdAt: 0,
     avatar: null,
+    twoFactor: false,
   });
   for (const s of seed) {
     const u = make(s);

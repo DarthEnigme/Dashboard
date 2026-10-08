@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { KeyRound, Link2Off, Plus, ShieldCheck, UserX } from "lucide-react";
+import { Copy, KeyRound, Link, Link2Off, LogOut, Plus, ShieldCheck, ShieldOff, Users2, UserX } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import type { User } from "@/lib/auth/users";
 import type { FieldSpec } from "@/integrations/fields";
 import { FieldsDialog } from "./FieldsDialog";
 import { DeleteButton, IconButton } from "./controls";
+import { Dialog } from "./Dialog";
+import { Avatar } from "../auth/ProfileDialog";
+import type { Group } from "@/lib/auth/groups";
 
-type Row = User & { identities: { provider: string; subject: string }[] };
+type Row = User & { identities: { provider: string; subject: string }[]; groups: { name: string; source: string }[] };
 
 const newUserFields: FieldSpec[] = [
   { key: "username", label: "Username", required: true },
@@ -22,7 +25,9 @@ const passwordFields: FieldSpec[] = [{ key: "password", label: "New password (8+
 export function UsersPanel() {
   const [rows, setRows] = useState<Row[]>();
   const [error, setError] = useState<string>();
-  const [dialog, setDialog] = useState<{ kind: "new" } | { kind: "password"; user: Row }>();
+  const [dialog, setDialog] = useState<
+    { kind: "new" } | { kind: "password"; user: Row } | { kind: "groups"; user: Row } | { kind: "link"; user: Row; link: string; hours: number }
+  >();
 
   const load = useCallback(async () => {
     try {
@@ -36,8 +41,9 @@ export function UsersPanel() {
   const patch = async (id: number, body: Record<string, unknown>) => {
     setError(undefined);
     try {
-      await sendJson(`/api/users/${id}`, "PATCH", body);
+      const r = await sendJson<{ link?: string; linkHours?: number }>(`/api/users/${id}`, "PATCH", body);
       await load();
+      return r;
     } catch (e) {
       setError((e as Error).message);
     }
@@ -67,9 +73,7 @@ export function UsersPanel() {
       {!rows && !error && <div className="glass h-24 animate-pulse rounded-2xl" />}
       {rows?.map((u) => (
         <div key={u.id} className={`glass flex flex-wrap items-center gap-3 rounded-2xl p-3 ${u.disabled ? "opacity-60" : ""}`}>
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent to-accent/50 font-semibold text-white">
-            {(u.name || u.username)[0]?.toUpperCase()}
-          </span>
+          <Avatar user={u} size={40} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 font-medium">
               <span className="truncate">{u.name || u.username}</span>
@@ -79,12 +83,31 @@ export function UsersPanel() {
                 </span>
               )}
               {u.disabled && <span className="rounded-full bg-[var(--err)]/15 px-2 py-0.5 text-[11px] text-[var(--err)]">disabled</span>}
+              {u.twoFactor && (
+                <span className="flex items-center gap-1 rounded-full bg-[var(--ok)]/15 px-2 py-0.5 text-[11px] text-[var(--ok)]" title="Two-factor sign-in is on">
+                  <ShieldCheck className="h-3 w-3" /> 2FA
+                </span>
+              )}
             </div>
             <div className="truncate text-xs text-muted">
               {u.username}
               {u.email && ` · ${u.email}`}
               {u.hasPassword ? " · password" : ""}
             </div>
+            {u.groups.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {u.groups.map((g) => (
+                  <span
+                    key={g.name}
+                    className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] text-accent"
+                    title={g.source === "sso" ? "From the groups the sign-in reported" : "Added by an admin"}
+                  >
+                    {g.name}
+                    {g.source === "sso" && " · sso"}
+                  </span>
+                ))}
+              </div>
+            )}
             {u.identities.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {u.identities.map((i) => (
@@ -110,8 +133,28 @@ export function UsersPanel() {
             >
               {u.role === "admin" ? "Make user" : "Make admin"}
             </button>
+            <IconButton label="Groups" onClick={() => setDialog({ kind: "groups", user: u })}>
+              <Users2 className="h-3.5 w-3.5" />
+            </IconButton>
             <IconButton label="Set password" onClick={() => setDialog({ kind: "password", user: u })}>
               <KeyRound className="h-3.5 w-3.5" />
+            </IconButton>
+            <IconButton
+              label="Link to set a password"
+              onClick={async () => {
+                const r = await patch(u.id, { resetLink: true });
+                if (r?.link) setDialog({ kind: "link", user: u, link: r.link, hours: r.linkHours ?? 48 });
+              }}
+            >
+              <Link className="h-3.5 w-3.5" />
+            </IconButton>
+            {u.twoFactor && (
+              <IconButton label="Turn off two-factor sign-in (lost phone)" onClick={() => patch(u.id, { resetTwoFactor: true })}>
+                <ShieldOff className="h-3.5 w-3.5" />
+              </IconButton>
+            )}
+            <IconButton label="Sign out everywhere" onClick={() => patch(u.id, { signOut: true })}>
+              <LogOut className="h-3.5 w-3.5" />
             </IconButton>
             <IconButton label={u.disabled ? "Enable account" : "Disable account"} onClick={() => patch(u.id, { disabled: !u.disabled })}>
               <UserX className="h-3.5 w-3.5" />
@@ -145,6 +188,91 @@ export function UsersPanel() {
           }}
         />
       )}
+      {dialog?.kind === "groups" && (
+        <GroupsDialog
+          user={dialog.user}
+          onClose={() => setDialog(undefined)}
+          onSave={async (groups) => {
+            await sendJson(`/api/users/${dialog.user.id}`, "PATCH", { groups });
+            await load();
+          }}
+        />
+      )}
+      {dialog?.kind === "link" && (
+        <Dialog title={`Password link for ${dialog.user.username}`} onClose={() => setDialog(undefined)} onSubmit={() => setDialog(undefined)} submitLabel="Done">
+          <p className="text-sm">
+            Send this to {dialog.user.name || dialog.user.username}. It works once, within {dialog.hours} hours, and signs them out everywhere when used.
+          </p>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={dialog.link}
+              onFocus={(e) => e.target.select()}
+              className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-chip px-3 font-mono text-xs"
+              aria-label="Link"
+            />
+            <button type="button" onClick={() => navigator.clipboard?.writeText(dialog.link)} className="flex items-center gap-1.5 rounded-xl bg-chip px-3 text-sm hover:bg-hover">
+              <Copy className="h-4 w-4" /> Copy
+            </button>
+          </div>
+        </Dialog>
+      )}
     </section>
+  );
+}
+
+/** Pick the groups an admin adds a user to; groups from SSO are shown but follow the provider. */
+function GroupsDialog({ user, onClose, onSave }: { user: Row; onClose: () => void; onSave: (groups: string[]) => Promise<void> }) {
+  const [groups, setGroups] = useState<Group[]>();
+  const [chosen, setChosen] = useState(new Set(user.groups.filter((g) => g.source === "manual").map((g) => g.name.toLowerCase())));
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    fetcher<Group[]>("/api/groups").then(setGroups, (e: Error) => setError(e.message));
+  }, []);
+  const sso = new Set(user.groups.filter((g) => g.source === "sso").map((g) => g.name.toLowerCase()));
+  return (
+    <Dialog
+      title={`Groups of ${user.username}`}
+      onClose={onClose}
+      busy={busy}
+      error={error}
+      onSubmit={async () => {
+        setBusy(true);
+        try {
+          await onSave(groups?.filter((g) => chosen.has(g.name.toLowerCase())).map((g) => g.name) ?? []);
+          onClose();
+        } catch (e) {
+          setError((e as Error).message);
+          setBusy(false);
+        }
+      }}
+    >
+      {groups?.length === 0 && <p className="text-sm text-muted">No groups yet. Create them under Groups below.</p>}
+      {groups?.map((g) => {
+        const key = g.name.toLowerCase();
+        return (
+          <label key={g.id} className="flex cursor-pointer items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+              checked={chosen.has(key) || sso.has(key)}
+              disabled={sso.has(key)}
+              onChange={(e) => {
+                const next = new Set(chosen);
+                if (e.target.checked) next.add(key);
+                else next.delete(key);
+                setChosen(next);
+              }}
+            />
+            <span>
+              <span className="font-medium">{g.name}</span>
+              {sso.has(key) && <span className="text-xs text-muted"> · from sign-in groups</span>}
+              {g.description && <span className="block text-xs text-muted">{g.description}</span>}
+            </span>
+          </label>
+        );
+      })}
+    </Dialog>
   );
 }

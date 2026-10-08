@@ -14,7 +14,7 @@ export async function findService(id: string, canSee: (v: Visibility) => boolean
     const s = ids[g].indexOf(id);
     if (s === -1) continue;
     const service = services[g].services[s];
-    return canSee(serviceVisibility(services[g], service)) ? service : undefined;
+    return serviceVisibility(services[g], service).every(canSee) ? service : undefined;
   }
   return undefined;
 }

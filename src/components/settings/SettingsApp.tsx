@@ -14,6 +14,8 @@ import { LiveReload } from "../LiveReload";
 import { FieldInput, type FormValue } from "../edit/FieldInput";
 import { getPath, setPath } from "../edit/FieldsDialog";
 import { UsersPanel } from "../edit/UsersPanel";
+import { GroupsPanel } from "../edit/GroupsPanel";
+import { AuditPanel } from "../edit/AuditPanel";
 import { HistoryPanel } from "../edit/HistoryPanel";
 import { ImportDialog } from "../edit/ImportDialog";
 import { sections, type Section } from "./sections";
@@ -280,6 +282,12 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                   <div className="flex flex-col gap-3 border-t border-line pt-5">
                     <h3 className="text-sm font-semibold tracking-wider text-muted uppercase">Accounts</h3>
                     <UsersPanel />
+                    <div className="mt-4">
+                      <GroupsPanel />
+                    </div>
+                    <div className="mt-4">
+                      <AuditPanel />
+                    </div>
                   </div>
                 )}
                 {!q && section.extra === "backup" && (

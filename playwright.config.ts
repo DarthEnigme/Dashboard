@@ -26,7 +26,7 @@ export default defineConfig({
       use: { ...desktop, storageState: "test-results/.auth/admin.json" },
     },
     // Starts signed out; logs in through the UI.
-    { name: "anonymous", testMatch: /auth\.spec\.ts/, dependencies: ["admin"], use: desktop },
+    { name: "anonymous", testMatch: /(auth|security)\.spec\.ts/, dependencies: ["admin"], use: desktop },
   ],
   webServer: [
     { command: "node scripts/mock-server.mjs", port: 4010, reuseExistingServer: !process.env.CI },

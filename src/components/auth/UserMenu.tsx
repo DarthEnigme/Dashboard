@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { LogIn, LogOut, Settings, ShieldCheck, UserRound, Wallet } from "lucide-react";
+import { KeyRound, LogIn, LogOut, Settings, ShieldCheck, UserRound, Wallet } from "lucide-react";
 import { sendJson } from "@/lib/fetcher";
 import type { ClientAuth } from "@/lib/auth";
 import { Avatar, ProfileDialog } from "./ProfileDialog";
+import { SecurityDialog } from "./SecurityDialog";
 
 /** Avatar with a small menu when signed in; a sign-in button otherwise. */
 export function UserMenu({ auth }: { auth: ClientAuth }) {
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState(false);
+  const [security, setSecurity] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,9 +93,22 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
             >
               <UserRound className="h-4 w-4" /> Profile
             </button>
-            <a role="menuitem" href="/finance" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover">
-              <Wallet className="h-4 w-4" /> Finance
-            </a>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                setSecurity(true);
+              }}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover"
+            >
+              <KeyRound className="h-4 w-4" /> Security
+              {u.twoFactor && <ShieldCheck className="ml-auto h-3.5 w-3.5 text-[var(--ok)]" aria-label="Two-factor sign-in is on" />}
+            </button>
+            {u.permissions.includes("finance") && (
+              <a role="menuitem" href="/finance" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover">
+                <Wallet className="h-4 w-4" /> Finance
+              </a>
+            )}
             {auth.canEdit && (
               <a role="menuitem" href="/settings" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover">
                 <Settings className="h-4 w-4" /> Settings
@@ -104,7 +120,8 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
           </motion.div>
         )}
       </AnimatePresence>
-      {profile && <ProfileDialog user={u} passwordSignIn={auth.methods.local} onClose={() => setProfile(false)} />}
+      {security && createPortal(<SecurityDialog onClose={() => setSecurity(false)} />, document.body)}
+      {profile && createPortal(<ProfileDialog user={u} passwordSignIn={auth.methods.local} onClose={() => setProfile(false)} />, document.body)}
     </div>
   );
 }

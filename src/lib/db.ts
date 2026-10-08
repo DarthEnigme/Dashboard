@@ -46,6 +46,36 @@ export function db(): DatabaseSync {
         subject TEXT NOT NULL,
         PRIMARY KEY (provider, subject)
       );
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at INTEGER NOT NULL,
+        last_seen INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        ip TEXT,
+        user_agent TEXT,
+        method TEXT
+      );
+      CREATE INDEX IF NOT EXISTS sessions_user ON sessions (user_id);
+      CREATE TABLE IF NOT EXISTS password_resets (
+        token_hash TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at INTEGER NOT NULL,
+        created_by TEXT
+      );
+      CREATE TABLE IF NOT EXISTS user_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        description TEXT,
+        permissions TEXT NOT NULL DEFAULT '[]',
+        sso TEXT NOT NULL DEFAULT '[]'
+      );
+      CREATE TABLE IF NOT EXISTS user_group_members (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        group_id INTEGER NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+        source TEXT NOT NULL DEFAULT 'manual',
+        PRIMARY KEY (user_id, group_id)
+      );
       CREATE TABLE IF NOT EXISTS pings_hourly (
         service_id TEXT NOT NULL,
         hour INTEGER NOT NULL,
@@ -138,6 +168,9 @@ export function db(): DatabaseSync {
     addColumn(d, "fin_categories", "budget_cents INTEGER");
     addColumn(d, "users", "avatar TEXT");
     addColumn(d, "fin_categories", "color TEXT");
+    // Encrypted TOTP secret, and SHA-256 hashes of unused recovery codes (JSON).
+    addColumn(d, "users", "totp_secret TEXT");
+    addColumn(d, "users", "totp_recovery TEXT");
     d.exec("PRAGMA foreign_keys = ON;");
     g.__pageDb = d;
   }

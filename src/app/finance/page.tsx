@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function Finance() {
   const auth = await clientAuth();
   if (!auth.user) redirect(auth.needsSetup ? "/setup" : "/login");
+  if (!auth.user.permissions.includes("finance")) redirect("/");
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { alerts, docker, auth: _a, ...settings } = loadConfig().settings;
   return (

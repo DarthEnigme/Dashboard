@@ -17,6 +17,7 @@ import { InfoBar } from "./InfoBar";
 import { ServiceGroup } from "./ServiceGroup";
 import { BookmarkGroup } from "./BookmarkGroup";
 import { UserMenu } from "./auth/UserMenu";
+import { MonitorPanel } from "./MonitorPanel";
 import { LiveReload } from "./LiveReload";
 
 // The editor (drag and drop, YAML parsing) is only downloaded when someone starts editing.
@@ -100,7 +101,8 @@ export function Dashboard({ config, auth, tabs, version }: { config: ClientConfi
         onEdit={auth.canEdit ? () => setMode("edit") : undefined}
         showSettings={auth.canEdit}
         updateAvailable={update?.available ? update.version : undefined}
-        showFinance={!!auth.user}
+        monitor={<MonitorPanel refreshSeconds={settings.pingInterval} />}
+        showFinance={!!auth.user?.permissions.includes("finance")}
         account={<UserMenu auth={auth} />}
       />
 
@@ -127,7 +129,7 @@ export function Dashboard({ config, auth, tabs, version }: { config: ClientConfi
       )}
 
       {services.map((g, gi) => (
-        <ServiceGroup key={`${g.tab}|${g.name}`} group={g} settings={settings} index={gi} forceOpen={!!q} tabLabel={label(g.tab)} canAct={auth.user?.role === "admin"} />
+        <ServiceGroup key={`${g.tab}|${g.name}`} group={g} settings={settings} index={gi} forceOpen={!!q} tabLabel={label(g.tab)} canAct={!!auth.user?.permissions.includes("actions")} />
       ))}
 
       {bookmarks.length > 0 && (

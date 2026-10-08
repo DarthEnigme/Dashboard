@@ -21,8 +21,8 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Live data is never cached.
-  if (url.pathname.startsWith("/api/")) return;
+  // Live data is never cached, nor pages carrying a one-time token.
+  if (url.pathname.startsWith("/api/") || url.pathname === "/reset") return;
 
   // Build assets are content-hashed: cache first.
   if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/pwa-icon/")) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { ArrowLeft, KeyRound, Loader2 } from "lucide-react";
+import { ArrowLeft, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { sendJson } from "@/lib/fetcher";
 import type { ClientAuth } from "@/lib/auth";
 import { Icon } from "../Icon";
@@ -19,6 +19,10 @@ interface Props {
 export function LoginForm({ title, methods, error: initialError, canGoBack }: Props) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
+  // Second step when the account has two-factor sign-in.
+  const [ticket, setTicket] = useState<string>();
+  const [code, setCode] = useState("");
   const [error, setError] = useState(initialError);
   const [busy, setBusy] = useState(false);
   const passwordLogin = methods.local || methods.ldap;
@@ -28,9 +32,19 @@ export function LoginForm({ title, methods, error: initialError, canGoBack }: Pr
     setBusy(true);
     setError(undefined);
     try {
-      await sendJson("/api/auth", "POST", { username, password });
+      if (ticket) {
+        await sendJson("/api/auth/2fa", "POST", { ticket, code });
+      } else {
+        const r = await sendJson<{ twoFactor?: boolean; ticket?: string }>("/api/auth", "POST", { username, password, remember });
+        if (r.twoFactor && r.ticket) {
+          setTicket(r.ticket);
+          setBusy(false);
+          return;
+        }
+      }
       window.location.href = "/";
     } catch (err) {
+      if (ticket && /took too long|again/i.test((err as Error).message)) setTicket(undefined);
       setError((err as Error).message);
       setBusy(false);
     }
@@ -47,7 +61,39 @@ export function LoginForm({ title, methods, error: initialError, canGoBack }: Pr
         </p>
       )}
 
-      {passwordLogin && (
+      {ticket && (
+        <form onSubmit={submit} className="flex flex-col gap-3">
+          <p className="flex items-center gap-2 text-sm">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-accent" /> Enter the code from your authenticator app.
+          </p>
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-muted">
+            Code
+            <input
+              autoFocus
+              autoComplete="one-time-code"
+              inputMode="text"
+              placeholder="123456"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className={`${inputClass} text-center font-mono text-lg tracking-[0.3em]`}
+            />
+          </label>
+          <p className="text-xs text-muted">Lost your phone? Enter one of your recovery codes instead.</p>
+          <button
+            type="submit"
+            disabled={busy || !code.trim()}
+            className="mt-2 flex h-10 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:brightness-110 disabled:opacity-60"
+          >
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+            Verify
+          </button>
+          <button type="button" onClick={() => (setTicket(undefined), setCode(""))} className="text-sm text-muted hover:text-fg">
+            Use another account
+          </button>
+        </form>
+      )}
+
+      {passwordLogin && !ticket && (
         <form onSubmit={submit} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1.5 text-xs font-medium text-muted">
             Username
@@ -69,6 +115,10 @@ export function LoginForm({ title, methods, error: initialError, canGoBack }: Pr
               className={inputClass}
             />
           </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
+            Keep me signed in for 30 days
+          </label>
           <button
             type="submit"
             disabled={busy}
@@ -80,7 +130,7 @@ export function LoginForm({ title, methods, error: initialError, canGoBack }: Pr
         </form>
       )}
 
-      {methods.providers.length > 0 && (
+      {methods.providers.length > 0 && !ticket && (
         <>
           {passwordLogin && (
             <div className="my-5 flex items-center gap-3 text-xs text-muted">

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadConfig } from "@/lib/config/load";
-import { requireUser, sameOrigin } from "@/lib/auth";
+import { requireUser, sameOrigin, viewer } from "@/lib/auth";
+import { revokeUserSessions } from "@/lib/auth/sessions";
 import { hashPassword, MIN_PASSWORD, verifyPassword } from "@/lib/auth/password";
 import { clearFailures, isLimited, recordFailure } from "@/lib/auth/ratelimit";
 import * as users from "@/lib/auth/users";
@@ -43,6 +44,8 @@ export async function PATCH(req: Request) {
   }
 
   users.updateUser(me.id, { name: b.name === undefined ? undefined : b.name?.trim() || null, passwordHash });
+  // A new password signs out every other device.
+  if (passwordHash) revokeUserSessions(me.id, (await viewer()).sessionId);
   users.audit(me.username, "profile-update", { name: b.name !== undefined || undefined, password: passwordHash ? "changed" : undefined });
   return NextResponse.json(users.getUser(me.id));
 }

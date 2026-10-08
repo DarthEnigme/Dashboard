@@ -13,6 +13,8 @@ export interface User {
   createdAt: number;
   /** URL of an uploaded profile picture. */
   avatar: string | null;
+  /** Signs in with a one-time code as well. */
+  twoFactor: boolean;
 }
 
 interface Row {
@@ -25,6 +27,8 @@ interface Row {
   disabled: number;
   created_at: number;
   avatar: string | null;
+  totp_secret: string | null;
+  totp_recovery: string | null;
 }
 
 const toUser = (r: Row | undefined): User | undefined =>
@@ -38,6 +42,7 @@ const toUser = (r: Row | undefined): User | undefined =>
     hasPassword: !!r.password_hash,
     createdAt: r.created_at,
     avatar: r.avatar ?? null,
+    twoFactor: !!r.totp_secret,
   };
 
 const one = (sql: string, ...args: (string | number | null)[]) => db().prepare(sql).get(...args) as Row | undefined;
@@ -94,6 +99,16 @@ export function updateUser(
   db()
     .prepare(`UPDATE users SET ${set.map(([k]) => `${k} = ?`).join(", ")} WHERE id = ?`)
     .run(...set.map(([, v]) => v ?? null), id);
+}
+
+/** The sealed TOTP secret and recovery-code hashes, or null when 2FA is off. */
+export function getTwoFactor(id: number): { secret: string; recovery: string[] } | null {
+  const r = one("SELECT * FROM users WHERE id = ?", id);
+  return r?.totp_secret ? { secret: r.totp_secret, recovery: JSON.parse(r.totp_recovery ?? "[]") as string[] } : null;
+}
+
+export function setTwoFactor(id: number, v: { secret: string; recovery: string[] } | null) {
+  db().prepare("UPDATE users SET totp_secret = ?, totp_recovery = ? WHERE id = ?").run(v?.secret ?? null, v ? JSON.stringify(v.recovery) : null, id);
 }
 
 export const deleteUser = (id: number) => db().prepare("DELETE FROM users WHERE id = ?").run(id);

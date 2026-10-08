@@ -4,7 +4,8 @@ import { loadConfig } from "@/lib/config/load";
 import { publicOrigin } from "@/lib/auth";
 import { resolveIdentity } from "@/lib/auth/identity";
 import { finishLogin, STATE_COOKIE } from "@/lib/auth/oauth";
-import { cookieOptions, isHttps, SESSION_COOKIE, sessionToken } from "@/lib/auth/session";
+import { startSession } from "@/lib/auth/sessions";
+import { syncSsoGroups } from "@/lib/auth/groups";
 import { audit } from "@/lib/auth/users";
 import { errorReason } from "@/lib/cache";
 
@@ -34,9 +35,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       audit(identity.email ?? identity.username ?? identity.subject, "login-refused", { provider: id, reason: result.error });
       return back(result.error);
     }
+    syncSsoGroups(result.user.id, identity.groups);
     audit(result.user.username, result.created ? "signup" : "login", { provider: id });
     const res = NextResponse.redirect(`${origin}/`);
-    res.cookies.set(SESSION_COOKIE, await sessionToken(result.user.id), cookieOptions(isHttps(req)));
+    // The identity provider handles its own second factor.
+    await startSession(res, req, result.user.id, id);
     res.cookies.delete({ name: STATE_COOKIE, path: "/api/auth/oauth" });
     return res;
   } catch (e) {

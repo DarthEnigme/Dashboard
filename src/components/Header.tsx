@@ -17,11 +17,13 @@ interface Props {
   updateAvailable?: string;
   /** Signed-in users: a wallet button linking to the finance page. */
   showFinance?: boolean;
+  /** Monitoring button (opens the slide-out panel). */
+  monitor?: ReactNode;
   /** User menu or sign-in link, after the edit button. */
   account?: ReactNode;
 }
 
-export function Header({ title, description, query, onQuery, onSubmit, onEdit, showSettings, updateAvailable, showFinance, account }: Props) {
+export function Header({ title, description, query, onQuery, onSubmit, onEdit, showSettings, updateAvailable, showFinance, monitor, account }: Props) {
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -93,6 +95,7 @@ export function Header({ title, description, query, onQuery, onSubmit, onEdit, s
             <Pencil className="h-4 w-4" />
           </button>
         )}
+        {monitor}
         {showFinance && (
           <Link href="/finance" className="glass glass-interactive grid h-11 w-11 shrink-0 place-items-center rounded-full" aria-label="Finance" title="Finance">
             <Wallet className="h-4 w-4" />

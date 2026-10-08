@@ -8,7 +8,7 @@ export interface FieldSpec {
    * "list": comma-separated strings. "yaml": nested values (objects, arrays) edited as YAML.
    * "textarea": multi-line text. "image": a URL, or a file uploaded to `upload`.
    */
-  kind?: "text" | "number" | "boolean" | "select" | "color" | "list" | "yaml" | "range" | "textarea" | "image";
+  kind?: "text" | "number" | "boolean" | "select" | "color" | "list" | "yaml" | "range" | "textarea" | "image" | "audience";
   /** "image" only: endpoint taking a multipart `file` and answering { url }. */
   upload?: string;
   options?: string[];

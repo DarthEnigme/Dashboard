@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { sameOrigin } from "@/lib/auth";
 import { hashPassword, MIN_PASSWORD } from "@/lib/auth/password";
-import { cookieOptions, isHttps, SESSION_COOKIE, sessionToken } from "@/lib/auth/session";
+import { startSession } from "@/lib/auth/sessions";
 import * as users from "@/lib/auth/users";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,6 @@ export async function POST(req: Request) {
   const user = users.createUser({ username, email: email || null, role: "admin", passwordHash: await hashPassword(password) });
   users.audit(user.username, "setup");
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, await sessionToken(user.id), cookieOptions(isHttps(req)));
+  await startSession(res, req, user.id, "setup");
   return res;
 }

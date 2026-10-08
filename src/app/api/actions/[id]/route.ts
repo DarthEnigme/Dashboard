@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { findService } from "@/lib/config/lookup";
-import { requireAdmin, sameOrigin } from "@/lib/auth";
+import { requirePermission, sameOrigin, seeFilter } from "@/lib/auth";
 import { audit } from "@/lib/auth/users";
 import { errorReason } from "@/lib/cache";
 import { integrations } from "@/integrations";
@@ -9,11 +9,11 @@ export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/** Resolve the service's integration and validated config, admins only. */
+/** Resolve the service's integration and validated config, for people with the actions permission who can see the service. */
 async function resolve(id: string) {
-  const admin = await requireAdmin();
-  if (!admin) return { error: NextResponse.json({ error: "Admins only" }, { status: 403 }) };
-  const service = await findService(id);
+  const admin = await requirePermission("actions");
+  if (!admin) return { error: NextResponse.json({ error: "You can't run actions. Ask an admin." }, { status: 403 }) };
+  const service = await findService(id, await seeFilter());
   const integration = service?.widget ? integrations[service.widget.type] : undefined;
   if (!service || !integration?.actions) return { error: NextResponse.json({ error: "No actions for this service" }, { status: 404 }) };
   const parsed = integration.schema.safeParse(service.widget);

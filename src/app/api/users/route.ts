@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin, sameOrigin } from "@/lib/auth";
 import { hashPassword, MIN_PASSWORD } from "@/lib/auth/password";
 import * as users from "@/lib/auth/users";
+import { allMemberships } from "@/lib/auth/groups";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,8 @@ const deny = () => NextResponse.json({ error: "Admins only" }, { status: 403 });
 
 export async function GET() {
   if (!(await requireAdmin())) return deny();
-  return NextResponse.json(users.listUsers());
+  const groups = allMemberships();
+  return NextResponse.json(users.listUsers().map((u) => ({ ...u, groups: groups.get(u.id) ?? [] })));
 }
 
 /** Create a user. Without a password they can only sign in through LDAP/SSO/proxy (matched by email or username). */

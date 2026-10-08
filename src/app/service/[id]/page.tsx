@@ -18,7 +18,7 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
   return (
     <>
       <Background settings={config.settings} />
-      <ServiceDetail service={service} group={group.name} settings={config.settings} canAct={auth.user?.role === "admin"} />
+      <ServiceDetail service={service} group={group.name} settings={config.settings} canAct={!!auth.user?.permissions.includes("actions")} />
     </>
   );
 }

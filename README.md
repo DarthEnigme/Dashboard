@@ -519,7 +519,8 @@ Each change is validated and written straight to the YAML file; comments on unto
 
 On first start, create the admin account at **Set up**. Add more people under **Edit → Users**. Roles:
 - **admin**: can edit, run actions, manage users and history.
-- **user**: can see items marked `users` and use the finance tracker.
+- **user**: can see items marked `users`, and do what `auth.userPermissions` allows (by default: use the finance tracker).
+- **groups** add to that: see items shown to the group, and extra permissions (see "Groups and permissions").
 
 ```yaml
 auth:
@@ -562,7 +563,36 @@ Everyone else is refused. Unverified emails are never used to match. LDAP and pr
 
 **Uploads:** profile pictures and uploaded wallpapers are kept in `data/uploads/`. Back up the data folder to keep them. They are served at unguessable URLs without signing in, because the wallpaper also shows to anonymous viewers.
 
-**Visibility:** add `visible: users` or `visible: admins` to a group, service, bookmark group or info widget to hide it from people below that role. The page and every API enforce this. Finance tiles default to `users`.
+**Visibility:** add `visible: users` or `visible: admins` to a group, service, bookmark group or info widget to hide it from people below that role. Or name groups, `visible: [family, media]`, to show it only to their members (and admins). A service inside a group needs to pass both the group's and its own. The page and every API enforce this. Finance tiles default to `users`.
+
+### Groups and permissions
+
+Create groups under **Settings → Accounts & sign-in → Groups**:
+- **Members** are added by hand (the people icon on a user), or automatically. A group's *sign-in groups* are names as your SSO provider (the `groupsClaim`), LDAP (`memberOf`) or proxy (`Remote-Groups`) reports them. Members join at each sign-in and leave when the provider no longer lists them. Hand-made memberships are never touched.
+- **Permissions** are on top of `auth.userPermissions`:
+  - `finance`: the finance tracker, its tile and its API.
+  - `actions`: start, stop and restart buttons on services the person can see.
+- Admins have every permission and see everything.
+
+```yaml
+auth:
+  userPermissions: [finance]   # what every signed-in user may do; [] for nothing
+```
+
+### Security
+
+From the account menu, **Security**:
+- **Two-factor sign-in (TOTP):** scan the QR code with an authenticator app (Aegis, 2FAS, Google Authenticator, 1Password…) and confirm a code. Signing in with a password (local or LDAP) then asks for a code too, or one of ten one-time recovery codes. SSO sign-ins rely on the provider's own second factor. The secret is stored encrypted with the session key (`HOMEPAGE_SECRET` or `data/secret.key`), so keep that key with your backups.
+- **Signed in:** every device with a session, its address and when it was last used. Sign out one, or all the others. Changing your password or turning on 2FA signs out the other devices.
+- **Keep me signed in:** on the sign-in page. Unticked, the session ends when the browser closes, or after 12 idle hours.
+
+Admins, on each user:
+- **Link to set a password:** a one-time link, valid 48 hours. Use it to invite someone, or when they forgot their password. Using it signs them out everywhere.
+- **Turn off two-factor sign-in:** for a lost phone.
+- **Sign out everywhere.** Disabling an account or setting its password does this too.
+- **Audit log:** the full history below the accounts list (sign-ins, failed attempts, account and config changes, actions). Search it by user, action or detail.
+
+Sessions are rows in the database now, so they can be revoked. Signing in again once after upgrading to this version is expected.
 
 ## Finance tracker
 
@@ -603,6 +633,7 @@ Add a `finance` widget to a tile to see it on the dashboard; bigger tiles show m
 - `Ctrl/⌘ K`: command palette, on every page. Fuzzy-search services, bookmarks, tabs, Finance and every settings section; `Enter` opens, `⇧ Enter` opens a service's details page.
   - Admins can also run container and VM actions (type the service name, pick "Actions for…", confirm with `Enter`), switch the theme, card style and glow, or open the editor.
   - Recently used entries are listed first.
+- `m`: open or close the monitoring panel. The pulse button in the header does the same. It shows every checked service, down ones first, with latency, 24-hour uptime, how long an outage has lasted and why, and certificates about to expire. Filter by down/up or by name; click one for its details page.
 - `/`: focus the filter
 - `Enter` in the filter: open the first match
 - `Esc`: clear the filter

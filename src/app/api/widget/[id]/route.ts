@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { findService } from "@/lib/config/lookup";
-import { seeFilter } from "@/lib/auth";
+import { seeFilter, viewer } from "@/lib/auth";
 import { errorReason } from "@/lib/cache";
 import { fetchWidget, WidgetError } from "@/lib/widgets";
 
@@ -10,6 +10,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const service = await findService(id, await seeFilter());
   if (!service?.widget) return NextResponse.json({ error: "Unknown service" }, { status: 404 });
+  // The finance tile shows the tracker's numbers: same permission as the finance page.
+  if (service.widget.type === "finance" && !(await viewer()).permissions.includes("finance")) {
+    return NextResponse.json({ error: "No access to finance" }, { status: 403 });
+  }
   try {
     return NextResponse.json(await fetchWidget(id, service));
   } catch (e) {

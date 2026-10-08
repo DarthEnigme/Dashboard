@@ -3,6 +3,8 @@
 import { useState } from "react";
 import YAML from "yaml";
 import { Upload, X } from "lucide-react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/fetcher";
 import type { FieldSpec } from "@/integrations/fields";
 import { MASK } from "@/lib/config/schema";
 
@@ -60,6 +62,8 @@ export function FieldInput({
         className={`${inputClass} h-auto py-2 font-mono text-xs leading-relaxed`}
       />
     );
+  } else if (spec.kind === "audience") {
+    control = <AudienceInput id={id} value={value} onChange={onChange} />;
   } else if (spec.kind === "image") {
     control = <ImageInput id={id} value={value} placeholder={spec.placeholder} upload={spec.upload} onChange={onChange} />;
   } else if (spec.kind === "select") {
@@ -132,6 +136,51 @@ export function FieldInput({
       </label>
       {control}
       {spec.help && <p className="text-xs text-muted/80">{spec.help}</p>}
+    </div>
+  );
+}
+
+/** public / users / admins, or a list of groups (visible: [family, media]). */
+function AudienceInput({ id, value, onChange }: { id: string; value: unknown; onChange: (v: FormValue) => void }) {
+  const { data: groups } = useSWR<{ id: number; name: string }[]>("/api/groups", fetcher);
+  const picked = Array.isArray(value) ? (value as string[]) : undefined;
+  const mode = picked ? "groups" : typeof value === "string" ? value : "";
+  return (
+    <div className="flex flex-col gap-2">
+      <select
+        id={id}
+        value={mode}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange(v === "groups" ? (picked ?? (groups?.[0] ? [groups[0].name] : ["family"])) : v || undefined);
+        }}
+        className={inputClass}
+      >
+        <option value="">public (default)</option>
+        <option value="users">users</option>
+        <option value="admins">admins</option>
+        <option value="groups">specific groups…</option>
+      </select>
+      {picked && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-xl border border-line px-3 py-2 text-sm">
+          {groups?.length === 0 && <span className="text-xs text-muted">No groups yet: create them in Settings → Accounts & sign-in.</span>}
+          {[...new Set([...(groups ?? []).map((g) => g.name), ...picked])].map((name) => (
+            <label key={name} className="flex cursor-pointer items-center gap-1.5">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-[var(--accent)]"
+                checked={picked.some((p) => p.toLowerCase() === name.toLowerCase())}
+                onChange={(e) => {
+                  const next = e.target.checked ? [...picked, name] : picked.filter((p) => p.toLowerCase() !== name.toLowerCase());
+                  onChange(next.length ? next : "admins");
+                }}
+              />
+              {name}
+              {!groups?.some((g) => g.name.toLowerCase() === name.toLowerCase()) && groups && <span className="text-xs text-[var(--warn)]">(no such group)</span>}
+            </label>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

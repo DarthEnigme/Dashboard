@@ -40,7 +40,8 @@ export async function verifyToken(token: string | undefined): Promise<{ sub: str
   }
 }
 
-export const sessionToken = (userId: number) => signToken({ kind: "session" }, String(userId), `${SESSION_DAYS}d`);
+/** The cookie: who, and which row of the sessions table (lib/auth/sessions.ts). */
+export const sessionToken = (userId: number, sid: string) => signToken({ kind: "session", sid }, String(userId), `${SESSION_DAYS}d`);
 
 export const cookieOptions = (secure: boolean) => ({
   httpOnly: true,

@@ -7,8 +7,13 @@ export const themes = ["dark", "light", "system", "oled", "sepia"] as const;
 export const glowLevels = ["none", "subtle", "strong"] as const;
 export const tileSizes = ["small", "wide", "tall", "large"] as const;
 export const visibilities = ["public", "users", "admins"] as const;
-export type Visibility = (typeof visibilities)[number];
-const visible = z.enum(visibilities).optional();
+/** public, users or admins; or a list of group names: their members (and admins). */
+export type Visibility = (typeof visibilities)[number] | string[];
+const visible = z.union([z.enum(visibilities), z.array(z.string().min(1)).min(1)]).optional();
+
+/** What a signed-in user may do beyond seeing things; admins may do everything. */
+export const PERMISSIONS = ["finance", "actions"] as const;
+export type Permission = (typeof PERMISSIONS)[number];
 
 const providerSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/, "lowercase letters, digits and dashes"),
@@ -35,6 +40,8 @@ export const authSchema = z
     /** Public URL of Page, used for OAuth redirects when behind a proxy. */
     baseUrl: z.string().url().optional(),
     defaultRole: z.enum(["user", "admin"]).default("user"),
+    /** What every signed-in user may do; groups add more (Settings → Accounts → Groups). */
+    userPermissions: z.array(z.enum(PERMISSIONS)).default(["finance"]),
     local: z.object({ enabled: z.boolean().default(true) }).default({}),
     proxy: z
       .object({
