@@ -28,6 +28,19 @@ export function niceTicks(max: number, target = 4): number[] {
   return ticks;
 }
 
+/** Ticks from below `min` (when negative) to above `max`, on the same nice steps as niceTicks; always includes 0. */
+export function niceRange(min: number, max: number, target = 4): number[] {
+  if (min >= 0) return niceTicks(max, target);
+  const top = Math.max(max, 0);
+  const span = top - min;
+  const pos = niceTicks(span, target);
+  const step = pos.length > 1 ? pos[1] - pos[0] : span || 1;
+  const ticks: number[] = [];
+  for (let v = Math.floor(min / step) * step; v < top + step * 0.999; v += step) ticks.push(Number(v.toFixed(10)));
+  if (ticks[ticks.length - 1] < top) ticks.push(ticks[ticks.length - 1] + step);
+  return ticks;
+}
+
 /** Thousands-comma'd, compact past 10k: 1,234 / 12.9K / 4.2M / 5.4G. */
 export function compact(n: number): string {
   const a = Math.abs(n);

@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { categoryColor } from "@/lib/finance/format";
 
 export interface DonutSlice {
   name: string;
   value: number;
-  /** Palette slot 1–8; null renders the neutral "Other" grey. */
+  /** Palette slot 1–8; null renders the neutral "Other" grey unless `color` is set. */
   slot: number | null;
+  color?: string | null;
   label: string;
 }
 
-const colorOf = (slot: number | null) => (slot ? `var(--series-${slot})` : "var(--fg-muted)");
+const colorOf = (s: Pick<DonutSlice, "slot" | "color">) => categoryColor(s.slot, s.color);
 
 /**
  * Donut with a 2px surface gap between slices, a centre total, and a legend that lists every
@@ -61,7 +63,7 @@ export function Donut({
               cy={r}
               r={radius}
               fill="none"
-              stroke={colorOf(a.s.slot)}
+              stroke={colorOf(a.s)}
               strokeWidth={hover === a.i ? stroke + 4 : stroke}
               strokeDasharray={`${a.dash} ${circumference - a.dash}`}
               strokeDashoffset={-a.offset}
@@ -89,7 +91,7 @@ export function Donut({
             onPointerEnter={() => setHover(i)}
             onPointerLeave={() => setHover(undefined)}
           >
-            <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: colorOf(s.slot) }} />
+            <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: colorOf(s) }} />
             <span className="min-w-0 flex-1 truncate text-fg/90">{s.name}</span>
             <span className="shrink-0 tabular-nums text-muted">{s.label}</span>
           </li>

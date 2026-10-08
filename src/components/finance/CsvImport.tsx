@@ -12,9 +12,24 @@ type Step = { kind: "start" } | { kind: "map"; rows: string[][]; columns: number
 
 const PRESETS_KEY = "page:csv-mapping";
 
-/** CSV bank export → column mapping (remembered in this browser) → preview → import; plus Firefly sync. */
+/** The file goes to the server as text (CSV) or base64 (Excel). */
+type Source = { text: string } | { xlsx: string; name: string };
+
+async function toBase64(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+const isExcel = (f: File) => /\.xlsx$/i.test(f.name) || f.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+/** CSV or Excel bank export → column mapping (remembered in this browser) → preview → import; plus Firefly sync. */
 export function CsvImport({ currency, onImported }: { currency: string; onImported: () => void }) {
   const [text, setText] = useState("");
+  // An Excel file replaces the pasted text until cleared.
+  const [excel, setExcel] = useState<{ xlsx: string; name: string }>();
+  const source: Source = excel ?? { text };
   const [step, setStep] = useState<Step>({ kind: "start" });
   const [map, setMap] = useState<CsvMapping>({ date: 0, description: 1, amount: 2, dateFormat: "auto", decimal: ".", header: true });
   const [preview, setPreview] = useState<{ preview: ParsedTransaction[]; total: number; errors: string[] }>();
@@ -34,9 +49,9 @@ export function CsvImport({ currency, onImported }: { currency: string; onImport
     }
   };
 
-  const analyse = (csv: string) =>
+  const analyse = (src: Source) =>
     run(async () => {
-      const r = await sendJson<{ rows: string[][]; columns: number; guess: Partial<CsvMapping> }>("/api/finance/import", "POST", { text: csv });
+      const r = await sendJson<{ rows: string[][]; columns: number; guess: Partial<CsvMapping> }>("/api/finance/import", "POST", src);
       let saved: Partial<CsvMapping> = {};
       try {
         saved = JSON.parse(localStorage.getItem(PRESETS_KEY) ?? "{}");
@@ -49,17 +64,18 @@ export function CsvImport({ currency, onImported }: { currency: string; onImport
       setStep({ kind: "map", rows: r.rows, columns: r.columns });
     });
 
-  const doPreview = () => run(async () => setPreview(await sendJson("/api/finance/import", "POST", { text, mapping: map })));
+  const doPreview = () => run(async () => setPreview(await sendJson("/api/finance/import", "POST", { ...source, mapping: map })));
 
   const doImport = () =>
     run(async () => {
-      const r = await sendJson<{ added: number; skipped: number; errors: number }>("/api/finance/import", "POST", { text, mapping: map, commit: true, currency });
+      const r = await sendJson<{ added: number; skipped: number; errors: number }>("/api/finance/import", "POST", { ...source, mapping: map, commit: true, currency });
       try {
         localStorage.setItem(PRESETS_KEY, JSON.stringify(map));
       } catch {}
       setMsg({ text: `Imported ${r.added} transactions${r.skipped ? `, ${r.skipped} already there` : ""}${r.errors ? `, ${r.errors} unreadable lines skipped` : ""}.` });
       setStep({ kind: "start" });
       setText("");
+      setExcel(undefined);
       setPreview(undefined);
       onImported();
     });
@@ -117,21 +133,29 @@ export function CsvImport({ currency, onImported }: { currency: string; onImport
       )}
 
       <div className="glass flex flex-col gap-3 rounded-3xl p-4">
-        <h2 className="font-semibold">Import a bank export (CSV)</h2>
+        <h2 className="font-semibold">Import a bank export (CSV or Excel)</h2>
         {step.kind === "start" && (
           <>
             <label className="flex w-fit cursor-pointer items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white hover:brightness-110">
-              <Upload className="h-4 w-4" /> Choose a CSV file
+              <Upload className="h-4 w-4" /> Choose a CSV or .xlsx file
               <input
                 type="file"
-                accept=".csv,text/csv,text/plain"
+                accept=".csv,.xlsx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className="sr-only"
                 onChange={async (e) => {
                   const f = e.target.files?.[0];
+                  e.target.value = "";
                   if (!f) return;
+                  if (isExcel(f)) {
+                    const x = { xlsx: await toBase64(f), name: f.name };
+                    setExcel(x);
+                    setText("");
+                    return analyse(x);
+                  }
                   const t = await f.text();
+                  setExcel(undefined);
                   setText(t);
-                  analyse(t);
+                  analyse({ text: t });
                 }}
               />
             </label>
@@ -145,7 +169,10 @@ export function CsvImport({ currency, onImported }: { currency: string; onImport
             />
             <button
               disabled={!text.trim() || busy}
-              onClick={() => analyse(text)}
+              onClick={() => {
+                setExcel(undefined);
+                analyse({ text });
+              }}
               className="w-fit rounded-full bg-chip px-4 py-2 text-sm hover:bg-hover disabled:opacity-50"
             >
               Next: match columns
@@ -155,6 +182,7 @@ export function CsvImport({ currency, onImported }: { currency: string; onImport
 
         {step.kind === "map" && (
           <>
+            {excel && <p className="text-xs text-muted">{excel.name}: the first sheet with data. Dates and amounts are read as Excel stores them.</p>}
             <div className="overflow-x-auto rounded-xl bg-chip p-2">
               <table className="text-xs">
                 <tbody>
@@ -186,13 +214,15 @@ export function CsvImport({ currency, onImported }: { currency: string; onImport
                   <option value="MDY">10/31/2026</option>
                 </select>
               </label>
-              <label className="flex flex-col gap-1 text-xs text-muted">
-                Decimal separator
-                <select value={map.decimal} onChange={(e) => setMap({ ...map, decimal: e.target.value as "." | "," })} className={inputClass}>
-                  <option value=".">1,234.56</option>
-                  <option value=",">1.234,56</option>
-                </select>
-              </label>
+              {!excel && (
+                <label className="flex flex-col gap-1 text-xs text-muted">
+                  Decimal separator
+                  <select value={map.decimal} onChange={(e) => setMap({ ...map, decimal: e.target.value as "." | "," })} className={inputClass}>
+                    <option value=".">1,234.56</option>
+                    <option value=",">1.234,56</option>
+                  </select>
+                </label>
+              )}
             </div>
             <div className="flex flex-wrap gap-4 text-sm">
               <label className="flex items-center gap-2">

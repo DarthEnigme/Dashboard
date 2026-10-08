@@ -118,6 +118,9 @@ alerts:
   gotify: https://gotify.example.com  # with gotifyToken (an app token)
   gotifyToken: "{{HOMEPAGE_VAR_GOTIFY_TOKEN}}"
   ntfy: https://ntfy.sh/my-homelab    # a topic URL; ntfyToken for protected topics
+  slack: "{{HOMEPAGE_VAR_SLACK_WEBHOOK}}"     # Slack incoming-webhook URL
+  telegramToken: "{{HOMEPAGE_VAR_TELEGRAM_TOKEN}}"   # bot token from @BotFather
+  telegramChat: "123456789"           # your user/group id, or @channel (the bot must be allowed to post there)
   threshold: 2         # failed checks in a row before alerting
   certDays: 14         # warn this many days before an HTTPS certificate expires (0 = off)
   title: Homelab       # sender name (Discord username, Gotify/ntfy title); default "Page"
@@ -566,11 +569,21 @@ Everyone else is refused. Unverified emails are never used to match. LDAP and pr
 Signed-in users get **Finance** in the header (the wallet button) and the account menu:
 - **Overview:** totals for the month or year, the money flow, budgets, a category donut, 12 months of income and spending, and the running balance.
 - **Flow:** a Sankey chart of where the money came from (income by category) and where it went (spending by category), with what was saved, or taken from savings when spending was higher. Categories under 2% are grouped as "Other". Hover a band for its amount and share.
+- **Quick entry:** at the top of every tab. **Repeat** makes it a recurring transaction from that date. ☆ saves it as a **shortcut**: a one-tap button above the form that adds it again today, in the currency it was saved in. Remove a shortcut with its ×.
 - **Transactions:** quick entry at the top, search and filter, edit and delete. **Export CSV** downloads the period with the current filters. **All** downloads every transaction, and **JSON** gives the same data as JSON. The CSV opens in Excel and imports back into Page as is. Text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets don't run it as a formula.
 - **Currency:** the picker in the header shows everything in another currency, remembered per browser. Transactions in other currencies are converted at the latest ECB reference rates (via Frankfurter, no key, cached 6 hours and kept for offline use). Budgets are converted too. New transactions and imports use the currency being shown. A currency without an ECB rate is listed but left out of the totals, and the page says how many transactions that affects.
-- **Categories:** pick each category's chart colour. There are eight; categories without one are grouped as "Other". Renaming to an existing name merges the two. Each category can have a **monthly budget**: the Overview shows how much of it is used (×12 in the year view), and an alert is sent when it runs out.
+- **Plan:**
+  - Your balance today, what to expect at the end of the month and in 12 months, and a chart of the last 6 months with the next 12 projected (dashed).
+  - The projection adds the recurring transactions to the average of everything else over the last three full months. It's a trend, not a promise.
+  - **Recurring transactions** (rent, salary, subscriptions, every n weeks, months or years, with an optional end date) are added as real transactions on their date, checked hourly.
+  - A start date in the past fills in the occurrences since then. Months keep their day: the 31st becomes the 28th in February and the 31st again in March.
+  - Pausing stops new ones; resuming adds what came due meanwhile. Deleting a rule keeps what it already added, and a deleted occurrence never comes back.
+- **Savings:**
+  - Goals with a target and an optional deadline. Each shows what is put aside, the share reached, and how much a month it takes to make the deadline.
+  - **Put aside** and **Take out**, or the **Savings** button in the header, record moves between your own pots. They are not spending, so they stay out of the totals and charts.
+- **Categories:** pick each category's chart colour. The eight palette colours are checked to stay apart, also for colour-blind people. Beyond that, **Custom** lets a category take any colour and keep its own band in the charts, at the cost of that guarantee. Categories with no colour are grouped as "Other". Renaming to an existing name merges the two. Each category can have a **monthly budget**: the Overview shows how much of it is used (×12 in the year view), and an alert is sent when it runs out.
 - **Import:**
-  - Upload a bank CSV export and match its columns. Page guesses them from English and French headers and handles decimal commas, day-first dates and debit/credit columns.
+  - Upload a bank CSV or Excel (.xlsx) export and match its columns. For Excel, the first sheet with data is read, and dates and amounts are taken as Excel stores them. Old .xls and .ods files need saving as .xlsx or .csv first. Page guesses them from English and French headers and handles decimal commas, day-first dates and debit/credit columns.
   - The mapping is remembered.
   - Importing the same file again adds nothing.
 

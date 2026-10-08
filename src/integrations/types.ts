@@ -53,7 +53,7 @@ export interface WidgetSpark {
 export interface WidgetCharts {
   currency: string;
   /** Spending by category; slot = palette slot 1–8, null = "Other". */
-  donut?: { name: string; cents: number; slot: number | null }[];
+  donut?: { name: string; cents: number; slot: number | null; color?: string | null }[];
   /** Income and spending per month. */
   bars?: { month: string; income: number; expense: number }[];
   /** Running balance at month end. */

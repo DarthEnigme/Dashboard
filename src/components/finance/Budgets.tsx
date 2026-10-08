@@ -2,7 +2,7 @@
 
 import { AlertTriangle, CheckCircle2, CircleAlert } from "lucide-react";
 import type { BudgetStatus } from "@/lib/finance/aggregate";
-import { money } from "@/lib/finance/format";
+import { categoryColor, money } from "@/lib/finance/format";
 
 const BUDGET_WARN = 0.8; // same as BUDGET_WARN_SHARE in lib/finance/budgets.ts (server-only module)
 
@@ -26,7 +26,7 @@ export function Budgets({ budgets, currency, yearly }: { budgets: BudgetStatus[]
         return (
           <li key={b.name} className="flex flex-col gap-1">
             <div className="flex items-center gap-2 text-sm">
-              <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: b.slot ? `var(--series-${b.slot})` : "var(--fg-muted)" }} />
+              <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: categoryColor(b.slot, b.color) }} />
               <span className="min-w-0 flex-1 truncate font-medium">{b.name}</span>
               <span className="tabular-nums text-muted">
                 {money(b.spent, currency)} / {money(b.budget, currency)}

@@ -2,11 +2,10 @@
 
 import { useId, useMemo, useState } from "react";
 import type { Flow } from "@/lib/finance/aggregate";
-import { money } from "@/lib/finance/format";
+import { categoryColor, money } from "@/lib/finance/format";
 import { Tooltip, useWidth } from "./common";
 import { foldSmall, layoutSankey, placeLabels, type FlowItem } from "./sankeyLayout";
 
-const slotColor = (slot: number | null) => (slot ? `var(--series-${slot})` : "var(--fg-muted)");
 const TOP = 20; // room for the middle node's label
 const SAVED = "Saved";
 const FROM_SAVINGS = "From savings";
@@ -26,11 +25,11 @@ export function Sankey({ flow, currency, height = 260, ariaLabel = "Where the mo
   const nodeWidth = compact ? 8 : 10;
 
   const { sources, sinks, income, spent } = useMemo(() => {
-    const src: FlowItem[] = flow.sources.map((s) => ({ name: s.name, value: s.cents, color: slotColor(s.slot) }));
+    const src: FlowItem[] = flow.sources.map((s) => ({ name: s.name, value: s.cents, color: categoryColor(s.slot, s.color) }));
     const snk = foldSmall(
-      flow.sinks.map((s) => ({ name: s.name, value: s.cents, color: slotColor(s.slot) })),
+      flow.sinks.map((s) => ({ name: s.name, value: s.cents, color: categoryColor(s.slot, s.color) })),
       0.02,
-      slotColor(null),
+      categoryColor(null),
     );
     if (flow.fromSavings) src.push({ name: FROM_SAVINGS, value: flow.fromSavings, color: hatch });
     if (flow.saved) snk.push({ name: SAVED, value: flow.saved, color: hatch });

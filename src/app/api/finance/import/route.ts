@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { loadConfig } from "@/lib/config/load";
 import { guessMapping, mapRows, parseCsv, type CsvMapping } from "@/lib/finance/csv";
 import { importTransactions } from "@/lib/finance/store";
+import { isZip, readXlsx } from "@/lib/finance/xlsx";
 import { audit } from "@/lib/auth/users";
 import { bad, guard } from "../_shared";
 
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 const MAX = 5 * 1024 * 1024;
 
 /**
+ * The file is { text } (CSV) or { xlsx } (an Excel workbook, base64); then:
  * { text } → the first rows and a guessed mapping.
  * { text, mapping } → a preview of parsed transactions (and errors).
  * { text, mapping, commit: true } → import; duplicates (same file again) are skipped.
@@ -17,10 +19,24 @@ const MAX = 5 * 1024 * 1024;
 export async function POST(req: Request) {
   const g = await guard(req);
   if ("error" in g) return g.error;
-  const b = ((await req.json().catch(() => ({}))) ?? {}) as { text?: string; mapping?: CsvMapping; commit?: boolean; currency?: string };
-  if (!b.text) return bad("Paste or upload a CSV file");
-  if (b.text.length > MAX) return bad("File too large (5 MB max)");
-  const rows = parseCsv(b.text);
+  const b = ((await req.json().catch(() => ({}))) ?? {}) as { text?: string; xlsx?: string; mapping?: CsvMapping; commit?: boolean; currency?: string };
+  let rows: string[][];
+  if (b.xlsx) {
+    if (b.xlsx.length > (MAX * 4) / 3 + 4) return bad("File too large (5 MB max)");
+    const buf = Buffer.from(b.xlsx, "base64");
+    if (!isZip(buf)) return bad("Not an .xlsx file. Old .xls and .ods files: save as .xlsx or .csv first");
+    try {
+      rows = readXlsx(buf);
+    } catch (e) {
+      return bad((e as Error).message);
+    }
+    // Excel stores numbers with a "." whatever the display looks like.
+    if (b.mapping) b.mapping = { ...b.mapping, decimal: "." };
+  } else {
+    if (!b.text) return bad("Paste or upload a CSV or Excel file");
+    if (b.text.length > MAX) return bad("File too large (5 MB max)");
+    rows = parseCsv(b.text);
+  }
   if (!rows.length) return bad("The file has no rows");
   if (!b.mapping) return NextResponse.json({ rows: rows.slice(0, 8), columns: rows[0].length, guess: guessMapping(rows[0]) });
 

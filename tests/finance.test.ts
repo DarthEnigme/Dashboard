@@ -124,7 +124,7 @@ describe("store", () => {
     expect(store.listCategories().map((c) => [c.name, c.slot])).toEqual([["Food", 1], ["Fun", 2]]);
 
     store.renameCategory("Fun", "food"); // merge into the existing category, case-insensitively
-    expect(store.listCategories()).toEqual([{ name: "Food", slot: 1, budget: null, count: 2 }]);
+    expect(store.listCategories()).toEqual([{ name: "Food", slot: 1, color: null, budget: null, count: 2 }]);
 
     store.setCategorySlot("Food", 5);
     expect(store.listCategories()[0].slot).toBe(5);

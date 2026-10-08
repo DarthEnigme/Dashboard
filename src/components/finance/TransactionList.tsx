@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { Download, FileSpreadsheet, Pencil, PenLine, RefreshCw } from "lucide-react";
+import { Download, FileSpreadsheet, Pencil, PenLine, RefreshCw, Repeat } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
-import { money } from "@/lib/finance/format";
+import { categoryColor, money } from "@/lib/finance/format";
 import type { Transaction } from "@/lib/finance/store";
 import type { FieldSpec } from "@/integrations/fields";
 import { FieldsDialog } from "../edit/FieldsDialog";
@@ -18,7 +18,7 @@ const editFields: FieldSpec[] = [
   { key: "amount", label: "Amount (negative = expense)", kind: "number", required: true },
 ];
 
-const sourceIcon = { manual: PenLine, csv: FileSpreadsheet, firefly: RefreshCw } as const;
+const sourceIcon = { manual: PenLine, csv: FileSpreadsheet, firefly: RefreshCw, recurring: Repeat } as const;
 
 export function TransactionList({ period, currency, onChanged }: { period: string; currency: string; onChanged: () => void }) {
   const [q, setQ] = useState("");
@@ -26,8 +26,8 @@ export function TransactionList({ period, currency, onChanged }: { period: strin
   const [editing, setEditing] = useState<Transaction>();
   const params = new URLSearchParams({ period, ...(q ? { q } : {}), ...(category !== undefined ? { category } : {}) });
   const { data, error } = useSWR<Transaction[]>(`/api/finance/transactions?${params}`, fetcher, { keepPreviousData: true });
-  const { data: categories } = useSWR<{ name: string; slot: number | null }[]>("/api/finance/categories", fetcher);
-  const slotOf = new Map(categories?.map((c) => [c.name.toLowerCase(), c.slot]));
+  const { data: categories } = useSWR<{ name: string; slot: number | null; color: string | null }[]>("/api/finance/categories", fetcher);
+  const colorOf = new Map(categories?.map((c) => [c.name.toLowerCase(), categoryColor(c.slot, c.color)]));
 
   return (
     <section className="glass flex flex-col gap-3 rounded-3xl p-4">
@@ -76,7 +76,7 @@ export function TransactionList({ period, currency, onChanged }: { period: strin
             <tbody>
               {data.map((t) => {
                 const Src = sourceIcon[t.source] ?? PenLine;
-                const slot = t.category ? slotOf.get(t.category.toLowerCase()) : undefined;
+                const color = (t.category && colorOf.get(t.category.toLowerCase())) || categoryColor(null);
                 return (
                   <tr key={t.id} className="border-t border-line/50">
                     <td className="px-2 py-1.5 whitespace-nowrap tabular-nums text-muted">{t.date}</td>
@@ -89,7 +89,7 @@ export function TransactionList({ period, currency, onChanged }: { period: strin
                     <td className="px-2 py-1.5">
                       {t.category ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-chip px-2 py-0.5 text-xs">
-                          <span className="h-2 w-2 rounded-[2px]" style={{ background: slot ? `var(--series-${slot})` : "var(--fg-muted)" }} />
+                          <span className="h-2 w-2 rounded-[2px]" style={{ background: color }} />
                           {t.category}
                         </span>
                       ) : (

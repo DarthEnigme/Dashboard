@@ -23,7 +23,7 @@ export function FinanceCharts({ charts, size }: { charts: WidgetCharts; size: Ti
       {sankey && <Sankey flow={charts.flow!} currency={cur} height={size === "wide" ? 150 : 200} />}
       {showDonut && charts.donut && (
         <Donut
-          slices={charts.donut.map((s) => ({ name: s.name, value: s.cents, slot: s.slot, label: money(s.cents, cur) }))}
+          slices={charts.donut.map((s) => ({ name: s.name, value: s.cents, slot: s.slot, color: s.color, label: money(s.cents, cur) }))}
           total={money(spent, cur)}
           size={size === "wide" ? 112 : 128}
           compact={size === "wide" || size === "tall"}

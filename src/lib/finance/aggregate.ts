@@ -5,6 +5,8 @@ export interface Txn {
   category: string | null;
   /** Set by convertTxns on amounts it converted. */
   converted?: boolean;
+  /** Added by a recurring rule. */
+  recurring?: boolean;
 }
 
 export interface CategoryInfo {
@@ -13,12 +15,15 @@ export interface CategoryInfo {
   slot: number | null;
   /** Monthly spending budget in cents, if one is set. */
   budget?: number | null;
+  /** Own colour (#rrggbb) instead of a palette slot; such categories get their own band too. */
+  color?: string | null;
 }
 
 export interface Slice {
   name: string;
   cents: number;
-  slot: number | null; // null = "Other"
+  slot: number | null; // null (and no colour) = "Other"
+  color?: string | null;
 }
 
 export interface MonthTotals {
@@ -42,6 +47,7 @@ export interface Flow {
 export interface BudgetStatus {
   name: string;
   slot: number | null;
+  color?: string | null;
   /** Budget for the period: the monthly budget, ×12 for a year. */
   budget: number;
   spent: number;
@@ -112,8 +118,9 @@ export function summarize(txns: Txn[], categories: CategoryInfo[], period: strin
   for (const t of inPeriod) {
     if (t.amount_cents >= 0) continue;
     const info = t.category ? slots.get(t.category.toLowerCase()) : undefined;
-    const name = info?.slot ? info.name : "Other";
-    const s = byCat.get(name) ?? { name, cents: 0, slot: info?.slot ?? null };
+    const own = info && (info.slot || info.color);
+    const name = own ? info.name : "Other";
+    const s = byCat.get(name) ?? { name, cents: 0, slot: own ? (info.slot ?? null) : null, ...(own && info.color ? { color: info.color } : {}) };
     s.cents -= t.amount_cents;
     byCat.set(name, s);
   }
@@ -127,8 +134,9 @@ export function summarize(txns: Txn[], categories: CategoryInfo[], period: strin
       if (info) spentByName.set(info.name, (spentByName.get(info.name) ?? 0) - t.amount_cents);
       continue;
     }
-    const name = info?.slot ? info.name : "Income";
-    const s = bySource.get(name) ?? { name, cents: 0, slot: info?.slot ?? null };
+    const own = info && (info.slot || info.color);
+    const name = own ? info.name : "Income";
+    const s = bySource.get(name) ?? { name, cents: 0, slot: own ? (info.slot ?? null) : null, ...(own && info.color ? { color: info.color } : {}) };
     s.cents += t.amount_cents;
     bySource.set(name, s);
   }
@@ -140,7 +148,7 @@ export function summarize(txns: Txn[], categories: CategoryInfo[], period: strin
   };
   const budgets = categories
     .filter((c) => c.budget && c.budget > 0)
-    .map((c) => ({ name: c.name, slot: c.slot, budget: c.budget! * (isYear ? 12 : 1), spent: spentByName.get(c.name) ?? 0 }))
+    .map((c) => ({ name: c.name, slot: c.slot, ...(c.color ? { color: c.color } : {}), budget: c.budget! * (isYear ? 12 : 1), spent: spentByName.get(c.name) ?? 0 }))
     .sort((a, b) => b.spent / b.budget - a.spent / a.budget);
 
   const months = Array.from({ length: 12 }, (_, i) => addMonths(lastMonth, i - 11));
@@ -179,8 +187,9 @@ export function summarize(txns: Txn[], categories: CategoryInfo[], period: strin
   };
 }
 
-/** Largest first, with the unslotted bucket ("Other", "Income") last. */
-const otherLast = (a: Slice, b: Slice) => (a.slot === null ? 1 : b.slot === null ? -1 : b.cents - a.cents);
+/** Largest first, with the uncoloured bucket ("Other", "Income") last. */
+const isBucket = (s: Slice) => s.slot === null && !s.color;
+const otherLast = (a: Slice, b: Slice) => (isBucket(a) ? 1 : isBucket(b) ? -1 : b.cents - a.cents);
 
 /** First palette slot (1–8) not used by another category, or null when all eight are taken. */
 export function freeSlot(categories: CategoryInfo[]): number | null {

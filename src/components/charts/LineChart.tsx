@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { compact, Legend, niceTicks, Tooltip, useWidth } from "./common";
+import { compact, Legend, niceRange, Tooltip, useWidth } from "./common";
 
 export interface LineSeries {
   name: string;
   color: string;
   values: (number | null)[];
+  /** Dashed: estimates (a projection) rather than measurements. */
+  dashed?: boolean;
 }
 
 interface Props {
@@ -27,13 +29,16 @@ export function LineChart({ x, series, height = 220, unit = "", formatX, area, a
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number>();
   const all = series.flatMap((s) => s.values.filter((v): v is number => v !== null));
-  // A little headroom so peaks never touch the top edge.
-  const ticks = niceTicks(all.length ? Math.max(...all) * 1.08 : 1);
+  // A little headroom so peaks never touch the edges; below zero only when a value is.
+  const hi = all.length ? Math.max(...all) : 1;
+  const lo = all.length ? Math.min(...all) : 0;
+  const ticks = niceRange(lo < 0 ? lo * 1.08 : 0, hi > 0 ? hi * 1.08 : 0.01);
+  const min = ticks[0];
   const max = ticks[ticks.length - 1];
   const w = Math.max(width - PAD.left - PAD.right, 10);
   const h = height - PAD.top - PAD.bottom;
   const px = (i: number) => PAD.left + (x.length > 1 ? (i / (x.length - 1)) * w : w / 2);
-  const py = (v: number) => PAD.top + h - (v / max) * h;
+  const py = (v: number) => PAD.top + h - ((v - min) / (max - min)) * h;
 
   // Break lines at gaps (null values) instead of interpolating across them.
   const path = (values: (number | null)[]) =>
@@ -52,7 +57,7 @@ export function LineChart({ x, series, height = 220, unit = "", formatX, area, a
 
   return (
     <div className="flex flex-col gap-2">
-      {series.length > 1 && <Legend items={series.map((s) => ({ label: s.name, color: s.color, line: true }))} />}
+      {series.length > 1 && <Legend items={series.map((s) => ({ label: s.dashed ? `${s.name} (dashed)` : s.name, color: s.color, line: true }))} />}
       <div ref={ref} className="relative" style={{ height }}>
         {width > 0 && (
           <svg width={width} height={height} role="img" aria-label={ariaLabel}>
@@ -78,14 +83,14 @@ export function LineChart({ x, series, height = 220, unit = "", formatX, area, a
             ))}
             {area && series[0] && (
               <path
-                d={`${path(series[0].values)} V${PAD.top + h} H${px(series[0].values.findIndex((v) => v !== null))} Z`}
+                d={`${path(series[0].values)} V${py(Math.max(min, 0))} H${px(series[0].values.findIndex((v) => v !== null))} Z`}
                 fill={series[0].color}
                 opacity={0.1}
               />
             )}
             {series.map((s) => (
               <g key={s.name}>
-                <path d={path(s.values)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                <path d={path(s.values)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" strokeDasharray={s.dashed ? "5 4" : undefined} />
                 {/* A value with no neighbours draws no line: show it as a dot. */}
                 {s.values.map((v, i) =>
                   v !== null && (s.values[i - 1] ?? null) === null && (s.values[i + 1] ?? null) === null ? (

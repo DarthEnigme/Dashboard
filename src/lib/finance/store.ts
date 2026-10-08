@@ -5,7 +5,7 @@ export interface Transaction extends Txn {
   id: number;
   description: string;
   account: string | null;
-  source: "manual" | "csv" | "firefly";
+  source: "manual" | "csv" | "firefly" | "recurring";
   external_id: string | null;
 }
 
@@ -32,9 +32,11 @@ export function listTransactions(filter: { from?: string; to?: string; category?
   return db().prepare(sql).all(...args, filter.limit ?? 1000) as unknown as Transaction[];
 }
 
-/** Everything needed for summaries (light columns only). */
+/** Everything needed for summaries (light columns only); `recurring` marks transactions added by a recurring rule. */
 export const allForSummary = () =>
-  db().prepare("SELECT date, amount_cents, currency, category FROM fin_transactions").all() as unknown as Txn[];
+  (db().prepare("SELECT date, amount_cents, currency, category, source = 'recurring' AS recurring FROM fin_transactions").all() as unknown as (Omit<Txn, "recurring"> & { recurring: number })[]).map(
+    (t): Txn => ({ ...t, recurring: !!t.recurring }),
+  );
 
 /** Currencies that transactions use, most used first. */
 export const currenciesInUse = () =>
@@ -43,7 +45,7 @@ export const currenciesInUse = () =>
 export function listCategories(): (CategoryInfo & { count: number })[] {
   return db()
     .prepare(
-      `SELECT c.name, c.slot, c.budget_cents AS budget, (SELECT COUNT(*) FROM fin_transactions t WHERE t.category = c.name COLLATE NOCASE) AS count
+      `SELECT c.name, c.slot, c.color, c.budget_cents AS budget, (SELECT COUNT(*) FROM fin_transactions t WHERE t.category = c.name COLLATE NOCASE) AS count
        FROM fin_categories c ORDER BY c.slot IS NULL, c.slot, c.name`,
     )
     .all() as unknown as (CategoryInfo & { count: number })[];
@@ -123,6 +125,12 @@ export function setCategorySlot(name: string, slot: number | null) {
   if (slot !== null && (slot < 1 || slot > 8)) throw new Error("Slot must be 1–8");
   if (slot !== null) db().prepare("UPDATE fin_categories SET slot = NULL WHERE slot = ?").run(slot);
   db().prepare("UPDATE fin_categories SET slot = ? WHERE name = ?").run(slot, name);
+}
+
+/** Own chart colour (#rrggbb), or null to go back to the palette slot. */
+export function setCategoryColor(name: string, color: string | null) {
+  if (color !== null && !/^#[0-9a-f]{6}$/i.test(color)) throw new Error("Colour must be #rrggbb");
+  db().prepare("UPDATE fin_categories SET color = ? WHERE name = ?").run(color?.toLowerCase() ?? null, name);
 }
 
 /** Monthly spending budget in cents; null or 0 removes it. */

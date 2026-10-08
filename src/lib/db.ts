@@ -81,6 +81,44 @@ export function db(): DatabaseSync {
         slot INTEGER
       );
       CREATE TABLE IF NOT EXISTS fin_meta (key TEXT PRIMARY KEY, value TEXT);
+      CREATE TABLE IF NOT EXISTS fin_recurring (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        description TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL,
+        currency TEXT NOT NULL,
+        category TEXT,
+        every TEXT NOT NULL,
+        every_n INTEGER NOT NULL DEFAULT 1,
+        start_date TEXT NOT NULL,
+        end_date TEXT,
+        last_date TEXT,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS fin_shortcuts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        label TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL,
+        currency TEXT NOT NULL,
+        category TEXT,
+        created_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS fin_goals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        target_cents INTEGER NOT NULL,
+        currency TEXT NOT NULL,
+        deadline TEXT,
+        created_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS fin_goal_moves (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        goal_id INTEGER NOT NULL REFERENCES fin_goals(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL,
+        note TEXT,
+        created_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS config_versions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         file TEXT NOT NULL,
@@ -99,6 +137,7 @@ export function db(): DatabaseSync {
     `);
     addColumn(d, "fin_categories", "budget_cents INTEGER");
     addColumn(d, "users", "avatar TEXT");
+    addColumn(d, "fin_categories", "color TEXT");
     d.exec("PRAGMA foreign_keys = ON;");
     g.__pageDb = d;
   }

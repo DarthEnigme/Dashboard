@@ -59,7 +59,8 @@ export function describeAlert(p: AlertPayload): string {
 type Level = "info" | "warn" | "error";
 
 /** Is any alert channel configured? */
-export const hasAlertChannel = (cfg: Settings["alerts"]) => !!(cfg.discord || cfg.webhook || (cfg.gotify && cfg.gotifyToken) || cfg.ntfy);
+export const hasAlertChannel = (cfg: Settings["alerts"]) =>
+  !!(cfg.discord || cfg.webhook || (cfg.gotify && cfg.gotifyToken) || cfg.ntfy || cfg.slack || (cfg.telegramToken && cfg.telegramChat));
 
 /**
  * Fill {{name}} placeholders; unknown names become empty. `escape` adapts values to the target (JSON strings).
@@ -176,7 +177,21 @@ async function deliver(
     if (cfg.ntfyToken) headers.Authorization = `Bearer ${cfg.ntfyToken}`;
     jobs.push(post("ntfy", cfg.ntfy, text, headers));
   }
+  if (cfg.slack) jobs.push(post("Slack", cfg.slack, { text: url ? `${text}\n<${url}>` : text }));
+  if (cfg.telegramToken && cfg.telegramChat) {
+    // Tokens look like 123456:ABC-def; anything else must not end up in the URL path.
+    if (!/^\d+:[\w-]+$/.test(cfg.telegramToken)) errors.push("Telegram: the bot token looks wrong (expected 123456:ABC…)");
+    else {
+      jobs.push(
+        post("Telegram", `https://api.telegram.org/bot${cfg.telegramToken}/sendMessage`, {
+          chat_id: cfg.telegramChat,
+          text: url ? `${text}\n${url}` : text,
+          disable_web_page_preview: true,
+        }),
+      );
+    }
+  }
   await Promise.all(jobs);
-  if (!jobs.length) errors.push("No alert channel configured");
+  if (!jobs.length && !errors.length) errors.push("No alert channel configured");
   return errors;
 }

@@ -2,47 +2,109 @@
 
 import { useState, type FormEvent } from "react";
 import useSWR from "swr";
-import { Plus } from "lucide-react";
+import { Plus, Star, X, Zap } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
+import type { Shortcut } from "@/lib/finance/recurring";
+import { money } from "@/lib/finance/format";
 import { inputBase } from "../edit/FieldInput";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** One-line entry: date, description, category, amount, expense/income. */
+/**
+ * One-line entry: date, description, category, amount, expense/income, and how often it repeats.
+ * Above it, shortcuts add a saved transaction with one tap.
+ */
 export function QuickAdd({ currency, onAdded }: { currency: string; onAdded: () => void }) {
   const { data: categories } = useSWR<{ name: string }[]>("/api/finance/categories", fetcher);
+  const { data: shortcuts, mutate: setShortcuts } = useSWR<Shortcut[]>("/api/finance/shortcuts", fetcher);
   const [form, setForm] = useState({ date: today(), description: "", category: "", amount: "" });
   const [income, setIncome] = useState(false);
-  const [error, setError] = useState<string>();
+  const [repeat, setRepeat] = useState("");
+  const [msg, setMsg] = useState<{ text: string; error?: boolean }>();
   const [busy, setBusy] = useState(false);
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const parsed = () => {
     const value = Number(form.amount.replace(",", "."));
-    if (!form.description.trim() || !Number.isFinite(value) || value <= 0) {
-      return setError("Enter a description and a positive amount");
-    }
+    return form.description.trim() && Number.isFinite(value) && value > 0 ? (income ? value : -value) : undefined;
+  };
+
+  const run = async (fn: () => Promise<string>) => {
     setBusy(true);
-    setError(undefined);
+    setMsg(undefined);
     try {
-      await sendJson("/api/finance/transactions", "POST", {
-        date: form.date,
-        description: form.description,
-        category: form.category || null,
-        amount: income ? value : -value,
-        currency,
-      });
-      setForm((f) => ({ ...f, description: "", amount: "" }));
-      onAdded();
+      setMsg({ text: await fn() });
     } catch (err) {
-      setError((err as Error).message);
+      setMsg({ text: (err as Error).message, error: true });
     } finally {
       setBusy(false);
     }
   };
 
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const amount = parsed();
+    if (amount === undefined) return setMsg({ text: "Enter a description and a positive amount", error: true });
+    void run(async () => {
+      const base = { description: form.description, category: form.category || null, amount, currency };
+      let text = `Added ${form.description}.`;
+      if (repeat) {
+        const r = await sendJson<{ added: number }>("/api/finance/recurring", "POST", { ...base, every: repeat, startDate: form.date });
+        text = `Added ${form.description}, repeating every ${repeat}${r.added > 1 ? ` (${r.added} past occurrences filled in)` : ""}.`;
+      } else {
+        await sendJson("/api/finance/transactions", "POST", { ...base, date: form.date });
+      }
+      setForm((f) => ({ ...f, description: "", amount: "" }));
+      setRepeat("");
+      onAdded();
+      return text;
+    });
+  };
+
+  const saveShortcut = () => {
+    const amount = parsed();
+    if (amount === undefined) return setMsg({ text: "Fill in a description and amount to save them as a shortcut", error: true });
+    void run(async () => {
+      await setShortcuts(await sendJson<Shortcut[]>("/api/finance/shortcuts", "POST", { label: form.description, amount, currency, category: form.category || null }), { revalidate: false });
+      return `Saved “${form.description}” as a shortcut.`;
+    });
+  };
+
+  const addShortcut = (s: Shortcut) =>
+    void run(async () => {
+      await sendJson("/api/finance/transactions", "POST", { date: today(), description: s.label, category: s.category, amount: s.amount_cents / 100, currency: s.currency });
+      onAdded();
+      return `Added ${s.label} (${money(s.amount_cents, s.currency, true)}).`;
+    });
+
   return (
     <form onSubmit={submit} className="glass flex flex-col gap-2 rounded-2xl p-3" aria-label="Add a transaction">
+      {!!shortcuts?.length && (
+        <ul className="flex flex-wrap gap-1.5" aria-label="Shortcuts">
+          {shortcuts.map((s) => (
+            <li key={s.id} className="group flex items-center rounded-full bg-chip text-sm">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => addShortcut(s)}
+                title={`Add ${s.label} today${s.category ? ` (${s.category})` : ""}`}
+                className="flex items-center gap-1.5 rounded-full py-1 pr-1 pl-3 hover:bg-hover disabled:opacity-60"
+              >
+                <Zap className="h-3.5 w-3.5 text-accent" />
+                {s.label}
+                <span className={`tabular-nums text-xs ${s.amount_cents > 0 ? "text-[var(--ok)]" : "text-muted"}`}>{money(s.amount_cents, s.currency, true)}</span>
+              </button>
+              <button
+                type="button"
+                aria-label={`Remove shortcut ${s.label}`}
+                onClick={async () => setShortcuts(await sendJson<Shortcut[]>(`/api/finance/shortcuts?id=${s.id}`, "DELETE"), { revalidate: false })}
+                className="mr-1 rounded-full p-1 text-muted opacity-40 group-hover:opacity-100 hover:bg-hover hover:text-fg focus-visible:opacity-100"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <input type="date" aria-label="Date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={`${inputBase} w-40`} />
         <input
@@ -84,6 +146,22 @@ export function QuickAdd({ currency, onAdded }: { currency: string; onAdded: () 
           onChange={(e) => setForm({ ...form, amount: e.target.value })}
           className={`${inputBase} w-32 text-right tabular-nums`}
         />
+        <select aria-label="Repeat" value={repeat} onChange={(e) => setRepeat(e.target.value)} className={`${inputBase} w-32`} title="Repeat from the date on the left">
+          <option value="">Once</option>
+          <option value="week">Every week</option>
+          <option value="month">Every month</option>
+          <option value="year">Every year</option>
+        </select>
+        <button
+          type="button"
+          onClick={saveShortcut}
+          disabled={busy}
+          aria-label="Save as a shortcut"
+          title="Save as a one-tap shortcut"
+          className="grid h-10 w-10 place-items-center rounded-xl bg-chip text-muted hover:bg-hover hover:text-fg disabled:opacity-60"
+        >
+          <Star className="h-4 w-4" />
+        </button>
         <button
           type="submit"
           disabled={busy}
@@ -92,7 +170,11 @@ export function QuickAdd({ currency, onAdded }: { currency: string; onAdded: () 
           <Plus className="h-4 w-4" /> Add
         </button>
       </div>
-      {error && <p role="alert" className="text-sm text-[var(--err)]">{error}</p>}
+      {msg && (
+        <p role={msg.error ? "alert" : "status"} className={`text-sm ${msg.error ? "text-[var(--err)]" : "text-muted"}`}>
+          {msg.text}
+        </p>
+      )}
     </form>
   );
 }

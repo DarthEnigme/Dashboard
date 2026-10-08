@@ -109,6 +109,11 @@ export const settingsSchema = z
         /** ntfy topic URL (e.g. https://ntfy.sh/my-homelab) and an optional access token. */
         ntfy: z.string().optional(),
         ntfyToken: z.string().optional(),
+        /** Slack incoming-webhook URL. */
+        slack: z.string().optional(),
+        /** Telegram bot token (from @BotFather) and the chat to post in (an id like 123456789 or -100…, or @channel). */
+        telegramToken: z.string().optional(),
+        telegramChat: z.string().optional(),
         threshold: z.number().int().min(1).default(2),
         /** Warn this many days before an HTTPS certificate of a checked service expires (0 = never). */
         certDays: z.number().int().min(0).default(14),
@@ -271,6 +276,6 @@ export type ConfigFile = keyof typeof configFiles;
 export const SECRET_KEYS = ["key", "apikey", "password", "token", "secret", "clientsecret", "bindpassword", "community"];
 export const isSecretKey = (k: string) => SECRET_KEYS.includes(k.toLowerCase());
 /** Settings values that never leave the server (webhook URLs embed tokens). */
-export const SETTINGS_SECRETS = ["alerts.discord", "alerts.webhook", "alerts.gotifyToken", "alerts.ntfy", "alerts.ntfyToken"];
+export const SETTINGS_SECRETS = ["alerts.discord", "alerts.webhook", "alerts.gotifyToken", "alerts.ntfy", "alerts.ntfyToken", "alerts.slack", "alerts.telegramToken"];
 /** Placeholder shown to the editor in place of a secret value. */
 export const MASK = "••••••••";

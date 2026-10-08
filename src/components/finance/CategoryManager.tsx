@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import useSWR from "swr";
 import { Pencil } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
@@ -8,7 +8,7 @@ import type { FieldSpec } from "@/integrations/fields";
 import { FieldsDialog } from "../edit/FieldsDialog";
 import { DeleteButton, IconButton } from "../edit/controls";
 
-type Cat = { name: string; slot: number | null; budget: number | null; count: number };
+type Cat = { name: string; slot: number | null; color: string | null; budget: number | null; count: number };
 
 const renameFields: FieldSpec[] = [
   { key: "rename", label: "New name", required: true, help: "Use an existing category's name to merge into it." },
@@ -16,12 +16,14 @@ const renameFields: FieldSpec[] = [
 
 /**
  * Chart colours are the eight palette slots, each owned by at most one category (never reused,
- * never cycled). Categories without a slot are grouped as "Other" in charts.
+ * never cycled), checked for colour-blind safety. Past eight, a category can take its own colour;
+ * categories with neither are grouped as "Other" in charts.
  */
 export function CategoryManager({ onChanged, currency }: { onChanged: () => void; currency: string }) {
   const { data, mutate } = useSWR<Cat[]>("/api/finance/categories", fetcher);
   const [renaming, setRenaming] = useState<Cat>();
   const [error, setError] = useState<string>();
+  const colorTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const post = async (body: Record<string, unknown>) => {
     setError(undefined);
@@ -36,8 +38,9 @@ export function CategoryManager({ onChanged, currency }: { onChanged: () => void
   return (
     <section className="glass flex flex-col gap-2 rounded-3xl p-4">
       <p className="text-sm text-muted">
-        Pick a chart colour per category. Eight colours exist; a category without one is shown as <em>Other</em>. A monthly budget
-        adds the category to the Budgets card and alerts you when it is used up.
+        Pick a chart colour per category. The eight palette colours are easy to tell apart, also for colour-blind people. For more
+        categories, pick your own colour with <em>Custom</em>. A category without a colour is shown as <em>Other</em>. A monthly
+        budget adds the category to the Budgets card and alerts you when it is used up.
       </p>
       {error && <p role="alert" className="text-sm text-[var(--err)]">{error}</p>}
       {data?.length === 0 && <p className="py-6 text-center text-sm text-muted">Categories appear as you add transactions.</p>}
@@ -50,19 +53,38 @@ export function CategoryManager({ onChanged, currency }: { onChanged: () => void
               <button
                 key={slot}
                 role="radio"
-                aria-checked={c.slot === slot}
+                aria-checked={!c.color && c.slot === slot}
                 aria-label={`Colour ${slot}`}
-                onClick={() => post({ name: c.name, slot })}
-                className={`h-5 w-5 rounded-md transition ${c.slot === slot ? "ring-2 ring-fg ring-offset-2 ring-offset-transparent" : "opacity-70 hover:opacity-100"}`}
+                onClick={() => post({ name: c.name, slot, ...(c.color ? { color: null } : {}) })}
+                className={`h-5 w-5 rounded-md transition ${!c.color && c.slot === slot ? "ring-2 ring-fg ring-offset-2 ring-offset-transparent" : "opacity-70 hover:opacity-100"}`}
                 style={{ background: `var(--series-${slot})` }}
               />
             ))}
+            <label
+              title="Your own colour"
+              className={`relative flex h-5 cursor-pointer items-center gap-1 rounded-md border border-line px-1.5 text-[10px] text-muted ${c.color ? "ring-2 ring-fg" : ""}`}
+            >
+              <span aria-hidden className="h-2.5 w-2.5 rounded-[3px]" style={{ background: c.color ?? "conic-gradient(#e66767, #c98500, #199e70, #3987e5, #9085e9, #e66767)" }} />
+              Custom
+              <input
+                type="color"
+                aria-label={`Custom colour for ${c.name}`}
+                value={c.color ?? "#888888"}
+                // Dragging in the picker fires a change per step: save once it settles.
+                onChange={(e) => {
+                  const v = e.target.value;
+                  clearTimeout(colorTimer.current);
+                  colorTimer.current = setTimeout(() => v !== c.color && post({ name: c.name, color: v }), 500);
+                }}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
             <button
               role="radio"
-              aria-checked={c.slot === null}
+              aria-checked={c.slot === null && !c.color}
               aria-label="No colour (Other)"
-              onClick={() => post({ name: c.name, slot: null })}
-              className={`h-5 rounded-md border border-line px-1.5 text-[10px] text-muted ${c.slot === null ? "ring-2 ring-fg" : ""}`}
+              onClick={() => post({ name: c.name, slot: null, color: null })}
+              className={`h-5 rounded-md border border-line px-1.5 text-[10px] text-muted ${c.slot === null && !c.color ? "ring-2 ring-fg" : ""}`}
             >
               Other
             </button>

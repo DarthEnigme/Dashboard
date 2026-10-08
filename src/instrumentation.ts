@@ -3,6 +3,7 @@ export async function register() {
     const { startMonitor, onHourly } = await import("./lib/monitor");
     const { fireflyDailyJob } = await import("./lib/finance/firefly");
     const { budgetAlertJob } = await import("./lib/finance/budgets");
+    const { recurringJob } = await import("./lib/finance/recurring");
     const { updateJob } = await import("./lib/update/job");
     const { reconcilePendingUpdate } = await import("./lib/update/apply");
     try {
@@ -12,6 +13,7 @@ export async function register() {
     }
     startMonitor();
     onHourly(fireflyDailyJob);
+    onHourly(recurringJob);
     onHourly(budgetAlertJob);
     onHourly(updateJob);
   }

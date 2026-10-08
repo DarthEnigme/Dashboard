@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR, { useSWRConfig } from "swr";
 import { motion } from "framer-motion";
-import { ArrowLeft, ChevronLeft, ChevronRight, Coins } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Coins, PiggyBank } from "lucide-react";
 import { fetcher } from "@/lib/fetcher";
 import type { Summary } from "@/lib/finance/aggregate";
 import { money } from "@/lib/finance/format";
@@ -15,8 +15,12 @@ import { QuickAdd } from "./QuickAdd";
 import { TransactionList } from "./TransactionList";
 import { CategoryManager } from "./CategoryManager";
 import { CsvImport } from "./CsvImport";
+import { Plan } from "./Plan";
+import { GOALS_KEY, SaveDialog, Savings } from "./Savings";
+import type { Goal } from "@/lib/finance/goals";
 
-type View = "overview" | "flow" | "transactions" | "categories" | "import";
+const VIEWS = ["overview", "flow", "transactions", "plan", "savings", "categories", "import"] as const;
+type View = (typeof VIEWS)[number];
 
 const shift = (period: string, n: number) => {
   if (period.length === 4) return String(Number(period) + n);
@@ -51,6 +55,8 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
   const { mutate } = useSWRConfig();
   const { data: summary } = useSWR<SummaryResponse>(`/api/finance/summary?period=${period}&currency=${currency}`, fetcher, { keepPreviousData: true });
   const currencies = [...new Set([currency, defaultCurrency, ...(summary?.currencies ?? []), ...COMMON])];
+  const { data: goals, mutate: setGoals } = useSWR<Goal[]>(GOALS_KEY, fetcher);
+  const [saving, setSaving] = useState(false);
 
   /** After any change: refresh every finance query (summary, lists, categories). */
   const refresh = () => mutate((key) => typeof key === "string" && key.startsWith("/api/finance/"));
@@ -75,6 +81,13 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => (goals?.length ? setSaving(true) : setView("savings"))}
+            className="glass glass-interactive flex h-9 items-center gap-1.5 rounded-full px-3 text-sm"
+            title={goals?.length ? "Put money aside for a savings goal" : "Create a savings goal"}
+          >
+            <PiggyBank className="h-4 w-4" /> Savings
+          </button>
           <label className="glass flex h-9 items-center gap-1.5 rounded-full pr-1 pl-3 text-sm" title="Show amounts in this currency">
             <Coins className="h-4 w-4 text-muted" />
             <select
@@ -131,7 +144,7 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
       </div>
 
       <nav className="glass flex w-fit flex-wrap gap-1 rounded-full p-1 text-sm" role="tablist" aria-label="Finance sections">
-        {(["overview", "flow", "transactions", "categories", "import"] as const).map((v) => (
+        {VIEWS.map((v) => (
           <button
             key={v}
             role="tab"
@@ -185,8 +198,11 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
         </section>
       )}
       {view === "transactions" && <TransactionList period={period} currency={currency} onChanged={refresh} />}
+      {view === "plan" && <Plan currency={currency} onChanged={refresh} />}
+      {view === "savings" && <Savings currency={defaultCurrency} />}
       {view === "categories" && <CategoryManager onChanged={refresh} currency={defaultCurrency} />}
       {view === "import" && <CsvImport currency={currency} onImported={refresh} />}
+      {saving && goals && <SaveDialog goals={goals} onClose={() => setSaving(false)} onDone={(list) => setGoals(list, { revalidate: false })} />}
     </main>
   );
 }
