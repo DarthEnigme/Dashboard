@@ -56,7 +56,7 @@ Open http://localhost:3000 and choose **Set up** to create the admin account (or
 
   Open pages notice the new version and offer a reload. Each attempt is listed under **History**.
 - **By hand:** `docker compose pull && docker compose up -d`, or for a source install `git pull && npm ci && npm run build`.
-- **Automatically:** set `updates.auto: true` to install new versions at `updates.window` (one attempt per version).
+- **Automatically:** set `updates.auto: true` to install new versions at `updates.window`. There is one attempt per version. If the release's image isn't in the registry yet, the attempt doesn't count, and Page tries again at the next window.
 
 ```yaml
 updates:
@@ -69,7 +69,7 @@ updates:
   image: ghcr.io/owner/page  # optional: defaults to the image the container runs
 ```
 
-The `:ro` flag on the socket mount doesn't limit what the Docker API allows, so the default mount is enough. Without the socket, Page shows the manual steps instead. To publish a release, bump `version` in `package.json`, then push a matching tag (`v0.3.1`). The Release workflow creates the GitHub release with generated notes, and the Docker workflow pushes the image.
+The `:ro` flag on the socket mount doesn't limit what the Docker API allows, so the default mount is enough. Without the socket, Page shows the manual steps instead. To publish a release, bump `version` in `package.json`, then push a matching tag (`v0.3.1`). The Docker workflow builds amd64 and arm64 on native runners, pushes the multi-arch image, and only then creates the GitHub release with generated notes. Running Pages never see a version whose image can't be pulled.
 
 ## Run locally
 

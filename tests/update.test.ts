@@ -2,7 +2,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { checkForUpdate, compareSemver } from "@/lib/update/check";
-import { imageRepo } from "@/lib/update/apply";
+import { imageRepo, isMissingImage } from "@/lib/update/apply";
 import { inWindow } from "@/lib/update/job";
 // @ts-expect-error plain ESM script without types
 import { planRecreate } from "../scripts/updater.mjs";
@@ -134,5 +134,17 @@ describe("updater", () => {
     expect(imageRepo("Me/Page@sha256:abc")).toBe("me/page");
     expect(inWindow("04:00", new Date(2026, 9, 5, 4, 30))).toBe(true);
     expect(inWindow("04:00", new Date(2026, 9, 5, 5, 0))).toBe(false);
+  });
+});
+
+describe("missing image", () => {
+  it("recognises Docker's not-found errors, so an unpublished image doesn't use up the automatic attempt", () => {
+    expect(
+      isMissingImage(
+        '(HTTP code 404) unexpected - failed to resolve reference "ghcr.io/darthenigme/dashboard:0.5.1": ghcr.io/darthenigme/dashboard:0.5.1: not found',
+      ),
+    ).toBe(true);
+    expect(isMissingImage("manifest unknown")).toBe(true);
+    expect(isMissingImage("connect ECONNREFUSED /var/run/docker.sock")).toBe(false);
   });
 });

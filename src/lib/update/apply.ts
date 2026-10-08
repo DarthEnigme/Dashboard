@@ -128,6 +128,12 @@ export async function preflight(cfg: Settings["updates"]): Promise<Preflight & {
 
 // ---------- apply ----------
 
+/** The release exists but its image doesn't (yet): the build is still running, or it failed. */
+export class ImageMissingError extends Error {}
+
+/** Docker's wording for a tag the registry doesn't have. */
+export const isMissingImage = (message: string) => /not found|manifest unknown|no such manifest|failed to resolve reference/i.test(message);
+
 function pull(docker: Docker, ref: string, onPercent: (p: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     docker.pull(ref, (err: Error | null, stream: NodeJS.ReadableStream) => {
@@ -180,6 +186,9 @@ export async function applyUpdate(cfg: Settings["updates"], status: UpdateStatus
       if (percent === last) return;
       last = percent;
       setProgress({ ...updateProgress(), percent });
+    }).catch((e: Error) => {
+      if (!isMissingImage(e.message)) throw e;
+      throw new ImageMissingError(`The ${ref} image isn't published yet: its build may still be running, or it failed. Try again later.`);
     });
 
     // The helper needs the Docker API: the same socket mount, or the same DOCKER_HOST and network.

@@ -2,7 +2,7 @@ import { loadConfig } from "../config/load";
 import { getAppMeta, setAppMeta } from "../db";
 import { hasAlertChannel, sendNotice } from "../alerts";
 import { CHECK_EVERY_MS, refreshStatus, savedStatus } from "./check";
-import { applyUpdate, preflight } from "./apply";
+import { applyUpdate, ImageMissingError, preflight } from "./apply";
 
 /** The hourly job runs once per hour, so "in the window" means the window's hour. */
 export function inWindow(window: string, now: Date): boolean {
@@ -31,10 +31,16 @@ export async function updateJob(now = new Date()) {
     if (!errors.length) setAppMeta("update.notified", version);
   }
 
-  // One automatic attempt per version: a failed one waits for an admin.
+  // One automatic attempt per version: a failed one waits for an admin. An image that isn't
+  // published yet doesn't count: the next window tries again.
   if (cfg.auto && inWindow(cfg.window, now) && getAppMeta<string>("update.autoTried") !== version) {
     if (!(await preflight(cfg)).canApply) return;
     setAppMeta("update.autoTried", version);
-    await applyUpdate(cfg, status, "auto-update");
+    try {
+      await applyUpdate(cfg, status, "auto-update");
+    } catch (e) {
+      if (!(e instanceof ImageMissingError)) throw e;
+      setAppMeta("update.autoTried", undefined);
+    }
   }
 }
