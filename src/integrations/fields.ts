@@ -4,8 +4,13 @@ export interface FieldSpec {
   label: string;
   placeholder?: string;
   secret?: boolean;
-  /** "list": comma-separated strings. "yaml": nested values (objects, arrays) edited as YAML. */
-  kind?: "text" | "number" | "boolean" | "select" | "color" | "list" | "yaml" | "range";
+  /**
+   * "list": comma-separated strings. "yaml": nested values (objects, arrays) edited as YAML.
+   * "textarea": multi-line text. "image": a URL, or a file uploaded to `upload`.
+   */
+  kind?: "text" | "number" | "boolean" | "select" | "color" | "list" | "yaml" | "range" | "textarea" | "image";
+  /** "image" only: endpoint taking a multipart `file` and answering { url }. */
+  upload?: string;
   options?: string[];
   /** "range" only. */
   min?: number;

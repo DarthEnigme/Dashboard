@@ -3,6 +3,7 @@ import { hasAlertChannel, sendNotice } from "../alerts";
 import { summarize, type BudgetStatus } from "./aggregate";
 import { allForSummary, getMeta, listCategories, setMeta } from "./store";
 import { money } from "./format";
+import { ratesForSummary } from "./rates";
 
 export const BUDGET_WARN_SHARE = 0.8;
 
@@ -30,7 +31,7 @@ export async function budgetAlertJob() {
   if (level === "off" || !hasAlertChannel(settings.alerts)) return;
   const month = new Date().toISOString().slice(0, 7);
   const currency = settings.finance.currency;
-  const s = summarize(allForSummary(), listCategories(), month, currency);
+  const s = summarize(allForSummary(), listCategories(), month, currency, (await ratesForSummary(currency))?.rates);
   for (const { budget: b, mark, key } of budgetCrossings(s.budgets, level, (k) => !!getMeta(k), month)) {
     const pct = Math.round((b.spent / b.budget) * 100);
     const errors = await sendNotice(settings.alerts, {

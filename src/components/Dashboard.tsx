@@ -100,6 +100,7 @@ export function Dashboard({ config, auth, tabs, version }: { config: ClientConfi
         onEdit={auth.canEdit ? () => setMode("edit") : undefined}
         showSettings={auth.canEdit}
         updateAvailable={update?.available ? update.version : undefined}
+        showFinance={!!auth.user}
         account={<UserMenu auth={auth} />}
       />
 

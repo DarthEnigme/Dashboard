@@ -100,7 +100,7 @@ accent: "#8b5cf6"      # or "auto" to take it from the wallpaper
 glow: subtle           # none | subtle | strong: edge light and accent glow on hovered cards
 background:
   gradient: aurora     # aurora | sunset | ocean | midnight | forest | aero | dawn | lagoon | graphite | nebula | synthwave
-  image: https://...   # optional; overrides the gradient
+  image: https://...   # optional; overrides the gradient. Or upload a file in Settings → Background
   blur: 0              # px, image only
   brightness: 0.7      # 0-1, image only
 columns: 4             # optional max tiles per row (fluid if omitted)
@@ -120,6 +120,12 @@ alerts:
   ntfy: https://ntfy.sh/my-homelab    # a topic URL; ntfyToken for protected topics
   threshold: 2         # failed checks in a row before alerting
   certDays: 14         # warn this many days before an HTTPS certificate expires (0 = off)
+  title: Homelab       # sender name (Discord username, Gotify/ntfy title); default "Page"
+  messages:            # optional templates (see "Alert messages")
+    down: "🔴 {{service}} is DOWN ({{reason}})"
+    up: "🟢 {{service}} is back after {{duration}}"
+    notice: "[{{kind}}] {{message}}"
+  webhookBody: '{"text": "{{message}}", "service": "{{service}}"}'   # optional custom JSON for the webhook
 docker:
   discovery: false     # build services from container labels
   hosts:
@@ -382,7 +388,18 @@ A background job checks every service that has `ping` set, every `pingInterval` 
 **Alerts:**
 - After `alerts.threshold` failed checks in a row, Page sends a DOWN alert to Discord and/or your webhook.
 - When the service comes back, it sends a RECOVERED alert with the outage length.
-- Use **Send test alert** in the editor's Settings to check your setup.
+- Use **Send** under Monitoring & alerts in Settings to check your setup. Pick **Sample: service down** or **back up** to see your templates.
+
+### Alert messages
+
+`alerts.messages.down`, `.up` and `.notice` replace Page's built-in text on every channel. Empty ones keep the built-in text. `{{name}}` is replaced by a variable, and unknown names become empty:
+- **Service alerts:** `service`, `status` (down, up), `reason` (e.g. HTTP 503), `duration` (outage length, e.g. 12m), `since`, `url`, `error`, `httpStatus`.
+- **Notices:** budgets, updates, certificates and thresholds pass their own fields (`service`, `version`, `category`, `value`…). `kind` is budget, update, cert or threshold.
+- **Everywhere:** `message` (Page's own text), `level` (info, warn, error), `time` and `title`.
+
+`alerts.webhookBody` sends your own JSON to the generic webhook instead of Page's, e.g. for Slack, Mattermost or Home Assistant. Values are escaped for JSON strings, so keep the quotes around `"{{…}}"`. There, `message` is the text after templating.
+
+Template placeholders don't clash with secrets: only `{{HOMEPAGE_VAR_…}}` and `{{HOMEPAGE_FILE_…}}` are read from the environment.
 
 History is stored per service id (group name + service name), so renaming a service starts a fresh history.
 
@@ -538,14 +555,19 @@ Everyone else is refused. Unverified emails are never used to match. LDAP and pr
 
 **Proxy sign-in** trusts the `Remote-User`, `Remote-Email`, `Remote-Name` and `Remote-Groups` headers. It only does so when the request also carries the shared secret, so make sure only your proxy can reach Page, and configure the proxy to add the header.
 
+**Profile:** everyone can open **Profile** from the account menu. There you can set a display name, upload a profile picture (PNG, JPEG, WebP, GIF or AVIF, up to 2 MB) and change your password if you have one. Email, role and SSO links stay with admins, because the email is what links SSO sign-ins to accounts.
+
+**Uploads:** profile pictures and uploaded wallpapers are kept in `data/uploads/`. Back up the data folder to keep them. They are served at unguessable URLs without signing in, because the wallpaper also shows to anonymous viewers.
+
 **Visibility:** add `visible: users` or `visible: admins` to a group, service, bookmark group or info widget to hide it from people below that role. The page and every API enforce this. Finance tiles default to `users`.
 
 ## Finance tracker
 
-Signed-in users get **Finance** in the account menu:
+Signed-in users get **Finance** in the header (the wallet button) and the account menu:
 - **Overview:** totals for the month or year, the money flow, budgets, a category donut, 12 months of income and spending, and the running balance.
 - **Flow:** a Sankey chart of where the money came from (income by category) and where it went (spending by category), with what was saved, or taken from savings when spending was higher. Categories under 2% are grouped as "Other". Hover a band for its amount and share.
-- **Transactions:** quick entry at the top, search and filter, edit and delete.
+- **Transactions:** quick entry at the top, search and filter, edit and delete. **Export CSV** downloads the period with the current filters. **All** downloads every transaction, and **JSON** gives the same data as JSON. The CSV opens in Excel and imports back into Page as is. Text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets don't run it as a formula.
+- **Currency:** the picker in the header shows everything in another currency, remembered per browser. Transactions in other currencies are converted at the latest ECB reference rates (via Frankfurter, no key, cached 6 hours and kept for offline use). Budgets are converted too. New transactions and imports use the currency being shown. A currency without an ECB rate is listed but left out of the totals, and the page says how many transactions that affects.
 - **Categories:** pick each category's chart colour. There are eight; categories without one are grouped as "Other". Renaming to an existing name merges the two. Each category can have a **monthly budget**: the Overview shows how much of it is used (×12 in the year view), and an alert is sent when it runs out.
 - **Import:**
   - Upload a bank CSV export and match its columns. Page guesses them from English and French headers and handles decimal commas, day-first dates and debit/credit columns.
@@ -554,7 +576,7 @@ Signed-in users get **Finance** in the account menu:
 
 ```yaml
 finance:
-  currency: EUR                 # totals and charts use this currency
+  currency: EUR                 # default currency for totals, charts and budgets (others are converted)
   fireflyService: money.firefly # optional: sync daily from this Firefly III widget's service
   budgetAlerts: over            # over: alert when a budget is used up; warn: also at 80%; off
 ```

@@ -17,7 +17,7 @@ const MAX = 5 * 1024 * 1024;
 export async function POST(req: Request) {
   const g = await guard(req);
   if ("error" in g) return g.error;
-  const b = ((await req.json().catch(() => ({}))) ?? {}) as { text?: string; mapping?: CsvMapping; commit?: boolean };
+  const b = ((await req.json().catch(() => ({}))) ?? {}) as { text?: string; mapping?: CsvMapping; commit?: boolean; currency?: string };
   if (!b.text) return bad("Paste or upload a CSV file");
   if (b.text.length > MAX) return bad("File too large (5 MB max)");
   const rows = parseCsv(b.text);
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   const { transactions, errors } = mapRows(rows, m);
   if (!b.commit) return NextResponse.json({ preview: transactions.slice(0, 10), total: transactions.length, errors: errors.slice(0, 20) });
 
-  const currency = loadConfig().settings.finance.currency;
+  const currency = typeof b.currency === "string" && /^[A-Za-z]{3}$/.test(b.currency) ? b.currency.toUpperCase() : loadConfig().settings.finance.currency;
   const result = importTransactions(
     transactions.map((t) => ({
       date: t.date,

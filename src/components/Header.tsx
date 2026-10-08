@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
-import { Command, Pencil, Search, Settings, X } from "lucide-react";
+import { Command, Pencil, Search, Settings, Wallet, X } from "lucide-react";
 
 interface Props {
   title: string;
@@ -15,11 +15,13 @@ interface Props {
   showSettings?: boolean;
   /** Admins: a newer version of Page is available (dot on the gear). */
   updateAvailable?: string;
+  /** Signed-in users: a wallet button linking to the finance page. */
+  showFinance?: boolean;
   /** User menu or sign-in link, after the edit button. */
   account?: ReactNode;
 }
 
-export function Header({ title, description, query, onQuery, onSubmit, onEdit, showSettings, updateAvailable, account }: Props) {
+export function Header({ title, description, query, onQuery, onSubmit, onEdit, showSettings, updateAvailable, showFinance, account }: Props) {
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -90,6 +92,11 @@ export function Header({ title, description, query, onQuery, onSubmit, onEdit, s
           >
             <Pencil className="h-4 w-4" />
           </button>
+        )}
+        {showFinance && (
+          <Link href="/finance" className="glass glass-interactive grid h-11 w-11 shrink-0 place-items-center rounded-full" aria-label="Finance" title="Finance">
+            <Wallet className="h-4 w-4" />
+          </Link>
         )}
         {showSettings && (
           <Link

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR, { useSWRConfig } from "swr";
 import { motion } from "framer-motion";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Coins } from "lucide-react";
 import { fetcher } from "@/lib/fetcher";
 import type { Summary } from "@/lib/finance/aggregate";
 import { money } from "@/lib/finance/format";
@@ -24,11 +24,33 @@ const shift = (period: string, n: number) => {
   return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7);
 };
 
-export function FinancePage({ currency }: { currency: string }) {
+/** Offered in the currency picker besides the ones transactions use (all have ECB rates). */
+const COMMON = ["EUR", "USD", "GBP", "CHF", "CAD", "AUD", "JPY", "SEK", "NOK", "DKK", "PLN", "CZK"];
+const CURRENCY_KEY = "page.finance.currency";
+
+type SummaryResponse = Summary & { currencies: string[]; ratesDate: string | null };
+
+export function FinancePage({ currency: defaultCurrency }: { currency: string }) {
   const [period, setPeriod] = useState(() => new Date().toISOString().slice(0, 7));
   const [view, setView] = useState<View>("overview");
+  // Display currency: per browser, defaults to the finance currency setting.
+  const [currency, setCurrency] = useState(defaultCurrency);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CURRENCY_KEY);
+      if (saved && /^[A-Z]{3}$/.test(saved)) setCurrency(saved);
+    } catch {}
+  }, []);
+  const pickCurrency = (c: string) => {
+    setCurrency(c);
+    try {
+      if (c === defaultCurrency) localStorage.removeItem(CURRENCY_KEY);
+      else localStorage.setItem(CURRENCY_KEY, c);
+    } catch {}
+  };
   const { mutate } = useSWRConfig();
-  const { data: summary } = useSWR<Summary>(`/api/finance/summary?period=${period}`, fetcher, { keepPreviousData: true });
+  const { data: summary } = useSWR<SummaryResponse>(`/api/finance/summary?period=${period}&currency=${currency}`, fetcher, { keepPreviousData: true });
+  const currencies = [...new Set([currency, defaultCurrency, ...(summary?.currencies ?? []), ...COMMON])];
 
   /** After any change: refresh every finance query (summary, lists, categories). */
   const refresh = () => mutate((key) => typeof key === "string" && key.startsWith("/api/finance/"));
@@ -42,9 +64,33 @@ export function FinancePage({ currency }: { currency: string }) {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Finance</h1>
-          <p className="text-muted">Spending and income, in {currency}.</p>
+          <p className="text-muted">
+            Spending and income, in {currency}.
+            {summary && summary.converted > 0 && summary.ratesDate && <> Other currencies converted at ECB rates of {summary.ratesDate}.</>}
+          </p>
+          {summary && summary.skipped > 0 && (
+            <p className="text-sm text-[var(--warn)]">
+              {summary.skipped} {summary.skipped === 1 ? "transaction is" : "transactions are"} in a currency with no exchange rate and left out of the totals.
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="glass flex h-9 items-center gap-1.5 rounded-full pr-1 pl-3 text-sm" title="Show amounts in this currency">
+            <Coins className="h-4 w-4 text-muted" />
+            <select
+              aria-label="Currency"
+              value={currency}
+              onChange={(e) => pickCurrency(e.target.value)}
+              className="h-full cursor-pointer rounded-full bg-transparent pr-2 outline-none"
+            >
+              {currencies.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                  {c === defaultCurrency ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="glass flex items-center rounded-full p-1">
             <button aria-label="Previous period" onClick={() => setPeriod((p) => shift(p, -1))} className="rounded-full p-1.5 text-muted hover:bg-hover hover:text-fg">
               <ChevronLeft className="h-4 w-4" />
@@ -74,11 +120,11 @@ export function FinancePage({ currency }: { currency: string }) {
       <QuickAdd currency={currency} onAdded={refresh} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Stat label="Spent" value={summary ? money(summary.expense, currency) : "–"} />
-        <Stat label="Income" value={summary ? money(summary.income, currency) : "–"} />
+        <Stat label="Spent" value={summary ? money(summary.expense, summary.currency) : "–"} />
+        <Stat label="Income" value={summary ? money(summary.income, summary.currency) : "–"} />
         <Stat
           label="Net"
-          value={summary ? money(summary.net, currency, true) : "–"}
+          value={summary ? money(summary.net, summary.currency, true) : "–"}
           tone={summary && summary.net < 0 ? "bad" : "good"}
           note={summary ? `${summary.count} transactions` : undefined}
         />
@@ -112,19 +158,19 @@ export function FinancePage({ currency }: { currency: string }) {
               <h2 id="flow-title" className="mb-2 text-sm font-semibold">
                 Money flow
               </h2>
-              <Sankey flow={summary.flow} currency={currency} height={220} />
+              <Sankey flow={summary.flow} currency={summary.currency} height={220} />
             </section>
             <section className="glass rounded-3xl p-5" aria-labelledby="budgets-title">
               <h2 id="budgets-title" className="mb-3 text-sm font-semibold">
                 Budgets
               </h2>
-              <Budgets budgets={summary.budgets} currency={currency} yearly={period.length === 4} />
+              <Budgets budgets={summary.budgets} currency={summary.currency} yearly={period.length === 4} />
             </section>
           </div>
           <section className="glass rounded-3xl p-5">
             <FinanceCharts
               size="detail"
-              charts={{ currency, donut: summary.categories, bars: summary.months, balance: summary.balance }}
+              charts={{ currency: summary.currency, donut: summary.categories, bars: summary.months, balance: summary.balance }}
             />
           </section>
         </>
@@ -135,11 +181,11 @@ export function FinancePage({ currency }: { currency: string }) {
             Where the money came from and where it went · {summary.period.label}
           </h2>
           <p className="mb-4 text-xs text-muted">Income by category on the left, spending on the right. Hover a band for its share.</p>
-          <Sankey flow={summary.flow} currency={currency} height={420} />
+          <Sankey flow={summary.flow} currency={summary.currency} height={420} />
         </section>
       )}
       {view === "transactions" && <TransactionList period={period} currency={currency} onChanged={refresh} />}
-      {view === "categories" && <CategoryManager onChanged={refresh} currency={currency} />}
+      {view === "categories" && <CategoryManager onChanged={refresh} currency={defaultCurrency} />}
       {view === "import" && <CsvImport currency={currency} onImported={refresh} />}
     </main>
   );

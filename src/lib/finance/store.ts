@@ -36,6 +36,10 @@ export function listTransactions(filter: { from?: string; to?: string; category?
 export const allForSummary = () =>
   db().prepare("SELECT date, amount_cents, currency, category FROM fin_transactions").all() as unknown as Txn[];
 
+/** Currencies that transactions use, most used first. */
+export const currenciesInUse = () =>
+  (db().prepare("SELECT UPPER(currency) AS c FROM fin_transactions GROUP BY UPPER(currency) ORDER BY COUNT(*) DESC").all() as { c: string }[]).map((r) => r.c);
+
 export function listCategories(): (CategoryInfo & { count: number })[] {
   return db()
     .prepare(

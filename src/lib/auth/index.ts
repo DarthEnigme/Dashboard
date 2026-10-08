@@ -130,7 +130,7 @@ export function publicOrigin(req: Request): string {
 }
 
 export interface ClientAuth {
-  user: { id: number; username: string; name: string | null; role: "admin" | "user" } | null;
+  user: { id: number; username: string; name: string | null; role: "admin" | "user"; avatar: string | null; hasPassword: boolean } | null;
   needsSetup: boolean;
   editingEnabled: boolean;
   canEdit: boolean;
@@ -146,7 +146,9 @@ export async function clientAuth(): Promise<ClientAuth> {
     needsSetup = users.countUsers() === 0;
   } catch {}
   return {
-    user: v.user ? { id: v.user.id, username: v.user.username, name: v.user.name, role: v.user.role } : null,
+    user: v.user
+      ? { id: v.user.id, username: v.user.username, name: v.user.name, role: v.user.role, avatar: v.user.avatar, hasPassword: v.user.hasPassword }
+      : null,
     needsSetup,
     editingEnabled: settings.editing,
     canEdit: settings.editing && v.role === "admin",

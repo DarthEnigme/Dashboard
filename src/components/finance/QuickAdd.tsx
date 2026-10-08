@@ -30,6 +30,7 @@ export function QuickAdd({ currency, onAdded }: { currency: string; onAdded: () 
         description: form.description,
         category: form.category || null,
         amount: income ? value : -value,
+        currency,
       });
       setForm((f) => ({ ...f, description: "", amount: "" }));
       onAdded();

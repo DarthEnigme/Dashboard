@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import YAML from "yaml";
+import { Upload, X } from "lucide-react";
 import type { FieldSpec } from "@/integrations/fields";
 import { MASK } from "@/lib/config/schema";
 
@@ -46,6 +47,21 @@ export function FieldInput({
     control = <ListInput id={id} value={value} placeholder={spec.placeholder} onChange={onChange} />;
   } else if (spec.kind === "yaml") {
     control = <YamlInput id={id} value={value} placeholder={spec.placeholder} onChange={onChange} />;
+  } else if (spec.kind === "textarea") {
+    const text = String(value ?? "");
+    control = (
+      <textarea
+        id={id}
+        rows={Math.min(10, Math.max(3, text.split("\n").length + 1))}
+        value={text}
+        placeholder={spec.placeholder}
+        spellCheck={false}
+        onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)}
+        className={`${inputClass} h-auto py-2 font-mono text-xs leading-relaxed`}
+      />
+    );
+  } else if (spec.kind === "image") {
+    control = <ImageInput id={id} value={value} placeholder={spec.placeholder} upload={spec.upload} onChange={onChange} />;
   } else if (spec.kind === "select") {
     control = (
       <select id={id} value={String(value ?? "")} onChange={(e) => onChange(e.target.value || undefined)} className={inputClass}>
@@ -117,6 +133,66 @@ export function FieldInput({
       {control}
       {spec.help && <p className="text-xs text-muted/80">{spec.help}</p>}
     </div>
+  );
+}
+
+/** POST one file as multipart `file`; the endpoint answers { url } or { error }. */
+export async function uploadFile(endpoint: string, file: File): Promise<string> {
+  const body = new FormData();
+  body.append("file", file);
+  const res = await fetch(endpoint, { method: "POST", body });
+  const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+  if (!res.ok || !data.url) throw new Error(data.error ?? `Upload failed (HTTP ${res.status})`);
+  return data.url;
+}
+
+/** A URL field with a thumbnail, an upload button and a clear button. */
+function ImageInput({ id, value, placeholder, upload, onChange }: { id: string; value: unknown; placeholder?: string; upload?: string; onChange: (v: FormValue) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const url = typeof value === "string" ? value : "";
+  const pick = async (file: File | undefined) => {
+    if (!file || !upload) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      onChange(await uploadFile(upload, file));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        {url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt="" className="h-10 w-16 shrink-0 rounded-lg object-cover ring-1 ring-line" />
+        )}
+        <input id={id} value={url} placeholder={placeholder} onChange={(e) => onChange(e.target.value || undefined)} className={inputClass} />
+        {upload && (
+          <label className={`flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl bg-track px-3 text-sm hover:bg-hover ${busy ? "pointer-events-none opacity-60" : ""}`}>
+            <Upload className="h-4 w-4" /> {busy ? "Uploading…" : "Upload"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+              className="sr-only"
+              onChange={(e) => {
+                void pick(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        )}
+        {url && (
+          <button type="button" onClick={() => onChange(undefined)} aria-label="Remove image" title="Remove image" className="shrink-0 rounded-lg p-2 text-muted hover:bg-hover hover:text-fg">
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      {error && <p className="text-xs text-[var(--err)]">{error}</p>}
+    </>
   );
 }
 

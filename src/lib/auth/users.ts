@@ -11,6 +11,8 @@ export interface User {
   disabled: boolean;
   hasPassword: boolean;
   createdAt: number;
+  /** URL of an uploaded profile picture. */
+  avatar: string | null;
 }
 
 interface Row {
@@ -22,6 +24,7 @@ interface Row {
   role: string;
   disabled: number;
   created_at: number;
+  avatar: string | null;
 }
 
 const toUser = (r: Row | undefined): User | undefined =>
@@ -34,6 +37,7 @@ const toUser = (r: Row | undefined): User | undefined =>
     disabled: !!r.disabled,
     hasPassword: !!r.password_hash,
     createdAt: r.created_at,
+    avatar: r.avatar ?? null,
   };
 
 const one = (sql: string, ...args: (string | number | null)[]) => db().prepare(sql).get(...args) as Row | undefined;
@@ -75,11 +79,12 @@ export function createUser(u: { username: string; email?: string | null; name?: 
 
 export function updateUser(
   id: number,
-  patch: Partial<{ email: string | null; name: string | null; role: Role; disabled: boolean; passwordHash: string | null }>,
+  patch: Partial<{ email: string | null; name: string | null; role: Role; disabled: boolean; passwordHash: string | null; avatar: string | null }>,
 ) {
   const cols: Record<string, string | number | null | undefined> = {
     email: patch.email,
     name: patch.name,
+    avatar: patch.avatar,
     role: patch.role,
     disabled: patch.disabled === undefined ? undefined : patch.disabled ? 1 : 0,
     password_hash: patch.passwordHash,

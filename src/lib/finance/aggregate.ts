@@ -3,6 +3,8 @@ export interface Txn {
   amount_cents: number;
   currency: string;
   category: string | null;
+  /** Set by convertTxns on amounts it converted. */
+  converted?: boolean;
 }
 
 export interface CategoryInfo {
@@ -61,6 +63,10 @@ export interface Summary {
   flow: Flow;
   /** Categories with a budget, most used first. */
   budgets: BudgetStatus[];
+  /** Transactions of this period converted from another currency. */
+  converted: number;
+  /** Transactions of this period left out: another currency without a rate. */
+  skipped: number;
 }
 
 const monthOf = (date: string) => date.slice(0, 7);
@@ -71,14 +77,32 @@ function addMonths(ym: string, n: number): string {
   return d.toISOString().slice(0, 7);
 }
 
-/** Summary for a month ("2026-10") or a year ("2026"), in one currency. */
-export function summarize(txns: Txn[], categories: CategoryInfo[], period: string, currency: string): Summary {
+/**
+ * Transactions in `currency`: others are converted with `rates` (units per one `currency`, as from
+ * ratesFor), or left out when there is no rate for them.
+ */
+export function convertTxns(txns: Txn[], currency: string, rates: Record<string, number> = {}): { txns: Txn[]; dropped: Txn[] } {
+  const target = currency.toUpperCase();
+  const out: Txn[] = [];
+  const dropped: Txn[] = [];
+  for (const t of txns) {
+    const cur = t.currency.toUpperCase();
+    if (cur === target) out.push(t);
+    else if (rates[cur] > 0) out.push({ ...t, currency: target, amount_cents: Math.round(t.amount_cents / rates[cur]), converted: true });
+    else dropped.push(t);
+  }
+  return { txns: out, dropped };
+}
+
+/** Summary for a month ("2026-10") or a year ("2026"), in one currency (see convertTxns for `rates`). */
+export function summarize(txns: Txn[], categories: CategoryInfo[], period: string, currency: string, rates?: Record<string, number>): Summary {
   const isYear = /^\d{4}$/.test(period);
   const from = isYear ? `${period}-01-01` : `${period}-01`;
   const lastMonth = isYear ? `${period}-12` : period;
   const to = `${lastMonth}-31`;
-  const mine = txns.filter((t) => t.currency.toUpperCase() === currency.toUpperCase());
-  const inPeriod = mine.filter((t) => t.date >= from && t.date <= to);
+  const inRange = (t: Txn) => t.date >= from && t.date <= to;
+  const { txns: mine, dropped } = convertTxns(txns, currency, rates);
+  const inPeriod = mine.filter(inRange);
 
   const income = inPeriod.filter((t) => t.amount_cents > 0).reduce((a, t) => a + t.amount_cents, 0);
   const expense = -inPeriod.filter((t) => t.amount_cents < 0).reduce((a, t) => a + t.amount_cents, 0);
@@ -150,6 +174,8 @@ export function summarize(txns: Txn[], categories: CategoryInfo[], period: strin
     balance,
     flow,
     budgets,
+    converted: inPeriod.filter((t) => t.converted).length,
+    skipped: dropped.filter(inRange).length,
   };
 }
 

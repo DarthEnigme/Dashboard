@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { LogIn, LogOut, Settings, ShieldCheck, Wallet } from "lucide-react";
+import { LogIn, LogOut, Settings, ShieldCheck, UserRound, Wallet } from "lucide-react";
 import { sendJson } from "@/lib/fetcher";
 import type { ClientAuth } from "@/lib/auth";
+import { Avatar, ProfileDialog } from "./ProfileDialog";
 
 /** Avatar with a small menu when signed in; a sign-in button otherwise. */
 export function UserMenu({ auth }: { auth: ClientAuth }) {
   const [open, setOpen] = useState(false);
+  const [profile, setProfile] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,9 +56,7 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
         aria-label={`Account: ${label}`}
         className="glass glass-interactive grid h-11 w-11 place-items-center rounded-full text-sm font-semibold"
       >
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-accent to-accent/50 text-white">
-          {label[0]?.toUpperCase()}
-        </span>
+        <Avatar user={u} size={32} />
       </button>
       <AnimatePresence>
         {open && (
@@ -69,14 +69,27 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
             className="glass glass-lens absolute right-0 z-40 mt-2 w-56 rounded-2xl p-1.5"
             style={{ background: "var(--dialog)" }}
           >
-            <div className="px-3 py-2">
-              <div className="truncate text-sm font-semibold">{label}</div>
-              <div className="flex items-center gap-1 text-xs text-muted">
-                {u.role === "admin" && <ShieldCheck className="h-3.5 w-3.5" />}
-                {u.role === "admin" ? "Admin" : "User"} · {u.username}
+            <div className="flex items-center gap-2.5 px-3 py-2">
+              <Avatar user={u} size={36} />
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold">{label}</div>
+                <div className="flex items-center gap-1 text-xs text-muted">
+                  {u.role === "admin" && <ShieldCheck className="h-3.5 w-3.5" />}
+                  {u.role === "admin" ? "Admin" : "User"} · {u.username}
+                </div>
               </div>
             </div>
             <div className="my-1 h-px bg-track" />
+            <button
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                setProfile(true);
+              }}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover"
+            >
+              <UserRound className="h-4 w-4" /> Profile
+            </button>
             <a role="menuitem" href="/finance" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover">
               <Wallet className="h-4 w-4" /> Finance
             </a>
@@ -91,6 +104,7 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
           </motion.div>
         )}
       </AnimatePresence>
+      {profile && <ProfileDialog user={u} passwordSignIn={auth.methods.local} onClose={() => setProfile(false)} />}
     </div>
   );
 }

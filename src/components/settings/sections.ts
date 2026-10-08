@@ -2,6 +2,8 @@ import { Activity, Archive, ArrowUpCircle, Container, LayoutGrid, Palette, Piggy
 import { glowLevels, gradientPresets, stylePresets, themes } from "@/lib/config/schema";
 import type { FieldSpec } from "@/integrations/fields";
 
+const ALERT_VARS = "{{service}}, {{status}}, {{reason}}, {{duration}}, {{since}}, {{url}}, {{message}}, {{level}}, {{time}}";
+
 /** Panels with their own UI next to (or instead of) the fields. */
 export type SectionExtra = "testAlert" | "users" | "backup" | "looks" | "updates";
 
@@ -47,7 +49,14 @@ export const sections: Section[] = [
     description: "A gradient, or an image of your own.",
     fields: [
       { key: "background.gradient", label: "Gradient", kind: "select", options: [...gradientPresets] },
-      { key: "background.image", label: "Image URL", placeholder: "https://…", help: "Overrides the gradient." },
+      {
+        key: "background.image",
+        label: "Image",
+        kind: "image",
+        upload: "/api/uploads/backgrounds",
+        placeholder: "https://… or upload a file",
+        help: "Overrides the gradient. PNG, JPEG, WebP, GIF or AVIF up to 15 MB.",
+      },
       { key: "background.brightness", label: "Image brightness", kind: "range", min: 0, max: 1, step: 0.05, placeholder: "0.7" },
       { key: "background.blur", label: "Image blur (px)", kind: "range", min: 0, max: 40, step: 1, placeholder: "0" },
     ],
@@ -95,6 +104,29 @@ export const sections: Section[] = [
       { key: "alerts.ntfyToken", label: "ntfy access token", secret: true, help: "Only for protected topics." },
       { key: "alerts.certDays", label: "Warn about expiring TLS certificates (days before)", kind: "number", placeholder: "14", help: "For services with an HTTPS status check. 0 turns it off." },
       { key: "alerts.threshold", label: "Alert after N failed checks", kind: "number", placeholder: "2" },
+      { key: "alerts.title", label: "Sender name", placeholder: "Page", help: "Discord username, Gotify and ntfy title." },
+      {
+        key: "alerts.messages.down",
+        label: "Message when a service goes down",
+        kind: "textarea",
+        placeholder: "🔴 {{service}} is DOWN ({{reason}})\n{{url}}",
+        help: `Empty keeps the built-in text. Variables: ${ALERT_VARS}.`,
+      },
+      { key: "alerts.messages.up", label: "Message when a service is back up", kind: "textarea", placeholder: "🟢 {{service}} is back UP after {{duration}}" },
+      {
+        key: "alerts.messages.notice",
+        label: "Message for other notices",
+        kind: "textarea",
+        placeholder: "[{{level}}] {{message}}",
+        help: "Budgets, updates, certificates and thresholds. {{message}} is Page's own text, {{kind}} is budget, update, cert or threshold.",
+      },
+      {
+        key: "alerts.webhookBody",
+        label: "Generic webhook body (JSON)",
+        kind: "textarea",
+        placeholder: '{\n  "text": "{{message}}",\n  "service": "{{service}}",\n  "level": "{{level}}"\n}',
+        help: "Empty sends Page's own JSON. Values are escaped for JSON strings, so keep the quotes around them.",
+      },
     ],
     extra: "testAlert",
   },

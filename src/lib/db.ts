@@ -98,6 +98,7 @@ export function db(): DatabaseSync {
       );
     `);
     addColumn(d, "fin_categories", "budget_cents INTEGER");
+    addColumn(d, "users", "avatar TEXT");
     d.exec("PRAGMA foreign_keys = ON;");
     g.__pageDb = d;
   }

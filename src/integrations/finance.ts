@@ -2,6 +2,7 @@ import { z } from "zod";
 import { loadConfig } from "@/lib/config/load";
 import { summarize, type Summary } from "@/lib/finance/aggregate";
 import { allForSummary, listCategories } from "@/lib/finance/store";
+import { ratesForSummary } from "@/lib/finance/rates";
 import { money } from "@/lib/finance/format";
 import type { Integration, WidgetResult } from "./types";
 
@@ -30,6 +31,7 @@ export const finance: Integration<typeof schema> = {
   async fetch(cfg) {
     const now = new Date().toISOString();
     const period = cfg.period === "year" ? now.slice(0, 4) : now.slice(0, 7);
-    return financeResult(summarize(allForSummary(), listCategories(), period, loadConfig().settings.finance.currency), cfg.chart);
+    const currency = loadConfig().settings.finance.currency;
+    return financeResult(summarize(allForSummary(), listCategories(), period, currency, (await ratesForSummary(currency))?.rates), cfg.chart);
   },
 };

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { FileSpreadsheet, Pencil, PenLine, RefreshCw } from "lucide-react";
+import { Download, FileSpreadsheet, Pencil, PenLine, RefreshCw } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import { money } from "@/lib/finance/format";
 import type { Transaction } from "@/lib/finance/store";
@@ -47,6 +47,17 @@ export function TransactionList({ period, currency, onChanged }: { period: strin
             </option>
           ))}
         </select>
+        <div className="ml-auto flex flex-wrap gap-1 text-sm">
+          <a href={`/api/finance/export?${params}`} download className="flex h-10 items-center gap-1.5 rounded-xl px-3 hover:bg-hover" title="This period, with the filters above">
+            <Download className="h-4 w-4" /> Export CSV
+          </a>
+          <a href="/api/finance/export" download className="flex h-10 items-center rounded-xl px-3 text-muted hover:bg-hover hover:text-fg" title="Every transaction, as CSV">
+            All
+          </a>
+          <a href={`/api/finance/export?${params}&format=json`} download className="flex h-10 items-center rounded-xl px-3 text-muted hover:bg-hover hover:text-fg" title="This period as JSON">
+            JSON
+          </a>
+        </div>
       </div>
       {error && <p className="text-sm text-[var(--err)]">{error.message}</p>}
       {data?.length === 0 && <p className="py-8 text-center text-sm text-muted">No transactions in this period.</p>}

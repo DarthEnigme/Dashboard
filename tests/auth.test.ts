@@ -49,6 +49,7 @@ function fakeRepo(seed: Partial<User & { identities: string[] }>[] = []) {
     disabled: !!u.disabled,
     hasPassword: false,
     createdAt: 0,
+    avatar: null,
   });
   for (const s of seed) {
     const u = make(s);

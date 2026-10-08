@@ -112,6 +112,12 @@ export const settingsSchema = z
         threshold: z.number().int().min(1).default(2),
         /** Warn this many days before an HTTPS certificate of a checked service expires (0 = never). */
         certDays: z.number().int().min(0).default(14),
+        /** Sender name: Discord username, Gotify and ntfy title (default "Page"). */
+        title: z.string().optional(),
+        /** Message templates with {{variables}} (see renderTemplate in lib/alerts.ts); empty keeps the built-in text. */
+        messages: z.object({ down: z.string().optional(), up: z.string().optional(), notice: z.string().optional() }).optional(),
+        /** JSON body for the generic webhook, with {{variables}}; empty sends Page's own JSON. */
+        webhookBody: z.string().optional(),
       })
       .default({}),
     auth: authSchema,

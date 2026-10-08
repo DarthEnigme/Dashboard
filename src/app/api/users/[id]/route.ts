@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin, sameOrigin } from "@/lib/auth";
 import { hashPassword, MIN_PASSWORD } from "@/lib/auth/password";
 import * as users from "@/lib/auth/users";
+import { removeUpload } from "@/lib/uploads";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,7 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (target.id === admin.id) return err("You can't delete your own account");
   if (target.role === "admin" && users.countAdmins() <= 1) return err("This is the last admin", 409);
   users.deleteUser(id);
+  removeUpload(target.avatar);
   users.audit(admin.username, "user-delete", { username: target.username });
   return NextResponse.json({ ok: true });
 }

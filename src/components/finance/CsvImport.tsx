@@ -53,7 +53,7 @@ export function CsvImport({ currency, onImported }: { currency: string; onImport
 
   const doImport = () =>
     run(async () => {
-      const r = await sendJson<{ added: number; skipped: number; errors: number }>("/api/finance/import", "POST", { text, mapping: map, commit: true });
+      const r = await sendJson<{ added: number; skipped: number; errors: number }>("/api/finance/import", "POST", { text, mapping: map, commit: true, currency });
       try {
         localStorage.setItem(PRESETS_KEY, JSON.stringify(map));
       } catch {}
