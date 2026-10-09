@@ -136,6 +136,21 @@ export const settingsSchema = z
     liveReload: z.boolean().default(true),
     tabs: z.array(z.string()).optional(),
     history: z.object({ retentionDays: z.number().min(1).max(400).default(90) }).default({}),
+    /** Nightly zip of the config, the database, uploads and the secret key. */
+    backup: z
+      .object({
+        enabled: z.boolean().default(true),
+        /** Hour it runs (server time). */
+        time: z
+          .string()
+          .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM")
+          .default("03:00"),
+        /** How many backups to keep. */
+        keep: z.number().int().min(1).max(365).default(7),
+        /** Folder for the zips (another disk or a network share); default data/backups. */
+        dir: z.string().optional(),
+      })
+      .default({}),
     alerts: z
       .object({
         discord: z.string().optional(),

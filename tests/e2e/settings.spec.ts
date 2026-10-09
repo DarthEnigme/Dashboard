@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { expect, test } from "@playwright/test";
 import { readConfig, setSetting, shot } from "./helpers";
 
@@ -72,6 +73,27 @@ test.describe.serial("settings page", () => {
     await expect(page.getByLabel("Generic webhook URL")).toBeVisible();
     await expect(page.getByLabel("Title")).toHaveCount(0);
     await shot(page, "61-settings-search", { fullPage: false });
+  });
+
+  test("backs up now, lists, downloads and deletes backups", async ({ page }) => {
+    await page.goto("/settings#backup");
+    await expect(page.getByLabel("Nightly backups")).toBeChecked();
+    await page.getByRole("button", { name: "Back up now" }).click();
+    const list = page.getByRole("list", { name: "Backups" });
+    await expect(list.getByRole("listitem")).toHaveCount(1);
+    await expect(page.getByText(/Last backup .*\(admin\)/)).toBeVisible();
+    const [download] = await Promise.all([page.waitForEvent("download"), list.getByRole("link", { name: /^Download page-backup-/ }).click()]);
+    expect(download.suggestedFilename()).toMatch(/^page-backup-\d{4}-\d{2}-\d{2}-\d{4}(-\d+)?\.zip$/);
+    const bytes = fs.readFileSync((await download.path())!);
+    expect(bytes.readUInt32LE(0)).toBe(0x04034b50);
+    expect(bytes.includes(Buffer.from("data/page.db"))).toBe(true);
+    await shot(page, "66-settings-backups", { fullPage: false });
+    // Delete asks for a second click.
+    await list.getByRole("button", { name: /^Delete page-backup-/ }).click();
+    await list.getByRole("button", { name: /^Confirm: Delete page-backup-/ }).click();
+    await expect(page.getByText("No backups yet.")).toBeVisible();
+    // Not for non-admins, and no path tricks.
+    expect((await page.request.get("/api/backups/..%2Fpage.db")).status()).toBe(404);
   });
 
   test("exports the config files as a zip", async ({ page }) => {

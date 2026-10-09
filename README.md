@@ -522,6 +522,28 @@ Admins open `/settings` from the gear next to the search box, or from the accoun
 
 Saving keeps the comments in `settings.yaml`, like the editor does.
 
+## Backups
+
+Every night (03:00 by default) Page writes one zip to `data/backups/` and keeps the newest 7. Each zip holds:
+- the config files, exactly as on disk
+- a consistent copy of the database (history, users, finance), taken safely while Page runs
+- uploaded wallpapers, logos and profile pictures
+- `secret.key`, which signs sessions and encrypts two-factor secrets
+
+Under **Settings → Backup & history** you can turn them off, change the hour, how many to keep and the folder, run **Back up now**, and download or delete backups. A failed backup is reported on the alert channels. Downloads and deletions are in the audit log.
+
+A backup on the same disk as the data doesn't survive that disk: point `backup.dir` at another disk or share, e.g. mount one in `docker-compose.yml` (`- /mnt/nas/page-backups:/backups`) and set `dir: /backups`.
+
+```yaml
+backup:
+  enabled: true
+  time: "03:00"     # server time
+  keep: 7
+  dir: /backups     # optional; default data/backups
+```
+
+**Restore:** stop Page, unzip the backup, copy `config/` over your config folder and `data/` over your data folder (delete `page.db-wal` and `page.db-shm` there first), and start Page again. The zip holds secrets: keep it somewhere safe.
+
 ## Editing in the browser
 
 Click the pencil next to the search box. You can:

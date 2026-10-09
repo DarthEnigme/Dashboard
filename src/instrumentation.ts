@@ -6,6 +6,7 @@ export async function register() {
     const { recurringJob } = await import("./lib/finance/recurring");
     const { pruneSessions } = await import("./lib/auth/sessions");
     const { updateJob } = await import("./lib/update/job");
+    const { backupJob } = await import("./lib/backup");
     const { reconcilePendingUpdate } = await import("./lib/update/apply");
     try {
       reconcilePendingUpdate();
@@ -17,6 +18,7 @@ export async function register() {
     onHourly(recurringJob);
     onHourly(budgetAlertJob);
     onHourly(updateJob);
+    onHourly(backupJob);
     onHourly(async () => void pruneSessions());
   }
 }

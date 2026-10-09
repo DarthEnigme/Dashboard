@@ -34,6 +34,7 @@ import { sections, type Section } from "./sections";
 import { TestAlertButton } from "./TestAlertButton";
 import { UpdatesPanel } from "./UpdatesPanel";
 import { ThemeEditor } from "./ThemeEditor";
+import { BackupsPanel } from "./BackupsPanel";
 import { changedFields, validateSettings } from "./validate";
 
 type Obj = Record<string, unknown>;
@@ -352,6 +353,8 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                 )}
                 {!q && section.extra === "backup" && (
                   <>
+                    <BackupsPanel />
+                    <h3 className="border-t border-line pt-5 text-sm font-semibold tracking-wider text-muted uppercase">Config files</h3>
                     <div className="flex flex-wrap gap-2">
                       <a href="/api/config/export" download className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110">
                         <Download className="h-4 w-4" /> Download config (.zip)

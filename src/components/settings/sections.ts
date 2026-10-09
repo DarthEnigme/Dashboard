@@ -239,8 +239,13 @@ export const sections: Section[] = [
     id: "backup",
     label: "Backup & history",
     icon: Archive,
-    description: "Every save keeps the previous version. Download all config files, or import from Homepage.",
-    fields: [],
+    description: "Nightly backups of everything, every config change kept with undo, and import from Homepage.",
+    fields: [
+      { key: "backup.enabled", label: "Nightly backups", kind: "boolean", default: true, help: "Config files, the database, uploads and the secret key, in one zip." },
+      { key: "backup.time", label: "Backup time", placeholder: "03:00", help: "HH:MM, server time." },
+      { key: "backup.keep", label: "Backups to keep", kind: "number", placeholder: "7" },
+      { key: "backup.dir", label: "Backup folder", placeholder: "data/backups", help: "Another disk or a mounted share protects against losing the data disk." },
+    ],
     extra: "backup",
   },
 ];
