@@ -163,8 +163,8 @@ export const sections: Section[] = [
         key: "auth.userPermissions",
         label: "Every signed-in user may",
         kind: "list",
-        placeholder: "finance",
-        help: "Comma-separated: finance (the finance tracker), actions (start/stop buttons). Empty field = finance. Groups below can add more.",
+        placeholder: "finance, travel, watchlist",
+        help: "Comma-separated: finance, travel, watchlist (those sections), inventory (the device list), actions (start/stop buttons and switches). Empty field = finance, travel, watchlist. Groups below can add more.",
       },
       { key: "auth.baseUrl", label: "Public URL (for SSO redirects)", placeholder: "https://home.example.com" },
       {

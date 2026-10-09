@@ -12,6 +12,7 @@ import type { ClientAuth } from "@/lib/auth";
 import { tabForPath, tabOf, type Tab } from "@/lib/tabs";
 import { useOnline } from "@/lib/useOnline";
 import { Header } from "./Header";
+import { sectionsFor } from "@/lib/sections";
 import { TabBar } from "./TabBar";
 import { InfoBar } from "./InfoBar";
 import { ServiceGroup } from "./ServiceGroup";
@@ -103,7 +104,7 @@ export function Dashboard({ config, auth, tabs, version }: { config: ClientConfi
         showSettings={auth.canEdit}
         updateAvailable={update?.available ? update.version : undefined}
         monitor={<MonitorPanel refreshSeconds={settings.pingInterval} />}
-        showFinance={!!auth.user?.permissions.includes("finance")}
+        sections={sectionsFor(auth.user?.permissions)}
         account={<UserMenu auth={auth} />}
       />
 

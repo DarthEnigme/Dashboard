@@ -152,6 +152,18 @@ export async function canEdit(): Promise<boolean> {
   return loadConfig().settings.editing && (await viewer()).role === "admin";
 }
 
+/**
+ * For a section's API routes: a signed-in person with `permission` (401 signed out, 403 without
+ * it); changes must also be same-origin.
+ */
+export async function guardPermission(permission: Permission, req?: Request, what = permission): Promise<{ user: User } | { error: Response }> {
+  const user = await requirePermission(permission);
+  const json = (error: string, status: number) => Response.json({ error }, { status });
+  if (!user) return { error: (await viewer()).user ? json(`You don't have access to ${what}. Ask an admin.`, 403) : json(`Sign in to use ${what}`, 401) };
+  if (req && req.method !== "GET" && !sameOrigin(req)) return { error: json("Cross-site request refused", 403) };
+  return { user };
+}
+
 /** Reject cross-site state changes: the Origin (when a browser sends one) must match the host. */
 export function sameOrigin(req: Request): boolean {
   const origin = req.headers.get("origin");

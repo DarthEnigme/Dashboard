@@ -134,6 +134,6 @@ describe("groups", () => {
   it("accepts group lists in visible:, not other words", () => {
     expect(servicesFileSchema.safeParse([{ name: "G", visible: ["family"], services: [] }]).success).toBe(true);
     expect(servicesFileSchema.safeParse([{ name: "G", visible: "family", services: [] }]).success).toBe(false);
-    expect(settingsSchema.parse({}).auth.userPermissions).toEqual(["finance"]);
+    expect(settingsSchema.parse({}).auth.userPermissions).toEqual(["finance", "travel", "watchlist"]);
   });
 });

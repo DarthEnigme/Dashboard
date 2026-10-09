@@ -1,9 +1,10 @@
 "use client";
 
+import { sectionsFor } from "@/lib/sections";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, LogIn, LogOut, Settings, ShieldCheck, UserRound, Wallet } from "lucide-react";
+import { KeyRound, LogIn, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
 import { sendJson } from "@/lib/fetcher";
 import type { ClientAuth } from "@/lib/auth";
 import { Avatar, ProfileDialog } from "./ProfileDialog";
@@ -104,11 +105,11 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
               <KeyRound className="h-4 w-4" /> Security
               {u.twoFactor && <ShieldCheck className="ml-auto h-3.5 w-3.5 text-[var(--ok)]" aria-label="Two-factor sign-in is on" />}
             </button>
-            {u.permissions.includes("finance") && (
-              <a role="menuitem" href="/finance" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover">
-                <Wallet className="h-4 w-4" /> Finance
+            {sectionsFor(u.permissions).map((s) => (
+              <a key={s.id} role="menuitem" href={s.href} className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover">
+                <s.icon className="h-4 w-4" /> {s.label}
               </a>
-            )}
+            ))}
             {auth.canEdit && (
               <a role="menuitem" href="/settings" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover">
                 <Settings className="h-4 w-4" /> Settings

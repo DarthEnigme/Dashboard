@@ -1,0 +1,17 @@
+import { Wallet, type LucideIcon } from "lucide-react";
+import type { Permission } from "./config/schema";
+
+/** A page of its own next to the dashboard (Finance, Travel…), shown to people with its permission. */
+export interface AppSection {
+  id: string;
+  href: string;
+  label: string;
+  permission: Permission;
+  icon: LucideIcon;
+  /** Extra words the command palette matches. */
+  keywords: string;
+}
+
+export const APP_SECTIONS: AppSection[] = [{ id: "finance", href: "/finance", label: "Finance", permission: "finance", icon: Wallet, keywords: "money budget spending accounts" }];
+
+export const sectionsFor = (permissions: readonly string[] = []) => APP_SECTIONS.filter((s) => permissions.includes(s.permission));

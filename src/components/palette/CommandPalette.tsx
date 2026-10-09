@@ -17,7 +17,6 @@ import {
   Power,
   Search,
   Settings2,
-  Wallet,
   Activity,
   type LucideIcon,
 } from "lucide-react";
@@ -30,6 +29,7 @@ import type { ClientConfig, ClientService } from "@/lib/config/sanitize";
 import type { ClientAuth } from "@/lib/auth";
 import type { ServiceAction } from "@/integrations/types";
 import { sections } from "../settings/sections";
+import { sectionsFor } from "@/lib/sections";
 
 export interface PaletteItem {
   id: string;
@@ -163,7 +163,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         },
       });
     }
-    if (auth?.user?.permissions.includes("finance")) items.push({ id: "page:/finance", title: "Finance", group: "Go to", icon: Wallet, keywords: "money budget spending", run: () => go("/finance") });
+    for (const s of sectionsFor(auth?.user?.permissions)) items.push({ id: `page:${s.href}`, title: s.label, group: "Go to", icon: s.icon, keywords: s.keywords, run: () => go(s.href) });
     if (auth?.canEdit) {
       for (const sec of sections) {
         items.push({

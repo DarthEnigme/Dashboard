@@ -37,7 +37,7 @@ export type Visibility = (typeof visibilities)[number] | string[];
 const visible = z.union([z.enum(visibilities), z.array(z.string().min(1)).min(1)]).optional();
 
 /** What a signed-in user may do beyond seeing things; admins may do everything. */
-export const PERMISSIONS = ["finance", "actions"] as const;
+export const PERMISSIONS = ["finance", "actions", "travel", "watchlist", "inventory"] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 const providerSchema = z.object({
@@ -66,7 +66,7 @@ export const authSchema = z
     baseUrl: z.string().url().optional(),
     defaultRole: z.enum(["user", "admin"]).default("user"),
     /** What every signed-in user may do; groups add more (Settings → Accounts → Groups). */
-    userPermissions: z.array(z.enum(PERMISSIONS)).default(["finance"]),
+    userPermissions: z.array(z.enum(PERMISSIONS)).default(["finance", "travel", "watchlist"]),
     local: z.object({ enabled: z.boolean().default(true) }).default({}),
     proxy: z
       .object({

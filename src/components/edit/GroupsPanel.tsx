@@ -13,6 +13,9 @@ import { inputClass } from "./FieldInput";
 const LABELS: Record<Permission, string> = {
   finance: "Use the finance tracker",
   actions: "Run widget actions (start, stop, restart)",
+  travel: "Use the travel log",
+  watchlist: "Use the watchlist and reading list",
+  inventory: "See and edit the device inventory (and wake devices, with actions)",
 };
 
 /** Groups: who sees items marked visible: [group], extra permissions, and SSO group mapping. */
