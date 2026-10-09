@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { ClientSettings } from "@/lib/config/sanitize";
-import { gradientColors } from "@/lib/theme";
+import { gradientFor } from "@/lib/theme";
 import { AutoAccent } from "./AutoAccent";
 
 const blobLayout: CSSProperties[] = [
@@ -39,7 +39,7 @@ function AeroSky() {
 
 export function Background({ settings }: { settings: ClientSettings }) {
   const { image, gradient, blur, brightness } = settings.background;
-  const preset = gradientColors[gradient] ?? gradientColors.aurora;
+  const preset = gradientFor(gradient, settings.customThemes);
 
   return (
     <div aria-hidden className="fixed inset-0 -z-10 overflow-hidden">

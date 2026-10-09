@@ -95,12 +95,15 @@ Config lives in `./config` (override with `HOMEPAGE_CONFIG_DIR`); history lives 
 title: Homelab
 description: Optional subtitle
 theme: dark            # dark | light | system | oled (pure black) | sepia (warm paper)
+                       # or a palette: nord | dracula | catppuccin-mocha | catppuccin-latte | solarized | gruvbox | tokyo-night
+                       # or one of your own: custom:<id> (see "Custom themes")
 style: glass           # glass | liquid | aero | neon | brutal | soft | retro | minimal | solid
 logo: /api/uploads/logos/…png   # optional: next to the title, on the sign-in page, and the app icon
 accent: "#8b5cf6"      # or "auto" to take it from the wallpaper
-glow: subtle           # none | subtle | strong: edge light and accent glow on hovered cards
+glow: 50               # 0–100 (or none | subtle | strong): edge light and accent glow on hovered cards
 background:
   gradient: aurora     # aurora | sunset | ocean | midnight | forest | aero | dawn | lagoon | graphite | nebula | synthwave
+                       # ember | arctic | rose | mint | dusk | cyberpunk | sand | deep-sea, or custom:<id>
   image: https://...   # optional; overrides the gradient. Or upload a file in Settings → Background
   blur: 0              # px, image only
   brightness: 0.7      # 0-1, image only
@@ -496,10 +499,22 @@ Open the page in Chrome, Edge or Safari and choose **Install** / **Add to Home S
 ## Settings page
 
 Admins open `/settings` from the gear next to the search box, or from the account menu. The page has:
-- **Sections:** General, Appearance, Background, Layout, Refresh, Monitoring & alerts, Accounts & sign-in, Docker, Finance, and Backup & history. Each section has its own URL, e.g. `/settings#appearance`, and a search box finds any setting across all of them.
+- **Sections:** General, Appearance (with the background), Layout, Refresh, Monitoring & alerts, Accounts & sign-in, Docker, Finance, and Backup & history. Each section has its own URL, e.g. `/settings#appearance`, and a search box finds any setting across all of them.
 - **Logo:** under General, upload an image or give a URL. It is shown next to the title and on the sign-in page, and becomes the browser and installed-app icon (PNG or JPEG for the icon; other formats keep the letter icon).
 - **Liquid Glass:** in Chrome and Edge, raised panes (search, menus, dialogs, the panel) and the hovered tile bend what is behind them at the rim, like the edge of a thick lens, with a faint colour fringe. Each pane gets a lens made for its own size and corner radius, so a small button and a wide card both bend the same few pixels at the edge and stay clear in the middle. Other browsers get the frosted version.
-- **Looks:** one click sets a card style, background, accent and glow that belong together, and sometimes the theme: Frutiger Aero, Liquid Glass, Synthwave, Nebula, Brutalist, Paper, Retro 98, Classic. Like everything else on the page, it's only kept once you save.
+- **Looks:** one click sets a card style, background, accent and glow that belong together, and sometimes the theme: Frutiger Aero, Liquid Glass, Synthwave, Nebula, Brutalist, Paper, Retro 98, Classic, Nord, Dracula, Catppuccin Mocha and Latte, Solarized, Gruvbox, Tokyo Night, plus your own themes. Like everything else on the page, it's only kept once you save.
+- **Custom themes:** under Appearance, **New theme** starts from any built-in theme. Pick the background, card, text, accent and status colours, how see-through the cards are, and optionally a gradient of your own; borders, hovers and chart lines are derived from them. The text contrast is checked as you go (a warning below 4.5:1). Themes can be duplicated, and exported or imported as JSON to share them. They're stored in `settings.yaml`:
+
+  ```yaml
+  theme: custom:mint-paper
+  customThemes:
+    - id: mint-paper
+      label: Mint paper
+      base: light                # light or dark: which built-in look it builds on
+      colors: { page: "#e8f5ee", surface: "#ffffff", fg: "#1f3b2d", accent: "#10b981", surfaceOpacity: 0.6 }
+      gradient: { base: "#e8f5ee", blobs: ["#10b981", "#a7f3d0", "#0ea5e9"] }   # optional; use with background.gradient: custom:mint-paper
+  ```
+- **Dropdowns** follow the theme: the open list uses the theme's colours and marks the chosen item with the accent (Chrome and Edge 135+ draw the whole list; other browsers colour the options).
 - **Live preview:** theme, card style, accent colour and background change on screen as you edit. Nothing is written until you **Save**, and **Discard** puts everything back.
 - **Checks before saving:** values are validated as you type and problems are shown next to the field. Sections with unsaved changes or problems are marked in the sidebar.
 - **Backup:** **Download config** saves all YAML files as a zip. They're exactly as on disk, so secrets that aren't in env vars are included. The page also has the version history and **Import from Homepage**.

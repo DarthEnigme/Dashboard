@@ -7,7 +7,7 @@ type Obj = Record<string, unknown>;
 // Same pattern as isPlaceholder in lib/config/env.ts (which also reads files, so isn't client-safe).
 const placeholder = /^\{\{\s*HOMEPAGE_(VAR|FILE)_[A-Z0-9_]+\s*\}\}$/;
 
-export const fieldKeys = sections.flatMap((s) => s.fields.map((f) => f.key));
+export const fieldKeys = sections.flatMap((s) => [...s.fields.map((f) => f.key), ...(s.extraKeys ?? [])]);
 
 /** The field a schema issue belongs to: the longest field key that prefixes the issue path. */
 function fieldFor(path: (string | number)[]): string {

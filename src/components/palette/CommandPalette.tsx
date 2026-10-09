@@ -24,7 +24,8 @@ import {
 import { fetcher, sendJson } from "@/lib/fetcher";
 import { scoreItem } from "@/lib/fuzzy";
 import { listTabs } from "@/lib/tabs";
-import { glowLevels, stylePresets, themes } from "@/lib/config/schema";
+import { stylePresets, themes } from "@/lib/config/schema";
+import { glowAmount, paletteThemes } from "@/lib/theme";
 import type { ClientConfig, ClientService } from "@/lib/config/sanitize";
 import type { ClientAuth } from "@/lib/auth";
 import type { ServiceAction } from "@/integrations/types";
@@ -65,7 +66,7 @@ const pushRecent = (id: string) => {
 };
 
 /** Write one top-level settings key, keeping the rest of settings.yaml (and its comments) as is. */
-async function setSetting(key: string, value: string) {
+async function setSetting(key: string, value: unknown) {
   const raw = await fetcher<{ settings: Record<string, unknown> }>("/api/config?raw=1");
   await sendJson("/api/config", "PUT", { file: "settings", data: { ...raw.settings, [key]: value } });
 }
@@ -174,6 +175,16 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           keywords: sec.fields.map((f) => f.label).join(" "),
           run: () => go(`/settings#${sec.id}`),
         });
+        for (const h of Object.values(sec.headings ?? {}))
+          items.push({
+            id: `set:${h.id}`,
+            title: `Settings: ${h.label}`,
+            subtitle: `In ${sec.label}`,
+            group: "Settings",
+            icon: sec.icon ?? Settings2,
+            keywords: "wallpaper image gradient",
+            run: () => go(`/settings#${h.id}`),
+          });
       }
       if (isAdmin) {
         items.push({
@@ -197,7 +208,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           else window.location.href = "/#edit";
         },
       });
-      const command = (id: string, title: string, key: string, value: string, icon: LucideIcon): PaletteItem => ({
+      const command = (id: string, title: string, key: string, value: unknown, icon: LucideIcon): PaletteItem => ({
         id,
         title,
         group: "Commands",
@@ -216,9 +227,16 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           }
         },
       });
-      for (const t of themes) if (config.settings.theme !== t) items.push(command(`cmd:theme:${t}`, `Theme: ${t}`, "theme", t, Palette));
+      const themeNames: [string, string][] = [
+        ...themes.map((t): [string, string] => [t, t]),
+        ...Object.entries(paletteThemes).map(([id, t]): [string, string] => [id, t.label]),
+        ...(config.settings.customThemes ?? []).map((t): [string, string] => [`custom:${t.id}`, t.label]),
+      ];
+      for (const [t, label] of themeNames) if (config.settings.theme !== t) items.push(command(`cmd:theme:${t}`, `Theme: ${label}`, "theme", t, Palette));
       for (const s of stylePresets) if (config.settings.style !== s) items.push(command(`cmd:style:${s}`, `Card style: ${s}`, "style", s, Palette));
-      for (const g of glowLevels) if (config.settings.glow !== g) items.push(command(`cmd:glow:${g}`, `Hover glow: ${g}`, "glow", g, Palette));
+      const glow = glowAmount(config.settings.glow);
+      for (const [label, g] of [["off", 0], ["subtle", 50], ["strong", 100]] as const)
+        if (glow !== g) items.push(command(`cmd:glow:${label}`, `Hover glow: ${label}`, "glow", g, Palette));
     }
     return items;
     // eslint-disable-next-line react-hooks/exhaustive-deps

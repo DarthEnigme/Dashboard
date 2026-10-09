@@ -1,13 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Check, Download, FileUp, Search, X } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import { gradientPresets, stylePresets, type Settings } from "@/lib/config/schema";
 import type { ClientSettings } from "@/lib/config/sanitize";
-import { gradientColors, lookPresets, themeAttrs, type LookPreset } from "@/lib/theme";
+import {
+  baseThemeColors,
+  CUSTOM_PREFIX,
+  glowAmount,
+  glowAttr,
+  gradientFor,
+  lookPresets,
+  paletteCss,
+  paletteThemes,
+  resolveTheme,
+  type CustomTheme,
+  type LookPreset,
+} from "@/lib/theme";
 import type { FieldSpec } from "@/integrations/fields";
 import { Background } from "../Background";
 import { LiveReload } from "../LiveReload";
@@ -21,6 +33,7 @@ import { ImportDialog } from "../edit/ImportDialog";
 import { sections, type Section } from "./sections";
 import { TestAlertButton } from "./TestAlertButton";
 import { UpdatesPanel } from "./UpdatesPanel";
+import { ThemeEditor } from "./ThemeEditor";
 import { changedFields, validateSettings } from "./validate";
 
 type Obj = Record<string, unknown>;
@@ -61,7 +74,12 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
   useEffect(() => {
     const fromHash = () => {
       const id = window.location.hash.slice(1);
-      if (sections.some((s) => s.id === id)) setActive(id);
+      if (sections.some((s) => s.id === id)) return setActive(id);
+      // A sub-heading (#background lives in Appearance): open its section, then scroll to it.
+      const owner = sections.find((s) => Object.values(s.headings ?? {}).some((h) => h.id === id));
+      if (!owner) return;
+      setActive(owner.id);
+      requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start" }));
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
@@ -69,31 +87,36 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
   }, []);
 
   // Live preview of theme, style and accent on the page itself; the saved look is restored when leaving.
-  // `theme` holds the setting (dark, oled…); data-theme/data-tone are derived from it.
-  const restore = useRef<{ theme?: string; style?: string; glow?: string; accent: string }>(undefined);
+  // `theme` holds the setting (dark, oled, nord, custom:…); data-theme/data-tone/data-palette are derived from it.
+  const restore = useRef<{ theme: string; custom: CustomTheme[]; style?: string; glow?: string | number; accent: string }>(undefined);
   useEffect(() => {
     const root = document.documentElement;
     restore.current = {
-      theme: root.dataset.tone === "oled" ? "oled" : root.dataset.tone === "sepia" ? "sepia" : root.dataset.theme,
+      theme: fallback.theme,
+      custom: fallback.customThemes,
       style: root.dataset.style,
-      glow: root.dataset.glow,
+      glow: Math.round(Number(root.style.getPropertyValue("--glow") || 0.5) * 100),
       accent: root.style.getPropertyValue("--accent"),
     };
     return () => {
       const r = restore.current!;
-      applyTheme(root, r.theme ?? "dark");
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      applyTheme(root, r.theme, r.custom);
       root.dataset.style = r.style;
-      root.dataset.glow = r.glow;
+      setGlow(root, r.glow);
       root.style.setProperty("--accent", r.accent);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const customKey = JSON.stringify(preview.customThemes);
   useEffect(() => {
     const root = document.documentElement;
-    applyTheme(root, preview.theme);
+    applyTheme(root, preview.theme, preview.customThemes);
     root.dataset.style = preview.style;
-    root.dataset.glow = preview.glow;
+    setGlow(root, preview.glow);
     if (HEX.test(preview.accent)) root.style.setProperty("--accent", preview.accent);
-  }, [preview.theme, preview.style, preview.glow, preview.accent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview.theme, customKey, preview.style, preview.glow, preview.accent]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -128,6 +151,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
       if (restore.current) {
         restore.current = {
           theme: preview.theme,
+          custom: preview.customThemes,
           style: preview.style,
           glow: preview.glow,
           accent: HEX.test(preview.accent) ? preview.accent : restore.current.accent,
@@ -157,18 +181,21 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
   const visible: { section: Section; fields: FieldSpec[] }[] = q
     ? sections.map((s) => ({ section: s, fields: s.fields.filter((f) => matches(f, q)) })).filter((x) => x.fields.length)
     : sections.filter((s) => s.id === active).map((s) => ({ section: s, fields: s.fields }));
-  const changedIn = (s: Section) => s.fields.filter((f) => changed.includes(f.key)).length;
-  const errorsIn = (s: Section) => s.fields.filter((f) => errors[f.key]).length;
+  const keysOf = (s: Section) => [...s.fields.map((f) => f.key), ...(s.extraKeys ?? [])];
+  const changedIn = (s: Section) => keysOf(s).filter((k) => changed.includes(k)).length;
+  const errorsIn = (s: Section) => keysOf(s).filter((k) => errors[k]).length;
 
   const field = (f: FieldSpec) => {
     const value = getPath(draft, f.key) as FormValue;
     const onChange = (v: FormValue) => setDraft((cur) => setPath(cur, f.key, v));
     return (
       <div key={`${generation}-${f.key}`} className="flex flex-col gap-1.5" data-field={f.key}>
-        {f.key === "style" ? (
+        {f.key === "theme" ? (
+          <ThemePicker value={(value as string) ?? "dark"} custom={preview.customThemes} onChange={onChange} />
+        ) : f.key === "style" ? (
           <StylePicker value={(value as string) ?? "glass"} onChange={onChange} />
         ) : f.key === "background.gradient" ? (
-          <GradientPicker value={(value as string) ?? "aurora"} onChange={onChange} />
+          <GradientPicker value={(value as string) ?? "aurora"} custom={preview.customThemes} onChange={onChange} />
         ) : (
           <FieldInput spec={f} value={value} onChange={onChange} />
         )}
@@ -264,6 +291,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                 {!q && section.extra === "looks" && (
                   <LookPicker
                     draft={draft}
+                    custom={preview.customThemes}
                     onApply={(look) =>
                       setDraft((cur) => {
                         let next = look.theme ? setPath(cur, "theme", look.theme) : cur;
@@ -275,7 +303,39 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                     }
                   />
                 )}
-                {fields.length > 0 && <div className="grid max-w-2xl gap-5">{fields.map(field)}</div>}
+                {fields.length > 0 && (
+                  <div className="grid max-w-2xl gap-5">
+                    {fields.map((f) => {
+                      const h = !q && section.headings?.[f.key];
+                      return h ? (
+                        <Fragment key={f.key}>
+                          <h3 id={h.id} className="mt-2 scroll-mt-6 border-t border-line pt-5 text-sm font-semibold tracking-wider text-muted uppercase">
+                            {h.label}
+                          </h3>
+                          {field(f)}
+                        </Fragment>
+                      ) : (
+                        field(f)
+                      );
+                    })}
+                  </div>
+                )}
+                {!q && section.extra === "looks" && (
+                  <ThemeEditor
+                    themes={(getPath(draft, "customThemes") as CustomTheme[] | undefined) ?? []}
+                    current={preview.theme}
+                    error={errors.customThemes}
+                    onChange={(list) => setDraft((cur) => setPath(cur, "customThemes", list.length ? list : undefined))}
+                    onUse={(t) =>
+                      setDraft((cur) => {
+                        let next = setPath(cur, "theme", `${CUSTOM_PREFIX}${t.id}`);
+                        if (t.colors.accent) next = setPath(next, "accent", t.colors.accent);
+                        if (t.gradient) next = setPath(next, "background.gradient", `${CUSTOM_PREFIX}${t.id}`);
+                        return next;
+                      })
+                    }
+                  />
+                )}
                 {!q && section.extra === "testAlert" && <TestAlertButton />}
                 {!q && section.extra === "updates" && <UpdatesPanel />}
                 {!q && section.extra === "users" && (
@@ -363,11 +423,63 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
   );
 }
 
-function applyTheme(root: HTMLElement, theme: string) {
-  const a = themeAttrs(theme);
+function setGlow(root: HTMLElement, glow: string | number | undefined) {
+  root.dataset.glow = glowAttr(glow);
+  root.style.setProperty("--glow", String(glowAmount(glow) / 100));
+}
+
+function applyTheme(root: HTMLElement, theme: string, custom: CustomTheme[] = []) {
+  const a = resolveTheme(theme, custom);
   root.dataset.theme = a.theme;
   if (a.tone) root.dataset.tone = a.tone;
   else delete root.dataset.tone;
+  if (a.palette) root.dataset.palette = "";
+  else delete root.dataset.palette;
+  const style = document.getElementById("page-palette");
+  if (style) style.textContent = paletteCss(a.palette);
+}
+
+const plainThemes: { id: string; label: string; note: string }[] = [
+  { id: "dark", label: "Dark", note: "Default" },
+  { id: "light", label: "Light", note: "Bright panes" },
+  { id: "system", label: "System", note: "Follows the OS" },
+  { id: "oled", label: "OLED", note: "Pure black" },
+  { id: "sepia", label: "Sepia", note: "Warm paper" },
+];
+
+/** Built-in themes, colour palettes and custom themes, each drawn in its own colours. */
+function ThemePicker({ value, custom, onChange }: { value: string; custom: CustomTheme[]; onChange: (v: string) => void }) {
+  const options = [
+    ...plainThemes.map((t) => ({ ...t, colors: baseThemeColors[t.id === "system" ? "dark" : t.id].colors })),
+    ...Object.entries(paletteThemes).map(([id, t]) => ({ id, label: t.label, note: t.base === "light" ? "Light palette" : "Dark palette", colors: t.colors })),
+    ...custom.map((t) => ({ id: `${CUSTOM_PREFIX}${t.id}`, label: t.label, note: "Custom", colors: t.colors })),
+  ];
+  return (
+    <fieldset className="flex flex-col gap-1.5">
+      <legend className="mb-1.5 text-xs font-medium text-muted">Theme</legend>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {options.map((t) => (
+          <label key={t.id} className="cursor-pointer" data-theme-option={t.id}>
+            <input type="radio" name="theme" value={t.id} checked={value === t.id} onChange={() => onChange(t.id)} className="peer sr-only" />
+            <div
+              className="flex items-center gap-2.5 rounded-xl p-2 ring-1 ring-line transition peer-checked:ring-2 peer-checked:ring-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent"
+              style={{ background: t.colors.page, color: t.colors.fg }}
+            >
+              <span aria-hidden className="flex h-8 w-8 shrink-0 items-end gap-0.5 rounded-lg p-1" style={{ background: t.colors.surface }}>
+                {[t.colors.accent, t.colors.ok, t.colors.err].map((c, i) => (
+                  <span key={i} className="h-2 flex-1 rounded-sm" style={{ background: c ?? "transparent" }} />
+                ))}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold">{t.label}</span>
+                <span className="block truncate text-[11px] opacity-70">{t.note}</span>
+              </span>
+            </div>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
 }
 
 const styleNotes: Record<(typeof stylePresets)[number], string> = {
@@ -402,13 +514,17 @@ function StylePicker({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
-function GradientPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function GradientPicker({ value, custom, onChange }: { value: string; custom: CustomTheme[]; onChange: (v: string) => void }) {
+  const names: { id: string; label: string }[] = [
+    ...gradientPresets.map((g) => ({ id: g as string, label: g.replace("-", " ") })),
+    ...custom.filter((t) => t.gradient).map((t) => ({ id: `${CUSTOM_PREFIX}${t.id}`, label: t.label })),
+  ];
   return (
     <fieldset className="flex flex-col gap-1.5">
       <legend className="mb-1.5 text-xs font-medium text-muted">Gradient</legend>
       <div className="flex flex-wrap gap-3">
-        {gradientPresets.map((g) => {
-          const c = gradientColors[g];
+        {names.map(({ id: g, label }) => {
+          const c = gradientFor(g, custom);
           const bg: CSSProperties = {
             background: c.swatch ?? `radial-gradient(circle at 20% 25%, ${c.blobs[0]} 0, transparent 55%), radial-gradient(circle at 85% 80%, ${c.blobs[1]} 0, transparent 55%), radial-gradient(circle at 50% 50%, ${c.blobs[2]} 0, transparent 60%), ${c.base}`,
           };
@@ -416,7 +532,7 @@ function GradientPicker({ value, onChange }: { value: string; onChange: (v: stri
             <label key={g} className="flex cursor-pointer flex-col items-center gap-1.5 text-xs">
               <input type="radio" name="gradient" value={g} checked={value === g} onChange={() => onChange(g)} className="peer sr-only" />
               <span className="h-14 w-20 rounded-xl ring-1 ring-line transition peer-checked:ring-2 peer-checked:ring-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent" style={bg} />
-              <span className="capitalize">{g}</span>
+              <span className="capitalize">{label}</span>
             </label>
           );
         })}
@@ -426,7 +542,22 @@ function GradientPicker({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 /** One-click looks: style, background, accent and glow together (still only a draft until saved). */
-function LookPicker({ draft, onApply }: { draft: Obj; onApply: (look: LookPreset) => void }) {
+function LookPicker({ draft, custom, onApply }: { draft: Obj; custom: CustomTheme[]; onApply: (look: LookPreset) => void }) {
+  const style = (getPath(draft, "style") as string | undefined) ?? "glass";
+  const glow = (getPath(draft, "glow") as string | number | undefined) ?? "subtle";
+  const looks: LookPreset[] = [
+    ...lookPresets,
+    // Custom themes keep the current card style and glow.
+    ...custom.map((t) => ({
+      id: `${CUSTOM_PREFIX}${t.id}`,
+      label: t.label,
+      style,
+      glow,
+      theme: `${CUSTOM_PREFIX}${t.id}`,
+      accent: t.colors.accent ?? ((getPath(draft, "accent") as string | undefined) ?? "#8b5cf6"),
+      gradient: t.gradient ? `${CUSTOM_PREFIX}${t.id}` : ((getPath(draft, "background.gradient") as string | undefined) ?? "aurora"),
+    })),
+  ];
   const current = (l: LookPreset) =>
     getPath(draft, "style") === l.style &&
     (getPath(draft, "background.gradient") ?? "aurora") === l.gradient &&
@@ -436,8 +567,8 @@ function LookPicker({ draft, onApply }: { draft: Obj; onApply: (look: LookPreset
     <div className="flex flex-col gap-1.5">
       <span className="text-xs font-medium text-muted">Looks</span>
       <div className="flex flex-wrap gap-2">
-        {lookPresets.map((l) => {
-          const c = gradientColors[l.gradient];
+        {looks.map((l) => {
+          const c = gradientFor(l.gradient, custom);
           return (
             <button
               key={l.id}

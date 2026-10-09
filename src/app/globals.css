@@ -135,6 +135,64 @@ body {
   background: color-mix(in oklab, var(--accent) 45%, transparent);
 }
 
+/*
+ * Dropdown lists. The OS list highlights the chosen option in grey, which hid its text on Windows,
+ * so options take the theme's colours; browsers with customizable selects get a themed pane.
+ * In the base layer so utilities (lg:hidden, widths) still win.
+ */
+@layer base {
+  option {
+    background-color: var(--page);
+    color: var(--fg);
+  }
+  option:checked {
+    background-color: color-mix(in oklab, var(--accent) 40%, var(--page));
+    color: var(--fg);
+  }
+  @supports (appearance: base-select) {
+    select,
+    ::picker(select) {
+      appearance: base-select;
+    }
+    select {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    select::picker-icon {
+      margin-inline-start: auto;
+      color: var(--fg-muted);
+    }
+    ::picker(select) {
+      margin-block: 0.25rem;
+      padding: 0.25rem;
+      border: 1px solid var(--glass-border);
+      border-radius: 0.75rem;
+      background: var(--dialog);
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: blur(22px) saturate(170%);
+      color: var(--fg);
+    }
+    option {
+      padding: 0.375rem 0.625rem;
+      border-radius: 0.5rem;
+      background-color: transparent;
+    }
+    option:hover,
+    option:focus-visible {
+      background-color: color-mix(in oklab, var(--accent) 22%, transparent);
+      outline: none;
+    }
+    option:checked {
+      background-color: color-mix(in oklab, var(--accent) 38%, transparent);
+      font-weight: 500;
+    }
+    option::checkmark {
+      color: var(--accent);
+    }
+  }
+}
+
 /* Pointer position on the hovered pane (PointerLight.tsx), registered so they can be animated. */
 @property --mx {
   syntax: "<percentage>";
@@ -173,14 +231,14 @@ body {
 /* Style presets. "glass" is the default token set above. */
 :root {
   --glass-filter: blur(22px) saturate(170%);
-  /* Hover glow, scaled by the "glow" setting (data-glow). */
-  --glow-edge: 0.75;
-  --glow-shadow: 0 10px 34px -10px color-mix(in oklab, var(--accent) 45%, transparent);
-  --glow-ring: color-mix(in oklab, var(--accent) 45%, var(--glass-border));
-}
-[data-glow="strong"] {
-  --glow-edge: 1;
-  --glow-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent), 0 12px 44px -8px color-mix(in oklab, var(--accent) 70%, transparent);
+  /* Hover glow, scaled by the "glow" setting: --glow is 0–1 (0.5 = the old "subtle", 1 = "strong"). */
+  --glow: 0.5;
+  --glow-edge: min(1, calc(var(--glow) * 1.5));
+  --glow-shadow:
+    0 0 0 1px color-mix(in oklab, var(--accent) calc(max(0, var(--glow) - 0.5) * 60%), transparent),
+    0 calc(8px + var(--glow) * 4px) calc(24px + var(--glow) * 20px) calc(-12px + var(--glow) * 4px)
+      color-mix(in oklab, var(--accent) min(70%, calc(var(--glow) * 90%)), transparent);
+  --glow-ring: color-mix(in oklab, var(--accent) min(60%, calc(var(--glow) * 90%)), var(--glass-border));
 }
 [data-glow="none"] {
   --glow-edge: 0;

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import { loadConfig } from "@/lib/config/load";
-import { serverAccent, themeAttrs } from "@/lib/theme";
+import { glowAmount, glowAttr, paletteCss, resolveTheme, serverAccent } from "@/lib/theme";
 import { buildInfo } from "@/lib/version";
 import { iconVersion } from "@/lib/logo";
 import { PwaRegister } from "@/components/PwaRegister";
@@ -26,19 +26,22 @@ export const viewport: Viewport = { themeColor: "#0b0b14", viewportFit: "cover" 
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const { settings } = loadConfig();
-  const look = themeAttrs(settings.theme);
+  const look = resolveTheme(settings.theme, settings.customThemes);
   return (
     <html
       lang="en"
       data-theme={look.theme}
       data-tone={look.tone}
+      data-palette={look.palette ? "" : undefined}
       data-style={settings.style}
-      data-glow={settings.glow}
+      data-glow={glowAttr(settings.glow)}
       data-build={buildInfo().buildId}
       data-version={buildInfo().version}
-      style={{ "--accent": serverAccent(settings.accent, settings.background.gradient) } as CSSProperties}
+      style={{ "--accent": serverAccent(settings.accent, settings.background.gradient, settings.customThemes), "--glow": glowAmount(settings.glow) / 100 } as CSSProperties}
     >
       <body>
+        {/* Colour theme (Nord, a custom one…); the settings preview rewrites it in place. */}
+        <style id="page-palette">{paletteCss(look.palette)}</style>
         <PointerLight />
         {children}
         <PaletteLauncher />

@@ -1,5 +1,6 @@
-import { Activity, Archive, ArrowUpCircle, Container, LayoutGrid, Palette, PiggyBank, RefreshCw, Settings2, Users, Wallpaper, type LucideIcon } from "lucide-react";
-import { glowLevels, gradientPresets, stylePresets, themes } from "@/lib/config/schema";
+import { Activity, Archive, ArrowUpCircle, Container, LayoutGrid, Palette, PiggyBank, RefreshCw, Settings2, Users, type LucideIcon } from "lucide-react";
+import { gradientPresets, stylePresets, themes } from "@/lib/config/schema";
+import { GLOW_ALIASES } from "@/lib/theme";
 import type { FieldSpec } from "@/integrations/fields";
 
 const ALERT_VARS = "{{service}}, {{status}}, {{reason}}, {{duration}}, {{since}}, {{url}}, {{message}}, {{level}}, {{time}}";
@@ -13,6 +14,10 @@ export interface Section {
   icon: LucideIcon;
   description: string;
   fields: FieldSpec[];
+  /** Sub-headings shown before a field (by key); `id` is also a deep link (/settings#background). */
+  headings?: Record<string, { id: string; label: string }>;
+  /** Settings edited by the section's own panel (not a field), counted for unsaved changes and problems. */
+  extraKeys?: string[];
   extra?: SectionExtra;
 }
 
@@ -41,21 +46,22 @@ export const sections: Section[] = [
     id: "appearance",
     label: "Appearance",
     icon: Palette,
-    description: "Theme, card style and accent colour. Changes preview immediately; save to keep them.",
+    description: "Theme, card style, accent colour and background. Changes preview immediately; save to keep them.",
     fields: [
       { key: "theme", label: "Theme", kind: "select", options: [...themes], required: true, help: "oled: pure black. sepia: warm paper." },
       { key: "style", label: "Card style", kind: "select", options: [...stylePresets] },
       { key: "accent", label: "Accent colour", kind: "color", help: "Type “auto” to take it from the wallpaper." },
-      { key: "glow", label: "Hover glow", kind: "select", options: [...glowLevels], placeholder: "subtle", help: "Edge light that follows the pointer, and an accent glow on hovered cards." },
-    ],
-    extra: "looks",
-  },
-  {
-    id: "background",
-    label: "Background",
-    icon: Wallpaper,
-    description: "A gradient, or an image of your own.",
-    fields: [
+      {
+        key: "glow",
+        label: "Hover glow",
+        kind: "range",
+        min: 0,
+        max: 100,
+        step: 5,
+        placeholder: "50",
+        aliases: GLOW_ALIASES,
+        help: "Edge light that follows the pointer, and an accent glow on hovered cards. 0 turns it off.",
+      },
       { key: "background.gradient", label: "Gradient", kind: "select", options: [...gradientPresets] },
       {
         key: "background.image",
@@ -68,6 +74,9 @@ export const sections: Section[] = [
       { key: "background.brightness", label: "Image brightness", kind: "range", min: 0, max: 1, step: 0.05, placeholder: "0.7" },
       { key: "background.blur", label: "Image blur (px)", kind: "range", min: 0, max: 40, step: 1, placeholder: "0" },
     ],
+    headings: { "background.gradient": { id: "background", label: "Background" } },
+    extraKeys: ["customThemes"],
+    extra: "looks",
   },
   {
     id: "layout",

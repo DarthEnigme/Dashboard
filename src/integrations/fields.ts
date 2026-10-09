@@ -16,6 +16,8 @@ export interface FieldSpec {
   min?: number;
   max?: number;
   step?: number;
+  /** "range" only: words that also stand for a value (the glow's old none / subtle / strong). */
+  aliases?: Record<string, number>;
   required?: boolean;
   help?: string;
   /** Value when the key is absent; a value equal to it is removed from the YAML. */

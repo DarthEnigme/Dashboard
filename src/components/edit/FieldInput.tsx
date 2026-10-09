@@ -78,7 +78,7 @@ export function FieldInput({
       </select>
     );
   } else if (spec.kind === "range") {
-    const n = typeof value === "number" ? value : Number(spec.placeholder ?? spec.min ?? 0);
+    const n = typeof value === "number" ? value : (spec.aliases?.[String(value)] ?? Number(spec.placeholder ?? spec.min ?? 0));
     control = (
       <div className="flex items-center gap-3">
         <input

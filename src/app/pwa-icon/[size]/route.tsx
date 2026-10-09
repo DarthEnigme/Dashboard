@@ -17,7 +17,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ size: st
   const q = new URL(req.url).searchParams;
   const maskable = q.has("maskable");
   const { settings } = loadConfig();
-  const accent = serverAccent(settings.accent, settings.background.gradient);
+  const accent = serverAccent(settings.accent, settings.background.gradient, settings.customThemes);
   const letter = (settings.title.trim()[0] ?? "P").toUpperCase();
   const logo = iconLogo(settings.logo);
   const inner = Math.round(size * (maskable ? 0.7 : 1));

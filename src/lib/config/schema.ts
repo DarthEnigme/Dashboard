@@ -1,10 +1,35 @@
 import { z } from "zod";
+import { paletteThemes } from "@/lib/theme";
 
-export const gradientPresets = ["aurora", "sunset", "ocean", "midnight", "forest", "aero", "dawn", "lagoon", "graphite", "nebula", "synthwave"] as const;
+export const gradientPresets = [
+  "aurora", "sunset", "ocean", "midnight", "forest", "aero", "dawn", "lagoon", "graphite", "nebula", "synthwave",
+  "ember", "arctic", "rose", "mint", "dusk", "cyberpunk", "sand", "deep-sea",
+] as const;
 export const stylePresets = ["glass", "liquid", "aero", "neon", "brutal", "soft", "retro", "minimal", "solid"] as const;
 /** oled and sepia are tones of dark and light (see themeAttrs in lib/theme.ts). */
 export const themes = ["dark", "light", "system", "oled", "sepia"] as const;
 export const glowLevels = ["none", "subtle", "strong"] as const;
+/** Colour palettes on top of dark or light (lib/theme.ts); custom themes are "custom:<id>". */
+export const paletteThemeIds = Object.keys(paletteThemes);
+const customRef = /^custom:[a-z0-9-]+$/;
+
+const hex = z.string().regex(/^#[0-9a-f]{3}([0-9a-f]{3})?$/i, "a colour like #1e1e2e");
+const customThemeSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/, "lowercase letters, digits and dashes"),
+  label: z.string().min(1).max(40),
+  base: z.enum(["dark", "light"]).default("dark"),
+  colors: z.object({
+    page: hex,
+    surface: hex,
+    fg: hex,
+    accent: hex.optional(),
+    ok: hex.optional(),
+    warn: hex.optional(),
+    err: hex.optional(),
+    surfaceOpacity: z.number().min(0).max(1).optional(),
+  }),
+  gradient: z.object({ base: hex, blobs: z.tuple([hex, hex, hex]) }).optional(),
+});
 export const tileSizes = ["small", "wide", "tall", "large"] as const;
 export const visibilities = ["public", "users", "admins"] as const;
 /** public, users or admins; or a list of group names: their members (and admins). */
@@ -84,15 +109,18 @@ export const settingsSchema = z
     description: z.string().optional(),
     /** Image shown next to the title, on the sign-in page and as the app icon (URL or an upload). */
     logo: z.string().optional(),
-    theme: z.enum(themes).default("dark"),
+    theme: z
+      .string()
+      .refine((t) => (themes as readonly string[]).includes(t) || paletteThemeIds.includes(t) || customRef.test(t), "not a known theme")
+      .default("dark"),
     style: z.enum(stylePresets).default("glass"),
     accent: z.string().default("#8b5cf6"), // a colour, or "auto" to take it from the wallpaper
-    /** Edge light and accent glow on hovered cards. */
-    glow: z.enum(glowLevels).default("subtle"),
+    /** Edge light and accent glow on hovered cards: 0–100, or none (0) / subtle (50) / strong (100). */
+    glow: z.union([z.enum(glowLevels), z.number().min(0).max(100)]).default("subtle"),
     background: z
       .object({
         image: z.string().optional(),
-        gradient: z.enum(gradientPresets).default("aurora"),
+        gradient: z.union([z.enum(gradientPresets), z.string().regex(customRef, "not a known gradient")]).default("aurora"),
         blur: z.number().min(0).max(40).default(0),
         brightness: z.number().min(0).max(1).default(0.7),
       })
@@ -175,6 +203,11 @@ export const settingsSchema = z
         hosts: z.array(z.object({ name: z.string(), host: z.string().optional() })).default([{ name: "local" }]),
       })
       .default({}),
+    /** Colour themes made in Settings → Appearance; picked with theme: custom:<id>. */
+    customThemes: z
+      .array(customThemeSchema)
+      .default([])
+      .refine((list) => new Set(list.map((t) => t.id)).size === list.length, "two themes have the same id"),
   })
   .default({});
 
