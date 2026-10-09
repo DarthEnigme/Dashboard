@@ -1,0 +1,32 @@
+{
+  "configurations": {
+    "status": true,
+    "message": null,
+    "data": [
+      { "Name": "wg0", "Status": true, "ListenPort": "51820", "Address": "10.0.0.1/24", "PublicKey": "pub0", "PrivateKey": "SECRET-iface-key", "ConnectedPeers": 2, "TotalPeers": 5, "DataUsage": { "Total": 1.5, "Sent": 1.25, "Receive": 0.25 } },
+      { "Name": "wg-guests", "Status": false, "ListenPort": "51821", "Address": "10.1.0.1/24", "PublicKey": "pub1", "PrivateKey": "SECRET-iface-key-2", "ConnectedPeers": 0, "TotalPeers": 1, "DataUsage": { "Total": 0, "Sent": 0, "Receive": 0 } }
+    ]
+  },
+  "peers": {
+    "wg0": {
+      "status": true,
+      "message": null,
+      "data": {
+        "configurationInfo": { "Name": "wg0" },
+        "configurationPeers": [
+          { "id": "a+b/c=", "name": "Laptop", "status": "stopped", "latest_handshake": "5:00:12", "private_key": "SECRET-peer-1", "preshared_key": "SECRET-psk", "allowed_ip": "10.0.0.2/32", "endpoint": "203.0.113.4:5000", "total_receive": 0.1, "total_sent": 0.2, "cumu_receive": 1.1, "cumu_sent": 2.2 },
+          { "id": "d+e/f=", "name": "Phone", "status": "running", "latest_handshake": "0:00:41", "private_key": "SECRET-peer-2", "preshared_key": "", "allowed_ip": "10.0.0.3/32", "endpoint": "198.51.100.7:6000", "total_receive": 0.05, "total_sent": 0.3, "cumu_receive": 0, "cumu_sent": 0 },
+          { "id": "g+h/i=", "name": "", "status": "running", "latest_handshake": "0:01:59", "private_key": "SECRET-peer-3", "allowed_ip": "10.0.0.4/32", "endpoint": "N/A", "total_receive": 0, "total_sent": 0.001, "cumu_receive": 0, "cumu_sent": 0 },
+          { "id": "j+k/l=", "name": "Old tablet", "status": "stopped", "latest_handshake": "No Handshake", "private_key": "SECRET-peer-4", "allowed_ip": "10.0.0.5/32", "endpoint": "N/A", "total_receive": 0, "total_sent": 0, "cumu_receive": 0, "cumu_sent": 0 },
+          { "id": "m+n/o=", "name": "Travel router", "status": "stopped", "latest_handshake": "2 days, 3:04:05", "private_key": "SECRET-peer-5", "allowed_ip": "10.0.0.6/32", "endpoint": "N/A", "total_receive": 0, "total_sent": 0, "cumu_receive": 3, "cumu_sent": 1 }
+        ],
+        "configurationRestrictedPeers": []
+      }
+    },
+    "wg-guests": {
+      "status": true,
+      "message": null,
+      "data": { "configurationInfo": { "Name": "wg-guests" }, "configurationPeers": [], "configurationRestrictedPeers": [] }
+    }
+  }
+}

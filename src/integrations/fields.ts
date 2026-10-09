@@ -303,6 +303,15 @@ export const integrationFields: Record<string, { label: string; fields: FieldSpe
       { key: "insecure", label: "Allow self-signed TLS", kind: "boolean" },
     ],
   },
+  wgdashboard: {
+    label: "WireGuard (WGDashboard)",
+    fields: [
+      { key: "url", label: "WGDashboard URL", placeholder: "http://wgdashboard:10086", required: true, help: "Include the path prefix if WGDashboard runs under one." },
+      { key: "key", label: "API key", secret: true, required: true, help: "Settings → API Keys: turn the API on and create a key." },
+      { key: "config", label: "Configuration", placeholder: "all (e.g. wg0)", help: "Only this WireGuard interface. Empty shows them all." },
+      { key: "insecure", label: "Allow self-signed TLS", kind: "boolean" },
+    ],
+  },
   minecraft: {
     label: "Minecraft server",
     fields: [

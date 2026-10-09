@@ -134,3 +134,6 @@
       widget: { type: pelican, url: http://localhost:4010/pelican, key: ptlc_key }
     - name: VPN
       widget: { type: wireguard, url: http://localhost:4010/wg, password: wg-pass }
+    - name: WGDashboard
+      size: large
+      widget: { type: wgdashboard, url: http://localhost:4010/wgd, key: wgd-key }

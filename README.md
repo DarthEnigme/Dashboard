@@ -11,7 +11,7 @@ A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Hom
 - **Info bar:** greeting and clock, weather, host resources, stock/crypto prices, exchange rates
 - **Integrations:**
   - Proxmox VE (nodes, storage, backups, per-guest charts), Proxmox Backup Server, Portainer, Docker, Uptime Kuma
-  - Pi-hole, AdGuard Home, UniFi, OPNsense, pfSense, Traefik, Nginx Proxy Manager, Tailscale, Cloudflare Tunnels, SNMP
+  - Pi-hole, AdGuard Home, UniFi, OPNsense, pfSense, Traefik, Nginx Proxy Manager, Tailscale, Cloudflare Tunnels, WireGuard (wg-easy, WGDashboard), SNMP
   - Home Assistant, TrueNAS, Synology, Scrutiny, Frigate
   - Jellyfin/Emby, Plex, Tautulli, Sonarr/Radarr/Lidarr/Readarr/Prowlarr, Overseerr/Jellyseerr, qBittorrent, Transmission, SABnzbd
   - Immich, Nextcloud, Gitea/Forgejo, Paperless-ngx, Authentik, Speedtest Tracker, Gotify, ntfy
@@ -299,6 +299,7 @@ When no icon is set or it fails to load, the tile shows the service's initials.
 | `gotify` | `url`, `key` (client token) | Apps, clients, recent messages |
 | `ntfy` | `url` | Messages sent and rate (from `/v1/stats`) |
 | `wireguard` | `url` (wg-easy), `password`, `username` (wg-easy 15+; empty for 14), `onlineMinutes` (default 3) | Connected peers (handshake within the last few minutes), enabled/total, traffic; each peer with when it was last seen |
+| `wgdashboard` | `url` (with WGDashboard's path prefix, if any), `key` (Settings → API Keys), `config` (one interface, e.g. `wg0`; default all), `insecure` | Connected peers, peers, interfaces up, traffic; every peer with its interface and when it was last seen on large tiles. Peer keys never leave the server |
 | `pelican` | `url` (panel), `key` (client API key, `ptlc_…`) | Game servers running/offline, CPU and memory; each server's state. Start, stop, restart and kill buttons (also works with Pterodactyl) |
 | `minecraft` | `host`, `edition` (`java`/`bedrock`), `port` | Players online/max, version, ping, the MOTD and who is online (Java). Talks the game's own status protocol: no plugin or query port needed |
 | `snmp` | `host`, `preset` (`system`, `interface`, `storage`, `printer`, `custom`), `interface`, `community`, `version` (`2c`/`1`), `oids` | Switches, routers, NAS, UPS and printers. system: uptime, CPU, name. interface: link state, in/out rate with sparklines, speed. storage: RAM and the fullest disk, every volume on large tiles. printer: supply levels. `oids` adds any value (`scale`, `rate: true` for counters, `format`, `warn`/`error`) |

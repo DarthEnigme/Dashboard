@@ -23,6 +23,23 @@ test("apps tab: media, downloads, network edge and disks", async ({ page }) => {
   await shot(page, "80-apps-tab");
 });
 
+test("wgdashboard: interfaces, peers and who was seen when", async ({ page }) => {
+  await page.goto("/apps");
+  await expect(field(page, "WGDashboard", "Connected")).toContainText("2");
+  await expect(field(page, "WGDashboard", "Interfaces")).toContainText("1 / 2");
+  // Large tile: the peer list, online ones first.
+  await expect(tile(page, "WGDashboard")).toContainText("Phone (wg0)");
+  await expect(tile(page, "WGDashboard")).toContainText("never connected");
+  await expect(tile(page, "WGDashboard")).not.toContainText("SECRET");
+  const res = await page.request.get("/api/widget/apps.wgdashboard");
+  expect(res.ok()).toBe(true);
+  const data = await res.text();
+  expect(data).toContain("Phone");
+  expect(data).not.toContain("SECRET");
+  await tile(page, "WGDashboard").scrollIntoViewIfNeeded();
+  await tile(page, "WGDashboard").screenshot({ path: "test-results/shots/81-wgdashboard-tile.png" });
+});
+
 test("pelican: power actions reach the panel", async ({ page }) => {
   const actions = await (await page.request.get("/api/actions/apps.game-servers")).json();
   expect(actions.map((a: { targetLabel: string; id: string }) => `${a.targetLabel}:${a.id}`)).toContain("Creative:start");

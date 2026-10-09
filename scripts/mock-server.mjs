@@ -311,6 +311,14 @@ const routes = {
   "GET /pelican/api/client": (req, res) =>
     req.headers.authorization === "Bearer ptlc_key" ? json(res, 200, pelicanData.servers) : json(res, 401, { errors: [{ detail: "Unauthenticated." }] }),
   "GET /pelican/_calls": (_q, res) => json(res, 200, pelicanCalls),
+  // WGDashboard: API key header; a wrong key answers 200 with status false, like the real one.
+  "GET /wgd/api/getWireguardConfigurations": (req, res) =>
+    json(res, 200, req.headers["wg-dashboard-apikey"] === "wgd-key" ? fixture("wgdashboard.json").configurations : { status: false, message: "Unauthorized access", data: null }),
+  "GET /wgd/api/getWireguardConfigurationInfo": (req, res) => {
+    if (req.headers["wg-dashboard-apikey"] !== "wgd-key") return json(res, 200, { status: false, message: "Unauthorized access", data: null });
+    const name = new URL(req.url, "http://x").searchParams.get("configurationName");
+    json(res, 200, fixture("wgdashboard.json").peers[name] ?? { status: false, message: "Configuration does not exist", data: null });
+  },
   // wg-easy 14: password → session cookie → clients.
   "POST /wg/api/session": async (req, res) => {
     const body = JSON.parse((await readBody(req)) || "{}");
