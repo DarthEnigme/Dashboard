@@ -690,3 +690,41 @@ body {
     animation: none;
   }
 }
+
+/*
+ * Printing (finance report, "Save as PDF"): dark text on white whatever the theme or palette,
+ * flat cards, no wallpaper, and cards kept whole across pages.
+ */
+@media print {
+  :root[data-theme][data-theme] {
+    --page: #ffffff;
+    --fg: #0f172a;
+    --fg-muted: rgb(15 23 42 / 0.62);
+    --glass: #ffffff;
+    --glass-border: rgb(15 23 42 / 0.14);
+    --glass-highlight: transparent;
+    --glass-shadow: none;
+    --glass-filter: none;
+    --track: rgb(15 23 42 / 0.1);
+    --row: rgb(15 23 42 / 0.03);
+    --grid: rgb(15 23 42 / 0.08);
+    --axis: rgb(15 23 42 / 0.2);
+    --ok: #059669;
+    --warn: #d97706;
+    --err: #e11d48;
+    color-scheme: light;
+  }
+  body {
+    background: #fff;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .no-print,
+  .glass::after,
+  .glass::before {
+    display: none !important;
+  }
+  .report-card {
+    break-inside: avoid;
+  }
+}

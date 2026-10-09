@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR, { useSWRConfig } from "swr";
 import { motion } from "framer-motion";
@@ -11,6 +11,7 @@ import { money } from "@/lib/finance/format";
 import { FinanceCharts } from "../charts/FinanceCharts";
 import { Sankey } from "../charts/Sankey";
 import { Budgets } from "./Budgets";
+import { FlowExport } from "./FlowExport";
 import { QuickAdd } from "./QuickAdd";
 import { TransactionList } from "./TransactionList";
 import { CategoryManager } from "./CategoryManager";
@@ -57,6 +58,7 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
   const currencies = [...new Set([currency, defaultCurrency, ...(summary?.currencies ?? []), ...COMMON])];
   const { data: goals, mutate: setGoals } = useSWR<Goal[]>(GOALS_KEY, fetcher);
   const [saving, setSaving] = useState(false);
+  const flowChart = useRef<HTMLDivElement>(null);
 
   /** After any change: refresh every finance query (summary, lists, categories). */
   const refresh = () => mutate((key) => typeof key === "string" && key.startsWith("/api/finance/"));
@@ -168,10 +170,15 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
         <>
           <div className="grid gap-3 lg:grid-cols-[2fr_1fr]">
             <section className="glass rounded-3xl p-5" aria-labelledby="flow-title">
-              <h2 id="flow-title" className="mb-2 text-sm font-semibold">
-                Money flow
-              </h2>
-              <Sankey flow={summary.flow} currency={summary.currency} height={220} />
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 id="flow-title" className="text-sm font-semibold">
+                  Money flow
+                </h2>
+                <FlowExport chart={flowChart} flow={summary.flow} currency={summary.currency} period={period} />
+              </div>
+              <div ref={flowChart}>
+                <Sankey flow={summary.flow} currency={summary.currency} height={220} />
+              </div>
             </section>
             <section className="glass rounded-3xl p-5" aria-labelledby="budgets-title">
               <h2 id="budgets-title" className="mb-3 text-sm font-semibold">
@@ -190,11 +197,16 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
       )}
       {view === "flow" && summary && (
         <section className="glass rounded-3xl p-5" aria-labelledby="flow-full-title">
-          <h2 id="flow-full-title" className="mb-1 text-sm font-semibold">
-            Where the money came from and where it went · {summary.period.label}
-          </h2>
+          <div className="mb-1 flex items-start justify-between gap-2">
+            <h2 id="flow-full-title" className="text-sm font-semibold">
+              Where the money came from and where it went · {summary.period.label}
+            </h2>
+            <FlowExport chart={flowChart} flow={summary.flow} currency={summary.currency} period={period} />
+          </div>
           <p className="mb-4 text-xs text-muted">Income by category on the left, spending on the right. Hover a band for its share.</p>
-          <Sankey flow={summary.flow} currency={summary.currency} height={420} />
+          <div ref={flowChart}>
+            <Sankey flow={summary.flow} currency={summary.currency} height={420} />
+          </div>
         </section>
       )}
       {view === "transactions" && <TransactionList period={period} currency={currency} onChanged={refresh} />}

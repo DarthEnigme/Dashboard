@@ -1,6 +1,7 @@
+import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { shot } from "./helpers";
+import { SHOTS_DIR, shot } from "./helpers";
 
 test.describe.serial("finance tracker", () => {
   test("syncs from Firefly III", async ({ page }) => {
@@ -75,6 +76,50 @@ test.describe.serial("finance tracker", () => {
     await page.reload();
     await page.getByRole("tab", { name: "categories" }).click();
     await expect(page.getByLabel("Monthly budget for Hobbies (EUR)")).toHaveValue("50");
+  });
+
+  test("exports the money flow as PNG, SVG, CSV and a PDF report", async ({ page, context }) => {
+    await page.goto("/finance");
+    await page.getByRole("tab", { name: "flow" }).click();
+    await expect(page.getByRole("img", { name: "Where the money came from and where it went" })).toBeVisible();
+    const month = new Date().toISOString().slice(0, 7);
+    const exportAs = async (label: string) => {
+      await page.getByRole("button", { name: "Export" }).click();
+      const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: label }).click()]);
+      return download;
+    };
+
+    const png = await exportAs("Image (PNG)");
+    expect(png.suggestedFilename()).toBe(`money-flow-${month}.png`);
+    const pngBytes = fs.readFileSync((await png.path())!);
+    expect(pngBytes.subarray(1, 4).toString()).toBe("PNG");
+    fs.mkdirSync(SHOTS_DIR, { recursive: true });
+    fs.writeFileSync(path.join(SHOTS_DIR, "56-finance-flow-export.png"), pngBytes);
+
+    const svg = await exportAs("Vector (SVG)");
+    const markup = fs.readFileSync((await svg.path())!, "utf8");
+    expect(markup).toContain("<svg");
+    expect(markup).toContain("Hobbies");
+    // Colours are resolved: nothing that only means something inside the page.
+    expect(markup).not.toMatch(/var\(--|class="/);
+
+    const csv = await exportAs("Flows (CSV)");
+    const text = fs.readFileSync((await csv.path())!, "utf8");
+    expect(text.split("\r\n")[0]).toBe("source,target,amount,currency,share_percent");
+    expect(text).toMatch(/Budget,Hobbies,\d+\.\d\d,EUR,/);
+
+    await page.getByRole("button", { name: "Export" }).click();
+    const [report] = await Promise.all([context.waitForEvent("page"), page.getByRole("menuitem", { name: "Report (PDF)" }).click()]);
+    // Stop the print dialog: headless Chromium has none, but the report must not depend on it.
+    await report.waitForLoadState();
+    expect(report.url()).toContain(`/finance/report?period=${month}`);
+    await expect(report.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(report.getByRole("img", { name: "Where the money came from and where it went" })).toBeVisible();
+    await report.emulateMedia({ media: "print" });
+    await shot(report, "55-finance-report-print");
+    const pdf = await report.pdf({ format: "A4", printBackground: true });
+    expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+    await report.close();
   });
 
   test("the finance tile shows on the dashboard for signed-in users only", async ({ page, browser }) => {

@@ -3,12 +3,13 @@
 import { useId, useMemo, useState } from "react";
 import type { Flow } from "@/lib/finance/aggregate";
 import { categoryColor, money } from "@/lib/finance/format";
+import { FLOW_FROM_SAVINGS, FLOW_MIDDLE, FLOW_SAVED } from "@/lib/finance/flowCsv";
 import { Tooltip, useWidth } from "./common";
 import { foldSmall, layoutSankey, placeLabels, type FlowItem } from "./sankeyLayout";
 
 const TOP = 20; // room for the middle node's label
-const SAVED = "Saved";
-const FROM_SAVINGS = "From savings";
+const SAVED = FLOW_SAVED;
+const FROM_SAVINGS = FLOW_FROM_SAVINGS;
 
 /**
  * Money flow for a period: income sources → the period's budget → spending categories, with what
@@ -42,7 +43,7 @@ export function Sankey({ flow, currency, height = 260, ariaLabel = "Where the mo
   }, [flow, hatch]);
 
   const layout = useMemo(
-    () => layoutSankey(sources, { name: "Budget", color: "var(--fg)" }, sinks, { width, height, nodeWidth, gap: compact ? 6 : 8 }),
+    () => layoutSankey(sources, { name: FLOW_MIDDLE, color: "var(--fg)" }, sinks, { width, height, nodeWidth, gap: compact ? 6 : 8 }),
     [sources, sinks, width, height, nodeWidth, compact],
   );
 
