@@ -29,6 +29,19 @@ export function insertMetrics(serviceId: string, ts: number, samples: Sample[]) 
   for (const s of samples) stmt.run(serviceId, s.key, ts, s.value);
 }
 
+/** The newest value of every recorded field (newer than `since`), for the Prometheus export. */
+export function latestMetrics(since: number): { service_id: string; key: string; value: number }[] {
+  init();
+  return db()
+    .prepare(
+      `SELECT m.service_id, m.key, m.value FROM metrics m
+       JOIN (SELECT service_id, key, MAX(ts) AS ts FROM metrics WHERE ts >= ? GROUP BY service_id, key) l
+         ON l.service_id = m.service_id AND l.key = m.key AND l.ts = m.ts
+       ORDER BY m.service_id, m.key`,
+    )
+    .all(since) as { service_id: string; key: string; value: number }[];
+}
+
 export interface Point {
   t: number;
   v: number;

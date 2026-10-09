@@ -35,6 +35,7 @@ import { TestAlertButton } from "./TestAlertButton";
 import { UpdatesPanel } from "./UpdatesPanel";
 import { ThemeEditor } from "./ThemeEditor";
 import { BackupsPanel } from "./BackupsPanel";
+import { TokensPanel } from "./TokensPanel";
 import { changedFields, validateSettings } from "./validate";
 import { msg } from "@/i18n";
 import { useT } from "@/i18n/client";
@@ -340,7 +341,12 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                     }
                   />
                 )}
-                {!q && section.extra === "testAlert" && <TestAlertButton />}
+                {!q && section.extra === "testAlert" && (
+                  <>
+                    <TestAlertButton />
+                    <TokensPanel />
+                  </>
+                )}
                 {!q && section.extra === "updates" && <UpdatesPanel />}
                 {!q && section.extra === "users" && (
                   <div className="flex flex-col gap-3 border-t border-line pt-5">

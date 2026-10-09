@@ -9,8 +9,8 @@ test.describe.serial("appearance", () => {
   test.afterAll(() => writeConfig("settings", original));
 
   test("dropdown lists use the theme colours", async ({ page }) => {
-    await page.goto("/settings#refresh");
     await page.goto("/settings#appearance");
+    await expect(page.getByRole("heading", { name: "Appearance", level: 2 })).toBeVisible();
     const picker = page.getByLabel("Start from");
     await picker.click();
     await expect(page.getByRole("option", { name: "Nord" })).toBeVisible();

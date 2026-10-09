@@ -96,6 +96,29 @@ test.describe.serial("settings page", () => {
     expect((await page.request.get("/api/backups/..%2Fpage.db")).status()).toBe(404);
   });
 
+  test("API token for the Prometheus export", async ({ page, browser }) => {
+    await page.goto("/settings#monitoring");
+    await page.getByLabel("Token name").fill("Prometheus e2e");
+    await page.getByRole("button", { name: "Create token" }).click();
+    const token = (await page.locator("[data-token]").innerText()).trim();
+    expect(token).toMatch(/^page_/);
+    await expect(page.getByRole("list", { name: "API tokens" })).toContainText("Prometheus e2e");
+
+    const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    expect((await anon.request.get("http://localhost:3300/api/export/metrics")).status()).toBe(401);
+    const res = await anon.request.get("http://localhost:3300/api/export/metrics", { headers: { Authorization: `Bearer ${token}` } });
+    expect(res.status()).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("# TYPE page_service_up gauge");
+    expect(body).toMatch(/^page_service_up\{service="[^"]+",name="[^"]+",group="[^"]+"\} [01]$/m);
+    expect(body).toContain("page_build_info");
+    await anon.close();
+
+    await page.getByRole("button", { name: "Revoke Prometheus e2e" }).click();
+    await page.getByRole("button", { name: "Confirm: Revoke Prometheus e2e" }).click();
+    await expect(page.getByRole("list", { name: "API tokens" })).toHaveCount(0);
+  });
+
   test("exports the config files as a zip", async ({ page }) => {
     const res = await page.request.get("/api/config/export");
     expect(res.status()).toBe(200);

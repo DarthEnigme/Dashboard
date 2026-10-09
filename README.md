@@ -476,6 +476,25 @@ Labels are read from formatted values too (`49%`, `5.0 GB`, `21.5 °C`). Both se
 
 Vaultwarden and other apps without a stats API can still be watched with an HTTP check, e.g. `ping: { type: http, url: https://vault/alive, expect: [200] }`.
 
+### Prometheus export
+
+Page can be scraped by Prometheus (or Grafana Agent, VictoriaMetrics…) at `/api/export/metrics`:
+- `page_service_up`, `page_service_latency_ms`, `page_service_uptime_ratio` (last 24 hours) and `page_service_last_check_timestamp_seconds` for every service with a status check, labelled `service`, `name` and `group`
+- `page_widget_value{service, field}`: the latest value of every recorded widget field (`record: true` or thresholds)
+- `page_build_info{version}`
+
+It needs an API token: create one under **Settings → Monitoring & alerts → API tokens** (admins). The token is shown once, with a ready-made `scrape_configs` block; only its hash is stored, it stops working if its admin is disabled or demoted, and it can be revoked any time.
+
+```yaml
+scrape_configs:
+  - job_name: page
+    metrics_path: /api/export/metrics
+    authorization:
+      credentials: page_…
+    static_configs:
+      - targets: ["page.example.com"]
+```
+
 ## Actions
 
 Admins get a ⋯ menu on Docker and Proxmox tiles:

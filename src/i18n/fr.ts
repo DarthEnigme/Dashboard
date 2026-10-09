@@ -1156,6 +1156,19 @@ export const fr: Record<string, string> = {
   "Of the account that posts (a bot account is best); it must have joined the room.": "Du compte qui publie (un compte bot de préférence) ; il doit avoir rejoint le salon.",
   "Matrix room id": "Id du salon Matrix",
 
+  // ---------- API tokens ----------
+  "Prometheus export and API tokens": "Export Prometheus et jetons d’API",
+  "Prometheus can scrape every service's status, latency and uptime, and the recorded widget values, from": "Prometheus peut collecter le statut, la latence et la disponibilité de chaque service, et les valeurs enregistrées des widgets, sur",
+  "It needs one of these tokens.": "Il faut l’un de ces jetons.",
+  "Token name": "Nom du jeton",
+  "Create token": "Créer un jeton",
+  "Copy it now: it won't be shown again.": "Copiez-le maintenant : il ne sera plus affiché.",
+  Copied: "Copié",
+  "API tokens": "Jetons d’API",
+  "used {when}": "utilisé le {when}",
+  "never used": "jamais utilisé",
+  "Revoke {name}": "Révoquer {name}",
+
   // ---------- Not literal in the code: action names, account kinds, glow levels ----------
   Start: "Démarrer",
   Stop: "Arrêter",
