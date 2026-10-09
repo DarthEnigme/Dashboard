@@ -696,6 +696,16 @@ Add a `finance` widget to a tile to see it on the dashboard; bigger tiles show m
 
 Each person has their own log. It needs the `travel` permission, which signed-in users have by default (see `auth.userPermissions`). City search uses Open-Meteo's free place search through Page; everything else (the map included) works offline. Country flags use the Twemoji Country Flags font (Twemoji graphics by Twitter, CC-BY 4.0) so they also show on Windows.
 
+## Watchlist and reading list
+
+**Watchlist** (in the Apps menu) keeps the books, movies, shows and games you want to get to:
+- **Add:** pick the kind and type a title. For books, Page searches Open Library as you type: pick one to get its cover, author, year and page count. Everything else you type yourself.
+- **Statuses:** in progress, planned, finished and dropped, each with its own tab, and a filter by kind. Starting something records the date; finishing it records that too and fills in the progress.
+- **Each item:** progress (pages, episodes, minutes or hours, shown on the cover while in progress), a rating out of 5, and notes.
+- **Stats:** what you're on, what's planned, what you finished this year by kind, and the pages read.
+
+Each person's list is private. It needs the `watchlist` permission, which signed-in users have by default.
+
 ## Keyboard
 
 - `Ctrl/⌘ K`: command palette, on every page. Fuzzy-search services, bookmarks, tabs, Finance and every settings section; `Enter` opens, `⇧ Enter` opens a service's details page.

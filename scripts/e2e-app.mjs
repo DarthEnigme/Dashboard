@@ -29,6 +29,9 @@ const child = spawn(process.execPath, [path.join(root, "node_modules", "next", "
     PAGE_REPO: "test/page",
     // City search for the travel log.
     PAGE_GEOCODER_URL: "http://localhost:4010/geo",
+    // Book search for the watchlist.
+    PAGE_OPENLIBRARY_URL: "http://localhost:4010/ol",
+    PAGE_OPENLIBRARY_COVERS_URL: "http://localhost:4010/ol-covers",
   },
 });
 const stop = () => child.kill();

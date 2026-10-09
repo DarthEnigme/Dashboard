@@ -319,6 +319,20 @@ const routes = {
   "GET /pelican/api/client": (req, res) =>
     req.headers.authorization === "Bearer ptlc_key" ? json(res, 200, pelicanData.servers) : json(res, 401, { errors: [{ detail: "Unauthenticated." }] }),
   "GET /pelican/_calls": (_q, res) => json(res, 200, pelicanCalls),
+  // Open Library search (watchlist books); covers come from /ol-covers.
+  "GET /ol/search.json": (req, res) => {
+    const q = (new URL(req.url, "http://x").searchParams.get("q") ?? "").toLowerCase();
+    const docs = [
+      { key: "/works/OL893415W", title: "Dune", author_name: ["Frank Herbert"], first_publish_year: 1965, number_of_pages_median: 612, cover_i: 1 },
+      { key: "/works/OL893416W", title: "Dune Messiah", author_name: ["Frank Herbert"], first_publish_year: 1969, number_of_pages_median: 256 },
+      { key: "/works/OL45883W", title: "The Hobbit", author_name: ["J.R.R. Tolkien"], first_publish_year: 1937, number_of_pages_median: 310, cover_i: 2 },
+    ];
+    json(res, 200, { docs: docs.filter((d) => d.title.toLowerCase().includes(q)) });
+  },
+  "GET /ol-covers/b/id/1-M.jpg": (_q, res) => {
+    res.writeHead(200, { "Content-Type": "image/svg+xml" });
+    res.end('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="180"><rect width="120" height="180" fill="#c2410c"/><text x="60" y="95" font-size="22" text-anchor="middle" fill="#fff">DUNE</text></svg>');
+  },
   // Open-Meteo place search (travel log city search).
   "GET /geo/v1/search": (req, res) => {
     const name = (new URL(req.url, "http://x").searchParams.get("name") ?? "").toLowerCase();

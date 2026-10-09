@@ -196,6 +196,25 @@ export function db(): DatabaseSync {
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         PRIMARY KEY (trip_id, user_id)
       );
+      CREATE TABLE IF NOT EXISTS watch_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL DEFAULT 'book',
+        title TEXT NOT NULL,
+        creator TEXT,
+        year INTEGER,
+        cover TEXT,
+        external_id TEXT,
+        status TEXT NOT NULL DEFAULT 'planned',
+        rating INTEGER,
+        progress INTEGER,
+        total INTEGER,
+        started TEXT,
+        finished TEXT,
+        notes TEXT,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS watch_items_owner ON watch_items (owner_id, status);
       CREATE TABLE IF NOT EXISTS config_versions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         file TEXT NOT NULL,
