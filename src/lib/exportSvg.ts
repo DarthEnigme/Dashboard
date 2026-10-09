@@ -5,16 +5,17 @@
 
 const PAINT = ["fill", "stroke", "opacity", "fill-opacity", "stroke-opacity", "stroke-width", "font-family", "font-size", "font-weight", "text-anchor", "dominant-baseline"] as const;
 
-/** A standalone SVG document of `svg`, on the page's background colour. */
+/**
+ * A standalone SVG document of `svg`: just what is drawn (cropped to it, labels included), on a
+ * transparent background unless `background` is given.
+ */
 export function standaloneSvg(svg: SVGSVGElement, opts: { background?: string; padding?: number } = {}): { markup: string; width: number; height: number } {
-  const pad = opts.padding ?? 16;
-  const box = svg.getBoundingClientRect();
-  // overflow-visible charts draw a little outside their box (labels): include it.
+  const pad = opts.padding ?? 4;
   const bbox = svg.getBBox();
-  const x0 = Math.min(0, bbox.x) - pad;
-  const y0 = Math.min(0, bbox.y) - pad;
-  const width = Math.ceil(Math.max(box.width, bbox.x + bbox.width) - x0 + pad);
-  const height = Math.ceil(Math.max(box.height, bbox.y + bbox.height) - y0 + pad);
+  const x0 = Math.floor(bbox.x - pad);
+  const y0 = Math.floor(bbox.y - pad);
+  const width = Math.ceil(bbox.width + 2 * pad);
+  const height = Math.ceil(bbox.height + 2 * pad);
 
   const copy = svg.cloneNode(true) as SVGSVGElement;
   const originals = [svg, ...svg.querySelectorAll("*")];
@@ -36,7 +37,7 @@ export function standaloneSvg(svg: SVGSVGElement, opts: { background?: string; p
   copy.setAttribute("height", String(height));
   copy.setAttribute("viewBox", `${x0} ${y0} ${width} ${height}`);
   copy.removeAttribute("style");
-  const bg = opts.background ?? getComputedStyle(document.body).backgroundColor;
+  const bg = opts.background;
   if (bg) {
     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
     Object.entries({ x: x0, y: y0, width, height, fill: bg }).forEach(([k, v]) => rect.setAttribute(k, String(v)));

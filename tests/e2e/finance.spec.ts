@@ -95,6 +95,17 @@ test.describe.serial("finance tracker", () => {
     expect(pngBytes.subarray(1, 4).toString()).toBe("PNG");
     fs.mkdirSync(SHOTS_DIR, { recursive: true });
     fs.writeFileSync(path.join(SHOTS_DIR, "56-finance-flow-export.png"), pngBytes);
+    // The corners are see-through.
+    const cornerAlpha = await page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${b64}`;
+      await img.decode();
+      const c = Object.assign(document.createElement("canvas"), { width: img.width, height: img.height });
+      const ctx = c.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+      return ctx.getImageData(0, 0, 1, 1).data[3];
+    }, pngBytes.toString("base64"));
+    expect(cornerAlpha).toBe(0);
 
     const svg = await exportAs("Vector (SVG)");
     const markup = fs.readFileSync((await svg.path())!, "utf8");
@@ -102,6 +113,8 @@ test.describe.serial("finance tracker", () => {
     expect(markup).toContain("Hobbies");
     // Colours are resolved: nothing that only means something inside the page.
     expect(markup).not.toMatch(/var\(--|class="/);
+    // Just the flow: no background behind it.
+    expect(markup).not.toMatch(/<svg[^>]*>\s*<rect/);
 
     const csv = await exportAs("Flows (CSV)");
     const text = fs.readFileSync((await csv.path())!, "utf8");
