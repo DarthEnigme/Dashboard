@@ -5,8 +5,10 @@ export interface Transaction extends Txn {
   id: number;
   description: string;
   account: string | null;
-  source: "manual" | "csv" | "firefly" | "recurring";
+  source: "manual" | "csv" | "firefly" | "recurring" | "transfer";
   external_id: string | null;
+  /** Shared by both halves of a transfer between own accounts. */
+  transfer_id: string | null;
 }
 
 export interface NewTransaction {
@@ -18,25 +20,38 @@ export interface NewTransaction {
   account?: string | null;
   source?: Transaction["source"];
   externalId?: string | null;
+  transferId?: string | null;
 }
 
-export function listTransactions(filter: { from?: string; to?: string; category?: string; q?: string; limit?: number } = {}): Transaction[] {
+export function listTransactions(filter: { from?: string; to?: string; category?: string; account?: string; q?: string; limit?: number } = {}): Transaction[] {
   const where: string[] = [];
   const args: (string | number)[] = [];
   if (filter.from) where.push("date >= ?"), args.push(filter.from);
   if (filter.to) where.push("date <= ?"), args.push(filter.to);
   if (filter.category === "") where.push("category IS NULL");
   else if (filter.category) where.push("category = ? COLLATE NOCASE"), args.push(filter.category);
+  if (filter.account === "") where.push("account IS NULL");
+  else if (filter.account) where.push("account = ? COLLATE NOCASE"), args.push(filter.account);
   if (filter.q) where.push("(description LIKE ? OR category LIKE ?)"), args.push(`%${filter.q}%`, `%${filter.q}%`);
   const sql = `SELECT * FROM fin_transactions ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY date DESC, id DESC LIMIT ?`;
   return db().prepare(sql).all(...args, filter.limit ?? 1000) as unknown as Transaction[];
 }
 
-/** Everything needed for summaries (light columns only); `recurring` marks transactions added by a recurring rule. */
-export const allForSummary = () =>
-  (db().prepare("SELECT date, amount_cents, currency, category, source = 'recurring' AS recurring FROM fin_transactions").all() as unknown as (Omit<Txn, "recurring"> & { recurring: number })[]).map(
-    (t): Txn => ({ ...t, recurring: !!t.recurring }),
-  );
+/**
+ * Everything needed for summaries (light columns only), optionally for one account ("" = no
+ * account). `recurring` marks transactions added by a recurring rule, `transfer` moves between
+ * own accounts.
+ */
+export const allForSummary = (account?: string) =>
+  (
+    db()
+      .prepare(
+        `SELECT date, amount_cents, currency, category, source = 'recurring' AS recurring, transfer_id IS NOT NULL AS transfer FROM fin_transactions${
+          account === undefined ? "" : account === "" ? " WHERE account IS NULL" : " WHERE account = ? COLLATE NOCASE"
+        }`,
+      )
+      .all(...(account ? [account] : [])) as unknown as (Omit<Txn, "recurring" | "transfer"> & { recurring: number; transfer: number })[]
+  ).map((t): Txn => ({ ...t, recurring: !!t.recurring, transfer: !!t.transfer }));
 
 /** Currencies that transactions use, most used first. */
 export const currenciesInUse = () =>
@@ -65,10 +80,21 @@ export function addTransaction(t: NewTransaction): "added" | "duplicate" {
   const category = ensureCategory(t.category);
   const res = db()
     .prepare(
-      `INSERT OR IGNORE INTO fin_transactions (date, amount_cents, currency, category, description, account, source, external_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO fin_transactions (date, amount_cents, currency, category, description, account, source, external_id, transfer_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(t.date, t.amountCents, t.currency.toUpperCase(), category, t.description, t.account ?? null, t.source ?? "manual", t.externalId ?? null, Date.now());
+    .run(
+      t.date,
+      t.amountCents,
+      t.currency.toUpperCase(),
+      category,
+      t.description,
+      t.account?.trim() || null,
+      t.source ?? "manual",
+      t.externalId ?? null,
+      t.transferId ?? null,
+      Date.now(),
+    );
   return res.changes ? "added" : "duplicate";
 }
 
@@ -91,13 +117,19 @@ export function updateTransaction(id: number, patch: Partial<NewTransaction>) {
   if (patch.amountCents !== undefined) cols.push(["amount_cents", patch.amountCents]);
   if (patch.description !== undefined) cols.push(["description", patch.description]);
   if (patch.category !== undefined) cols.push(["category", ensureCategory(patch.category)]);
+  if (patch.account !== undefined) cols.push(["account", patch.account?.trim() || null]);
   if (!cols.length) return;
   db()
     .prepare(`UPDATE fin_transactions SET ${cols.map(([c]) => `${c} = ?`).join(", ")} WHERE id = ?`)
     .run(...cols.map(([, v]) => v), id);
 }
 
-export const deleteTransaction = (id: number) => db().prepare("DELETE FROM fin_transactions WHERE id = ?").run(id);
+/** Deleting either half of a transfer deletes both. */
+export function deleteTransaction(id: number) {
+  const row = db().prepare("SELECT transfer_id FROM fin_transactions WHERE id = ?").get(id) as { transfer_id: string | null } | undefined;
+  if (row?.transfer_id) db().prepare("DELETE FROM fin_transactions WHERE transfer_id = ?").run(row.transfer_id);
+  else db().prepare("DELETE FROM fin_transactions WHERE id = ?").run(id);
+}
 
 /** Rename a category, or merge it into another one when the new name exists. */
 export function renameCategory(from: string, to: string) {

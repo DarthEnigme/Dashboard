@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
  * ?period=2026-10 (month) or ?period=2026 (year); defaults to the current month.
  * ?currency=USD shows everything in that currency (default: the finance currency setting);
  * other currencies are converted at the latest ECB rates.
+ * ?account=Checking limits it to one account ("" = transactions without an account).
  */
 export async function GET(req: Request) {
   const g = await guard();
@@ -26,7 +27,7 @@ export async function GET(req: Request) {
   const budgetRate = currency === defaultCurrency ? 1 : rates?.rates[defaultCurrency];
   const categories = listCategories().map((c) => (c.budget && budgetRate ? { ...c, budget: Math.round(c.budget / budgetRate) } : c));
   return NextResponse.json({
-    ...summarize(allForSummary(), categories, period, currency, rates?.rates),
+    ...summarize(allForSummary(q.get("account") ?? undefined), categories, period, currency, rates?.rates),
     currencies: currenciesInUse(),
     ratesDate: rates?.date ?? null,
   });

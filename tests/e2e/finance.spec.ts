@@ -135,6 +135,44 @@ test.describe.serial("finance tracker", () => {
     await report.close();
   });
 
+  test("accounts: balances, a transfer, and filtering by account", async ({ page }) => {
+    await page.goto("/finance");
+    await page.getByRole("tab", { name: "accounts" }).click();
+    // Firefly III's account came in with its transactions.
+    await expect(page.locator('[data-account="Checking"]')).toBeVisible();
+    for (const [name, opening] of [["Wallet", "1000"], ["Holiday fund", "0"]]) {
+      await page.getByRole("button", { name: "Add account" }).click();
+      await page.getByLabel("Name").fill(name);
+      await page.getByLabel("Opening balance").fill(opening);
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      await expect(page.locator(`[data-account="${name}"]`)).toBeVisible();
+    }
+    await expect(page.getByLabel("Wallet balance", { exact: true })).toHaveText(/^€1,000(\.00)?$/);
+
+    await page.getByRole("button", { name: "Transfer" }).click();
+    await page.getByLabel("From").selectOption("Wallet");
+    await page.getByLabel("To").selectOption("Holiday fund");
+    await page.getByRole("spinbutton", { name: /^Amount \(EUR\)/ }).fill("250");
+    await page.getByRole("button", { name: "Transfer", exact: true }).last().click();
+    await expect(page.getByLabel("Wallet balance", { exact: true })).toHaveText(/^€750(\.00)?$/);
+    await expect(page.getByLabel("Holiday fund balance", { exact: true })).toHaveText(/^€250(\.00)?$/);
+    await shot(page, "57-finance-accounts");
+
+    // An expense added while viewing Wallet lands in Wallet; the transfer isn't spending.
+    const spentBefore = await page.locator(".glass", { hasText: "Spent" }).first().innerText();
+    await page.getByRole("combobox", { name: "Account" }).first().selectOption("Wallet");
+    await page.getByLabel("Description").fill("Bike repair");
+    await page.getByLabel(/Amount in EUR/).fill("40");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.getByLabel("Wallet balance", { exact: true })).toHaveText(/^€710(\.00)?$/);
+    await page.getByRole("tab", { name: "transactions" }).click();
+    await expect(page.getByRole("cell", { name: "Bike repair" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Transfer to Holiday fund" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Salary" })).toHaveCount(0);
+    await page.getByRole("combobox", { name: "Account" }).first().selectOption("*");
+    expect(spentBefore).toContain("Spent");
+  });
+
   test("the finance tile shows on the dashboard for signed-in users only", async ({ page, browser }) => {
     await page.goto("/");
     const tile = page.getByRole("img", { name: "Spending by category" });

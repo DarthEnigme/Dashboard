@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const period = q.get("period");
   const range = period && /^\d{4}(-\d{2})?$/.test(period) ? { from: period.length === 4 ? `${period}-01-01` : `${period}-01`, to: `${period.length === 4 ? `${period}-12` : period}-31` } : {};
   return NextResponse.json(
-    listTransactions({ ...range, category: q.get("category") ?? undefined, q: q.get("q") ?? undefined, limit: 2000 }),
+    listTransactions({ ...range, category: q.get("category") ?? undefined, account: q.get("account") ?? undefined, q: q.get("q") ?? undefined, limit: 2000 }),
   );
 }
 
@@ -30,6 +30,7 @@ export async function POST(req: Request) {
     currency: typeof b.currency === "string" && b.currency.length === 3 ? b.currency : loadConfig().settings.finance.currency,
     description: b.description.trim().slice(0, 300),
     category: typeof b.category === "string" ? b.category.slice(0, 60) : null,
+    account: typeof b.account === "string" ? b.account.slice(0, 60) : null,
   });
   return NextResponse.json({ ok: true }, { status: 201 });
 }

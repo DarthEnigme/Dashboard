@@ -18,6 +18,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     amountCents: amount === undefined ? undefined : Math.round(amount * 100),
     description: typeof b.description === "string" ? b.description.trim().slice(0, 300) : undefined,
     category: b.category === undefined ? undefined : typeof b.category === "string" ? b.category : null,
+    account: b.account === undefined ? undefined : typeof b.account === "string" ? b.account.slice(0, 60) : null,
   });
   return NextResponse.json({ ok: true });
 }

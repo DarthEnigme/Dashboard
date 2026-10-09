@@ -2,29 +2,45 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { Download, FileSpreadsheet, Pencil, PenLine, RefreshCw, Repeat } from "lucide-react";
+import { ArrowLeftRight, Download, FileSpreadsheet, Pencil, PenLine, RefreshCw, Repeat } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import { categoryColor, money } from "@/lib/finance/format";
 import type { Transaction } from "@/lib/finance/store";
+import type { Account } from "@/lib/finance/accounts";
 import type { FieldSpec } from "@/integrations/fields";
 import { FieldsDialog } from "../edit/FieldsDialog";
 import { DeleteButton, IconButton } from "../edit/controls";
 import { inputBase } from "../edit/FieldInput";
 
-const editFields: FieldSpec[] = [
+const editFields = (accounts: string[]): FieldSpec[] => [
   { key: "date", label: "Date (YYYY-MM-DD)", required: true },
   { key: "description", label: "Description", required: true },
   { key: "category", label: "Category" },
+  ...(accounts.length ? [{ key: "account", label: "Account", kind: "select" as const, options: accounts, placeholder: "No account" }] : []),
   { key: "amount", label: "Amount (negative = expense)", kind: "number", required: true },
 ];
 
-const sourceIcon = { manual: PenLine, csv: FileSpreadsheet, firefly: RefreshCw, recurring: Repeat } as const;
+const sourceIcon = { manual: PenLine, csv: FileSpreadsheet, firefly: RefreshCw, recurring: Repeat, transfer: ArrowLeftRight } as const;
 
-export function TransactionList({ period, currency, onChanged }: { period: string; currency: string; onChanged: () => void }) {
+export function TransactionList({
+  period,
+  currency,
+  account,
+  accounts = [],
+  onChanged,
+}: {
+  period: string;
+  currency: string;
+  /** Only this account ("" = none); undefined = all. */
+  account?: string;
+  accounts?: Account[];
+  onChanged: () => void;
+}) {
   const [q, setQ] = useState("");
   const [category, setCategory] = useState<string>();
   const [editing, setEditing] = useState<Transaction>();
-  const params = new URLSearchParams({ period, ...(q ? { q } : {}), ...(category !== undefined ? { category } : {}) });
+  const params = new URLSearchParams({ period, ...(q ? { q } : {}), ...(category !== undefined ? { category } : {}), ...(account !== undefined ? { account } : {}) });
+  const showAccount = accounts.length > 0 && account === undefined;
   const { data, error } = useSWR<Transaction[]>(`/api/finance/transactions?${params}`, fetcher, { keepPreviousData: true });
   const { data: categories } = useSWR<{ name: string; slot: number | null; color: string | null }[]>("/api/finance/categories", fetcher);
   const colorOf = new Map(categories?.map((c) => [c.name.toLowerCase(), categoryColor(c.slot, c.color)]));
@@ -69,6 +85,7 @@ export function TransactionList({ period, currency, onChanged }: { period: strin
                 <th className="px-2 py-1.5 font-medium">Date</th>
                 <th className="px-2 py-1.5 font-medium">Description</th>
                 <th className="px-2 py-1.5 font-medium">Category</th>
+                {showAccount && <th className="px-2 py-1.5 font-medium">Account</th>}
                 <th className="px-2 py-1.5 text-right font-medium">Amount</th>
                 <th className="w-20" />
               </tr>
@@ -96,6 +113,7 @@ export function TransactionList({ period, currency, onChanged }: { period: strin
                         <span className="text-xs text-muted">–</span>
                       )}
                     </td>
+                    {showAccount && <td className="max-w-40 truncate px-2 py-1.5 text-xs text-muted">{t.account ?? "–"}</td>}
                     <td className={`px-2 py-1.5 text-right whitespace-nowrap tabular-nums ${t.amount_cents > 0 ? "text-[var(--ok)]" : ""}`}>
                       {money(t.amount_cents, t.currency || currency, true)}
                     </td>
@@ -121,11 +139,11 @@ export function TransactionList({ period, currency, onChanged }: { period: strin
       {editing && (
         <FieldsDialog
           title="Edit transaction"
-          fields={editFields}
-          initial={{ date: editing.date, description: editing.description, category: editing.category ?? "", amount: editing.amount_cents / 100 }}
+          fields={editFields(accounts.map((a) => a.name))}
+          initial={{ date: editing.date, description: editing.description, category: editing.category ?? "", account: editing.account ?? "", amount: editing.amount_cents / 100 }}
           onClose={() => setEditing(undefined)}
           onSave={async (v) => {
-            await sendJson(`/api/finance/transactions/${editing.id}`, "PATCH", { ...v, category: v.category || null });
+            await sendJson(`/api/finance/transactions/${editing.id}`, "PATCH", { ...v, category: v.category || null, ...(accounts.length ? { account: v.account || null } : {}) });
             onChanged();
           }}
         />

@@ -1,20 +1,22 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import useSWR from "swr";
 import { Plus, Star, X, Zap } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import type { Shortcut } from "@/lib/finance/recurring";
 import { money } from "@/lib/finance/format";
 import { inputBase } from "../edit/FieldInput";
+import type { Account } from "@/lib/finance/accounts";
 
 const today = () => new Date().toISOString().slice(0, 10);
+const ACCOUNT_KEY = "page.finance.account";
 
 /**
  * One-line entry: date, description, category, amount, expense/income, and how often it repeats.
  * Above it, shortcuts add a saved transaction with one tap.
  */
-export function QuickAdd({ currency, onAdded }: { currency: string; onAdded: () => void }) {
+export function QuickAdd({ currency, accounts = [], account: filtered, onAdded }: { currency: string; accounts?: Account[]; account?: string; onAdded: () => void }) {
   const { data: categories } = useSWR<{ name: string }[]>("/api/finance/categories", fetcher);
   const { data: shortcuts, mutate: setShortcuts } = useSWR<Shortcut[]>("/api/finance/shortcuts", fetcher);
   const [form, setForm] = useState({ date: today(), description: "", category: "", amount: "" });
@@ -22,6 +24,22 @@ export function QuickAdd({ currency, onAdded }: { currency: string; onAdded: () 
   const [repeat, setRepeat] = useState("");
   const [msg, setMsg] = useState<{ text: string; error?: boolean }>();
   const [busy, setBusy] = useState(false);
+  // The account new entries go to: the one being viewed, else the last one used in this browser.
+  const [picked, setPicked] = useState("");
+  useEffect(() => {
+    try {
+      setPicked(localStorage.getItem(ACCOUNT_KEY) ?? "");
+    } catch {}
+  }, []);
+  const open = accounts.filter((a) => !a.archived);
+  const account = filtered || (open.some((a) => a.name === picked) ? picked : "");
+  const pickAccount = (name: string) => {
+    setPicked(name);
+    try {
+      if (name) localStorage.setItem(ACCOUNT_KEY, name);
+      else localStorage.removeItem(ACCOUNT_KEY);
+    } catch {}
+  };
 
   const parsed = () => {
     const value = Number(form.amount.replace(",", "."));
@@ -45,7 +63,7 @@ export function QuickAdd({ currency, onAdded }: { currency: string; onAdded: () 
     const amount = parsed();
     if (amount === undefined) return setMsg({ text: "Enter a description and a positive amount", error: true });
     void run(async () => {
-      const base = { description: form.description, category: form.category || null, amount, currency };
+      const base = { description: form.description, category: form.category || null, amount, currency, account: account || null };
       let text = `Added ${form.description}.`;
       if (repeat) {
         const r = await sendJson<{ added: number }>("/api/finance/recurring", "POST", { ...base, every: repeat, startDate: form.date });
@@ -106,7 +124,7 @@ export function QuickAdd({ currency, onAdded }: { currency: string; onAdded: () 
         </ul>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <input type="date" aria-label="Date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={`${inputBase} w-40`} />
+        <input type="date" aria-label="Date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={`${inputBase} w-36`} />
         <input
           aria-label="Description"
           placeholder="Groceries, salary…"
@@ -120,11 +138,21 @@ export function QuickAdd({ currency, onAdded }: { currency: string; onAdded: () 
           list="fin-categories"
           value={form.category}
           onChange={(e) => setForm({ ...form, category: e.target.value })}
-          className={`${inputBase} w-40`}
+          className={`${inputBase} w-32`}
         />
         <datalist id="fin-categories">
           {categories?.map((c) => <option key={c.name} value={c.name} />)}
         </datalist>
+        {open.length > 0 && (
+          <select aria-label="Account" value={account} onChange={(e) => pickAccount(e.target.value)} className={`${inputBase} w-32`}>
+            <option value="">No account</option>
+            {open.map((a) => (
+              <option key={a.id} value={a.name}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        )}
         <div className="flex rounded-xl bg-chip p-0.5 text-sm" role="group" aria-label="Type">
           {[false, true].map((inc) => (
             <button
@@ -144,9 +172,9 @@ export function QuickAdd({ currency, onAdded }: { currency: string; onAdded: () 
           placeholder={`0.00 ${currency}`}
           value={form.amount}
           onChange={(e) => setForm({ ...form, amount: e.target.value })}
-          className={`${inputBase} w-32 text-right tabular-nums`}
+          className={`${inputBase} w-28 text-right tabular-nums`}
         />
-        <select aria-label="Repeat" value={repeat} onChange={(e) => setRepeat(e.target.value)} className={`${inputBase} w-32`} title="Repeat from the date on the left">
+        <select aria-label="Repeat" value={repeat} onChange={(e) => setRepeat(e.target.value)} className={`${inputBase} w-28`} title="Repeat from the date on the left">
           <option value="">Once</option>
           <option value="week">Every week</option>
           <option value="month">Every month</option>

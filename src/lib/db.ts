@@ -149,6 +149,15 @@ export function db(): DatabaseSync {
         note TEXT,
         created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS fin_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        kind TEXT NOT NULL DEFAULT 'bank',
+        currency TEXT NOT NULL,
+        opening_cents INTEGER NOT NULL DEFAULT 0,
+        archived INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS config_versions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         file TEXT NOT NULL,
@@ -171,6 +180,8 @@ export function db(): DatabaseSync {
     // Encrypted TOTP secret, and SHA-256 hashes of unused recovery codes (JSON).
     addColumn(d, "users", "totp_secret TEXT");
     addColumn(d, "users", "totp_recovery TEXT");
+    // Both halves of a transfer between own accounts share this id (left out of income and spending).
+    addColumn(d, "fin_transactions", "transfer_id TEXT");
     d.exec("PRAGMA foreign_keys = ON;");
     g.__pageDb = d;
   }

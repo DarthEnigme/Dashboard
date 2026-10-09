@@ -7,6 +7,8 @@ export interface Txn {
   converted?: boolean;
   /** Added by a recurring rule. */
   recurring?: boolean;
+  /** Half of a move between own accounts: changes balances, but isn't income or spending. */
+  transfer?: boolean;
 }
 
 export interface CategoryInfo {
@@ -107,7 +109,9 @@ export function summarize(txns: Txn[], categories: CategoryInfo[], period: strin
   const lastMonth = isYear ? `${period}-12` : period;
   const to = `${lastMonth}-31`;
   const inRange = (t: Txn) => t.date >= from && t.date <= to;
-  const { txns: mine, dropped } = convertTxns(txns, currency, rates);
+  const { txns: all, dropped } = convertTxns(txns, currency, rates);
+  // Transfers between own accounts only move money around: they count for balances, nothing else.
+  const mine = all.filter((t) => !t.transfer);
   const inPeriod = mine.filter(inRange);
 
   const income = inPeriod.filter((t) => t.amount_cents > 0).reduce((a, t) => a + t.amount_cents, 0);
@@ -160,11 +164,10 @@ export function summarize(txns: Txn[], categories: CategoryInfo[], period: strin
       expense: -ts.filter((t) => t.amount_cents < 0).reduce((a, t) => a + t.amount_cents, 0),
     };
   });
-  const before = mine.filter((t) => monthOf(t.date) < months[0]).reduce((a, t) => a + t.amount_cents, 0);
-  let running = before;
-  const balance = monthTotals.map((m) => {
-    running += m.income - m.expense;
-    return { month: m.month, cents: running };
+  let running = all.filter((t) => monthOf(t.date) < months[0]).reduce((a, t) => a + t.amount_cents, 0);
+  const balance = months.map((month) => {
+    running += all.filter((t) => monthOf(t.date) === month).reduce((a, t) => a + t.amount_cents, 0);
+    return { month, cents: running };
   });
 
   const label = isYear

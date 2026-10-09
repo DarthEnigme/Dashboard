@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { Loader2, RefreshCw, Upload } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import type { CsvMapping, ParsedTransaction } from "@/lib/finance/csv";
+import type { Account } from "@/lib/finance/accounts";
 import { money } from "@/lib/finance/format";
 import { inputClass } from "../edit/FieldInput";
 
@@ -25,7 +26,9 @@ async function toBase64(file: File): Promise<string> {
 const isExcel = (f: File) => /\.xlsx$/i.test(f.name) || f.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 /** CSV or Excel bank export → column mapping (remembered in this browser) → preview → import; plus Firefly sync. */
-export function CsvImport({ currency, onImported }: { currency: string; onImported: () => void }) {
+export function CsvImport({ currency, accounts = [], onImported }: { currency: string; accounts?: Account[]; onImported: () => void }) {
+  // The bank account the file comes from (statements are per account).
+  const [account, setAccount] = useState("");
   const [text, setText] = useState("");
   // An Excel file replaces the pasted text until cleared.
   const [excel, setExcel] = useState<{ xlsx: string; name: string }>();
@@ -68,7 +71,7 @@ export function CsvImport({ currency, onImported }: { currency: string; onImport
 
   const doImport = () =>
     run(async () => {
-      const r = await sendJson<{ added: number; skipped: number; errors: number }>("/api/finance/import", "POST", { ...source, mapping: map, commit: true, currency });
+      const r = await sendJson<{ added: number; skipped: number; errors: number }>("/api/finance/import", "POST", { ...source, mapping: map, commit: true, currency, account: account || null });
       try {
         localStorage.setItem(PRESETS_KEY, JSON.stringify(map));
       } catch {}
@@ -224,6 +227,21 @@ export function CsvImport({ currency, onImported }: { currency: string; onImport
                 </label>
               )}
             </div>
+            {accounts.some((a) => !a.archived) && (
+              <label className="flex max-w-xs flex-col gap-1 text-xs text-muted">
+                Import into account
+                <select aria-label="Import into account" value={account} onChange={(e) => setAccount(e.target.value)} className={inputClass}>
+                  <option value="">No account</option>
+                  {accounts
+                    .filter((a) => !a.archived)
+                    .map((a) => (
+                      <option key={a.id} value={a.name}>
+                        {a.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
             <div className="flex flex-wrap gap-4 text-sm">
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={map.header} onChange={(e) => setMap({ ...map, header: e.target.checked })} className="accent-[var(--accent)]" />

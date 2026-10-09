@@ -4,13 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR, { useSWRConfig } from "swr";
 import { motion } from "framer-motion";
-import { ArrowLeft, ChevronLeft, ChevronRight, Coins, PiggyBank } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Coins, Landmark, PiggyBank } from "lucide-react";
 import { fetcher } from "@/lib/fetcher";
 import type { Summary } from "@/lib/finance/aggregate";
 import { money } from "@/lib/finance/format";
 import { FinanceCharts } from "../charts/FinanceCharts";
 import { Sankey } from "../charts/Sankey";
 import { Budgets } from "./Budgets";
+import { Accounts, ACCOUNTS_KEY } from "./Accounts";
+import type { AccountWithBalance } from "@/lib/finance/accounts";
 import { FlowExport } from "./FlowExport";
 import { QuickAdd } from "./QuickAdd";
 import { TransactionList } from "./TransactionList";
@@ -20,7 +22,7 @@ import { Plan } from "./Plan";
 import { GOALS_KEY, SaveDialog, Savings } from "./Savings";
 import type { Goal } from "@/lib/finance/goals";
 
-const VIEWS = ["overview", "flow", "transactions", "plan", "savings", "categories", "import"] as const;
+const VIEWS = ["overview", "flow", "transactions", "accounts", "plan", "savings", "categories", "import"] as const;
 type View = (typeof VIEWS)[number];
 
 const shift = (period: string, n: number) => {
@@ -54,7 +56,11 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
     } catch {}
   };
   const { mutate } = useSWRConfig();
-  const { data: summary } = useSWR<SummaryResponse>(`/api/finance/summary?period=${period}&currency=${currency}`, fetcher, { keepPreviousData: true });
+  // One account, or all of them (undefined); "" = transactions without an account.
+  const [account, setAccount] = useState<string>();
+  const { data: accounts } = useSWR<AccountWithBalance[]>(ACCOUNTS_KEY, fetcher);
+  const accountQuery = account === undefined ? "" : `&account=${encodeURIComponent(account)}`;
+  const { data: summary } = useSWR<SummaryResponse>(`/api/finance/summary?period=${period}&currency=${currency}${accountQuery}`, fetcher, { keepPreviousData: true });
   const currencies = [...new Set([currency, defaultCurrency, ...(summary?.currencies ?? []), ...COMMON])];
   const { data: goals, mutate: setGoals } = useSWR<Goal[]>(GOALS_KEY, fetcher);
   const [saving, setSaving] = useState(false);
@@ -90,6 +96,27 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
           >
             <PiggyBank className="h-4 w-4" /> Savings
           </button>
+          {!!accounts?.length && (
+            <label className="glass flex h-9 items-center gap-1.5 rounded-full pr-1 pl-3 text-sm" title="Only this account's transactions">
+              <Landmark className="h-4 w-4 text-muted" />
+              <select
+                aria-label="Account"
+                value={account ?? "*"}
+                onChange={(e) => setAccount(e.target.value === "*" ? undefined : e.target.value)}
+                className="h-full max-w-40 cursor-pointer rounded-full bg-transparent pr-2 outline-none"
+              >
+                <option value="*">All accounts</option>
+                {accounts
+                  .filter((a) => !a.archived || a.name === account)
+                  .map((a) => (
+                    <option key={a.id} value={a.name}>
+                      {a.name}
+                    </option>
+                  ))}
+                <option value="">No account</option>
+              </select>
+            </label>
+          )}
           <label className="glass flex h-9 items-center gap-1.5 rounded-full pr-1 pl-3 text-sm" title="Show amounts in this currency">
             <Coins className="h-4 w-4 text-muted" />
             <select
@@ -132,7 +159,7 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
         </div>
       </header>
 
-      <QuickAdd currency={currency} onAdded={refresh} />
+      <QuickAdd currency={currency} accounts={accounts} account={account} onAdded={refresh} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat label="Spent" value={summary ? money(summary.expense, summary.currency) : "–"} />
@@ -209,11 +236,12 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
           </div>
         </section>
       )}
-      {view === "transactions" && <TransactionList period={period} currency={currency} onChanged={refresh} />}
+      {view === "transactions" && <TransactionList period={period} currency={currency} account={account} accounts={accounts} onChanged={refresh} />}
+      {view === "accounts" && <Accounts currency={defaultCurrency} selected={account} onSelect={setAccount} onChanged={refresh} />}
       {view === "plan" && <Plan currency={currency} onChanged={refresh} />}
       {view === "savings" && <Savings currency={defaultCurrency} />}
       {view === "categories" && <CategoryManager onChanged={refresh} currency={defaultCurrency} />}
-      {view === "import" && <CsvImport currency={currency} onImported={refresh} />}
+      {view === "import" && <CsvImport currency={currency} accounts={accounts} onImported={refresh} />}
       {saving && goals && <SaveDialog goals={goals} onClose={() => setSaving(false)} onDone={(list) => setGoals(list, { revalidate: false })} />}
     </main>
   );

@@ -9,7 +9,7 @@ const HEADER = ["date", "description", "amount", "currency", "category", "accoun
 
 /**
  * Download transactions as CSV (default) or JSON (?format=json). Same filters as the list:
- * ?period=2026-10 or 2026 (omit for everything), ?category= ("" = uncategorised), ?q=.
+ * ?period=2026-10 or 2026 (omit for everything), ?category= ("" = uncategorised), ?account=, ?q=.
  * The CSV imports back as is: the column names match the importer's guesses, decimals use ".".
  */
 export async function GET(req: Request) {
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   if (period && !/^\d{4}(-\d{2})?$/.test(period)) return bad("period must be YYYY or YYYY-MM");
   const format = q.get("format") === "json" ? "json" : "csv";
   const range = period ? { from: period.length === 4 ? `${period}-01-01` : `${period}-01`, to: `${period.length === 4 ? `${period}-12` : period}-31` } : {};
-  const txns = listTransactions({ ...range, category: q.get("category") ?? undefined, q: q.get("q") ?? undefined, limit: -1 }) // -1: no limit
+  const txns = listTransactions({ ...range, category: q.get("category") ?? undefined, account: q.get("account") ?? undefined, q: q.get("q") ?? undefined, limit: -1 }) // -1: no limit
     // Oldest first reads better in a spreadsheet.
     .reverse();
   audit(g.user.username, "finance-export", { format, period, count: txns.length });

@@ -19,7 +19,7 @@ const MAX = 5 * 1024 * 1024;
 export async function POST(req: Request) {
   const g = await guard(req);
   if ("error" in g) return g.error;
-  const b = ((await req.json().catch(() => ({}))) ?? {}) as { text?: string; xlsx?: string; mapping?: CsvMapping; commit?: boolean; currency?: string };
+  const b = ((await req.json().catch(() => ({}))) ?? {}) as { text?: string; xlsx?: string; mapping?: CsvMapping; commit?: boolean; currency?: string; account?: string };
   let rows: string[][];
   if (b.xlsx) {
     if (b.xlsx.length > (MAX * 4) / 3 + 4) return bad("File too large (5 MB max)");
@@ -55,6 +55,7 @@ export async function POST(req: Request) {
       currency,
       description: t.description,
       category: t.category,
+      account: typeof b.account === "string" ? b.account.slice(0, 60) : null,
       source: "csv" as const,
       externalId: t.externalId,
     })),
