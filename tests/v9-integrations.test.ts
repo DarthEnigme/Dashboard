@@ -5,6 +5,7 @@ import { handshakeSeconds, parseWgDashboard, wgdashboard, type WgdConfiguration,
 import { integrations } from "@/integrations";
 import { integrationFields } from "@/integrations/fields";
 import wgd from "./fixtures/wgdashboard.json";
+import { cloudflare, parseZone, type CfHour } from "@/integrations/cloudflare";
 
 const configs = wgd.configurations.data as WgdConfiguration[];
 const peers = Object.fromEntries(Object.entries(wgd.peers).map(([k, v]) => [k, v.data.configurationPeers as WgdPeer[]]));
@@ -95,5 +96,78 @@ describe("wgdashboard", () => {
   it("is registered with editor fields, and its key is a secret", () => {
     expect(integrations.wgdashboard?.type).toBe("wgdashboard");
     expect(integrationFields.wgdashboard.fields.find((f) => f.key === "key")?.secret).toBe(true);
+  });
+});
+
+describe("cloudflare zone traffic", () => {
+  const hours: CfHour[] = [
+    { sum: { requests: 12000, cachedRequests: 9000, bytes: 1024 ** 3, threats: 3 }, uniq: { uniques: 800 } },
+    { sum: { requests: 8000, cachedRequests: 1000, bytes: 512 * 1024 ** 2, threats: 0 }, uniq: { uniques: 400 } },
+  ];
+
+  it("sums the last 24 hours", () => {
+    expect(parseZone(hours).map((f) => [f.label, f.value])).toEqual([
+      ["Requests", "20.0k"],
+      ["Cached", "50%"],
+      ["Threats", "3"],
+      ["Bandwidth", "1.5 GB"],
+      ["Visitors", "1,200"],
+    ]);
+    expect(parseZone([], { status: "pending" })[0]).toEqual({ label: "Zone", value: "pending", status: "warn" });
+    expect(parseZone([]).find((f) => f.label === "Cached")?.value).toBe("–");
+  });
+
+  it("needs an account or a zone", () => {
+    expect(cloudflare.schema.safeParse({ key: "k" }).success).toBe(false);
+    expect(cloudflare.schema.safeParse({ key: "k", zone: "z1" }).success).toBe(true);
+    expect(cloudflare.schema.safeParse({ key: "k", account: "a", tunnels: false }).success).toBe(false);
+  });
+
+  describe("against the API", () => {
+    let server: http.Server;
+    let url = "";
+    let gqlBody: { query: string; variables: { zone: string; since: string } } | undefined;
+    beforeAll(async () => {
+      server = http.createServer((req, res) => {
+        const send = (body: unknown) => {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(body));
+        };
+        if (req.headers.authorization !== "Bearer cf") return send({ success: false, errors: [{ message: "Invalid API Token" }] });
+        if (req.url === "/zones/z1") return send({ success: true, result: { name: "example.com", status: "active" } });
+        if (req.url === "/accounts/acc/cfd_tunnel?is_deleted=false&per_page=100")
+          return send({ success: true, result: [{ name: "home", status: "healthy", connections: [{ colo_name: "cdg01" }] }] });
+        if (req.method === "POST" && req.url === "/graphql") {
+          let body = "";
+          req.on("data", (c) => (body += c));
+          req.on("end", () => {
+            gqlBody = JSON.parse(body);
+            send(gqlBody!.variables.zone === "z1" ? { data: { viewer: { zones: [{ httpRequests1hGroups: hours }] } }, errors: null } : { data: { viewer: { zones: [] } }, errors: null });
+          });
+          return;
+        }
+        res.writeHead(404).end();
+      });
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+      url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    });
+    afterAll(() => server.close());
+
+    it("queries the zone's hourly traffic since 24 hours ago", async () => {
+      const r = (await cloudflare.fetch(cloudflare.schema.parse({ key: "cf", zone: "z1", url }), { serviceName: "site" })) as { fields: { label: string; value: unknown }[] };
+      expect(fields(r)[0]).toEqual(["Requests", "20.0k"]);
+      expect(gqlBody?.query).toContain("httpRequests1hGroups");
+      expect(Date.now() - Date.parse(gqlBody!.variables.since)).toBeGreaterThan(23.9 * 3600_000);
+    });
+
+    it("shows tunnels and the zone together", async () => {
+      const r = (await cloudflare.fetch(cloudflare.schema.parse({ key: "cf", account: "acc", zone: "z1", url }), { serviceName: "site" })) as { fields: { label: string; value: unknown }[]; list: unknown[] };
+      expect(r.fields.map((f) => f.label)).toEqual(["Healthy", "Connections", "Edges", "Requests", "Cached", "Threats", "Bandwidth", "Visitors"]);
+      expect(r.list).toHaveLength(1);
+    });
+
+    it("explains a zone it can't read", async () => {
+      await expect(cloudflare.fetch(cloudflare.schema.parse({ key: "cf", zone: "nope", url }), { serviceName: "site" })).rejects.toThrow(/Zone not found/);
+    });
   });
 });

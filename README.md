@@ -279,7 +279,7 @@ When no icon is set or it fails to load, the tile shows the service's initials.
 | `npm` | `url`, `username` (email), `password`, `certDays` (default 14) | Nginx Proxy Manager: proxy hosts enabled, redirects, certificates and how many expire soon; certificates by expiry on large tiles |
 | `traefik` | `url` (API), `username`/`password` (basic auth, optional) | Routers, services, middlewares, warnings/errors; routers with problems on large tiles |
 | `tailscale` | `key` (API access token), `tailnet` (default `-`), `expiryDays` | Devices online, node keys about to expire, client updates; device list on large tiles |
-| `cloudflare` | `account`, `key` (API token with Tunnel read), `tunnel` (optional) | Healthy tunnels, connections, edge locations |
+| `cloudflare` | `key` (API token), `account` + `tunnel` (optional) for tunnels, `zone` for a website, `tunnels: false` for the website only | Tunnels: healthy tunnels, connections, edge locations (token: Account → Cloudflare Tunnel → Read). Website (zone ID): requests, cached share, threats, bandwidth and visitors over the last 24 hours, and the zone's status when it isn't active (token: Zone → Analytics → Read) |
 | `immich` | `url`, `key` (admin API key) | Photos, videos, storage, users |
 | `nextcloud` | `url`, `token` (serverinfo token) or `username`/`password` | Active users (24h), users, files, free space |
 | `gitea` | `url`, `key` (access token) | Repositories, open issues and PRs, unread notifications, version (Gitea and Forgejo) |

@@ -375,11 +375,13 @@ export const integrationFields: Record<string, { label: string; fields: FieldSpe
     ],
   },
   cloudflare: {
-    label: "Cloudflare Tunnels",
+    label: "Cloudflare (tunnels, website traffic)",
     fields: [
-      { key: "account", label: "Account ID", required: true },
-      { key: "key", label: "API token", secret: true, required: true, help: "Needs Account → Cloudflare Tunnel → Read." },
+      { key: "key", label: "API token", secret: true, required: true, help: "Tunnels need Account → Cloudflare Tunnel → Read; website traffic needs Zone → Analytics → Read." },
+      { key: "account", label: "Account ID", help: "For tunnels." },
       { key: "tunnel", label: "Only this tunnel", placeholder: "all tunnels" },
+      { key: "zone", label: "Zone ID", help: "A website's requests, cache rate, threats, bandwidth and visitors over 24 hours (Overview page of the domain, right column)." },
+      { key: "tunnels", label: "Show tunnels", kind: "boolean", default: true },
     ],
   },
   immich: {
