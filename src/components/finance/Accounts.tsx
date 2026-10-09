@@ -11,16 +11,18 @@ import { FieldsDialog, getPath, setPath } from "../edit/FieldsDialog";
 import { DeleteButton, IconButton } from "../edit/controls";
 import { Dialog } from "../edit/Dialog";
 import { FieldInput, type FormValue } from "../edit/FieldInput";
+import { useT } from "@/i18n/client";
+import { msg } from "@/i18n";
 
 export const ACCOUNTS_KEY = "/api/finance/accounts";
 const KINDS = ["bank", "cash", "card", "savings", "other"];
 const kindIcon = { bank: Landmark, cash: Banknote, card: CreditCard, savings: PiggyBank, other: Wallet } as const;
 
 const accountFields = (currency: string): FieldSpec[] => [
-  { key: "name", label: "Name", required: true, placeholder: "Checking, Wallet, Visa…" },
-  { key: "kind", label: "Kind", kind: "select", options: KINDS, required: true },
-  { key: "currency", label: "Currency", placeholder: currency, help: "Three letters, e.g. EUR." },
-  { key: "opening", label: "Opening balance", kind: "number", placeholder: "0", help: "What the account held before its first transaction here." },
+  { key: "name", label: msg("Name"), required: true, placeholder: msg("Checking, Wallet, Visa…") },
+  { key: "kind", label: msg("Kind"), kind: "select", options: KINDS, required: true },
+  { key: "currency", label: msg("Currency"), placeholder: currency, help: msg("Three letters, e.g. EUR.") },
+  { key: "opening", label: msg("Opening balance"), kind: "number", placeholder: "0", help: msg("What the account held before its first transaction here.") },
 ];
 
 /**
@@ -28,6 +30,7 @@ const accountFields = (currency: string): FieldSpec[] => [
  * Transfers between them change balances but are never income or spending.
  */
 export function Accounts({ currency, selected, onSelect, onChanged }: { currency: string; selected?: string; onSelect: (name?: string) => void; onChanged: () => void }) {
+  const t = useT();
   const { data: accounts, mutate } = useSWR<AccountWithBalance[]>(ACCOUNTS_KEY, fetcher);
   const [editing, setEditing] = useState<AccountWithBalance | "new">();
   const [moving, setMoving] = useState(false);
@@ -51,31 +54,31 @@ export function Accounts({ currency, selected, onSelect, onChanged }: { currency
   for (const a of accounts ?? []) if (!a.archived) totals.set(a.currency, (totals.get(a.currency) ?? 0) + a.balance);
 
   return (
-    <section className="flex flex-col gap-3" aria-label="Accounts">
+    <section className="flex flex-col gap-3" aria-label={t("Accounts")}>
       <div className="flex flex-wrap items-center gap-2">
         <div className="mr-auto text-sm text-muted">
           {[...totals].map(([c, cents]) => (
             <span key={c} className="mr-3">
-              Total <span className="font-semibold text-fg tabular-nums">{money(cents, c)}</span>
+              {t("Total")}{" "}<span className="font-semibold text-fg tabular-nums">{money(cents, c)}</span>
             </span>
           ))}
         </div>
         {archived > 0 && (
           <button type="button" onClick={() => setShowArchived((v) => !v)} className="rounded-full px-3 py-1.5 text-sm text-muted hover:bg-hover hover:text-fg">
-            {showArchived ? "Hide archived" : `Show archived (${archived})`}
+            {showArchived ? t("Hide archived") : t("Show archived ({n})", { n: archived })}
           </button>
         )}
         <button
           type="button"
           disabled={(accounts?.filter((a) => !a.archived).length ?? 0) < 2}
           onClick={() => setMoving(true)}
-          title="Move money between two of your accounts"
+          title={t("Move money between two of your accounts")}
           className="flex items-center gap-1.5 rounded-full bg-track px-4 py-2 text-sm hover:bg-hover disabled:opacity-50"
         >
-          <ArrowLeftRight className="h-4 w-4" /> Transfer
+          <ArrowLeftRight className="h-4 w-4" /> {t("Transfer")}
         </button>
         <button type="button" onClick={() => setEditing("new")} className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110">
-          <Plus className="h-4 w-4" /> Add account
+          <Plus className="h-4 w-4" /> {t("Add account")}
         </button>
       </div>
       {error && (
@@ -85,7 +88,7 @@ export function Accounts({ currency, selected, onSelect, onChanged }: { currency
       )}
       {accounts && !accounts.length && (
         <p className="glass rounded-3xl p-8 text-center text-sm text-muted">
-          No accounts yet. Add your bank account, wallet or card to see a balance per account. Accounts named by Firefly III or a CSV import appear here by themselves.
+          {t("No accounts yet. Add your bank account, wallet or card to see a balance per account. Accounts named by Firefly III or a CSV import appear here by themselves.")}
         </p>
       )}
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -98,26 +101,26 @@ export function Accounts({ currency, selected, onSelect, onChanged }: { currency
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-chip text-accent">
                   <Icon className="h-4.5 w-4.5" />
                 </span>
-                <button type="button" onClick={() => onSelect(active ? undefined : a.name)} className="mr-auto min-w-0 text-left" title={active ? "Show all accounts" : `Only ${a.name}`}>
+                <button type="button" onClick={() => onSelect(active ? undefined : a.name)} className="mr-auto min-w-0 text-left" title={active ? t("Show all accounts") : t("Only {name}", { name: a.name })}>
                   <span className="block truncate font-semibold">{a.name}</span>
                   <span className="block text-xs text-muted">
-                    <span className="capitalize">{a.kind}</span> · {a.transactions} {a.transactions === 1 ? "transaction" : "transactions"}
-                    {a.archived ? " · archived" : ""}
+                    <span className="capitalize">{t(a.kind)}</span> · {t.plural(a.transactions, "{n} transaction", "{n} transactions")}
+                    {a.archived ? t(" · archived") : ""}
                   </span>
                 </button>
-                <IconButton label={`Edit ${a.name}`} onClick={() => setEditing(a)}>
+                <IconButton label={t("Edit {name}", { name: a.name })} onClick={() => setEditing(a)}>
                   <Pencil className="h-3.5 w-3.5" />
                 </IconButton>
-                <IconButton label={a.archived ? `Restore ${a.name}` : `Archive ${a.name}`} onClick={() => act(() => sendJson(ACCOUNTS_KEY, "PATCH", { id: a.id, archived: !a.archived }))}>
+                <IconButton label={a.archived ? t("Restore {name}", { name: a.name }) : t("Archive {name}", { name: a.name })} onClick={() => act(() => sendJson(ACCOUNTS_KEY, "PATCH", { id: a.id, archived: !a.archived }))}>
                   {a.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
                 </IconButton>
-                {a.transactions === 0 && <DeleteButton label={`Delete ${a.name}`} onConfirm={() => act(() => sendJson(`${ACCOUNTS_KEY}?id=${a.id}`, "DELETE"))} />}
+                {a.transactions === 0 && <DeleteButton label={t("Delete {name}", { name: a.name })} onConfirm={() => act(() => sendJson(`${ACCOUNTS_KEY}?id=${a.id}`, "DELETE"))} />}
               </div>
-              <div className={`text-2xl font-semibold tabular-nums ${a.balance < 0 ? "text-[var(--err)]" : ""}`} aria-label={`${a.name} balance`}>
+              <div className={`text-2xl font-semibold tabular-nums ${a.balance < 0 ? "text-[var(--err)]" : ""}`} aria-label={t("{name} balance", { name: a.name })}>
                 {money(a.balance, a.currency)}
               </div>
-              <BalanceLine history={a.history} label={`${a.name} balance over 12 months`} />
-              {a.skipped > 0 && <p className="text-xs text-[var(--warn)]">{a.skipped} in another currency without a rate, left out.</p>}
+              <BalanceLine history={a.history} label={t("{name} balance over 12 months", { name: a.name })} />
+              {a.skipped > 0 && <p className="text-xs text-[var(--warn)]">{a.skipped} {t("in another currency without a rate, left out.")}</p>}
             </li>
           );
         })}
@@ -125,7 +128,7 @@ export function Accounts({ currency, selected, onSelect, onChanged }: { currency
 
       {editing && (
         <FieldsDialog
-          title={editing === "new" ? "Add account" : `Edit ${editing.name}`}
+          title={editing === "new" ? t("Add account") : t("Edit {name}", { name: editing.name })}
           fields={accountFields(currency)}
           initial={
             editing === "new"
@@ -173,6 +176,7 @@ function BalanceLine({ history, label }: { history: { month: string; cents: numb
 }
 
 function TransferDialog({ accounts, onClose, onDone }: { accounts: AccountWithBalance[]; onClose: () => void; onDone: () => Promise<void> }) {
+  const t = useT();
   const [value, setValue] = useState<Record<string, unknown>>({ from: accounts[0].name, to: accounts[1].name, date: new Date().toISOString().slice(0, 10) });
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -180,16 +184,16 @@ function TransferDialog({ accounts, onClose, onDone }: { accounts: AccountWithBa
   const to = accounts.find((a) => a.name === value.to) ?? accounts[1];
   const names = accounts.map((a) => a.name);
   const fields: FieldSpec[] = [
-    { key: "from", label: "From", kind: "select", options: names, required: true },
-    { key: "to", label: "To", kind: "select", options: names, required: true },
-    { key: "date", label: "Date (YYYY-MM-DD)", required: true },
-    { key: "amount", label: `Amount (${from.currency})`, kind: "number", required: true },
-    ...(from.currency !== to.currency ? [{ key: "toAmount", label: `Received (${to.currency})`, kind: "number" as const, required: true }] : []),
-    { key: "note", label: "Note", placeholder: `Transfer to ${to.name}` },
+    { key: "from", label: msg("From"), kind: "select", options: names, required: true },
+    { key: "to", label: msg("To"), kind: "select", options: names, required: true },
+    { key: "date", label: t("Date (YYYY-MM-DD)"), required: true },
+    { key: "amount", label: t("Amount ({currency})", { currency: from.currency }), kind: "number", required: true },
+    ...(from.currency !== to.currency ? [{ key: "toAmount", label: t("Received ({currency})", { currency: to.currency }), kind: "number" as const, required: true }] : []),
+    { key: "note", label: msg("Note"), placeholder: t("Transfer to {name}", { name: to.name }) },
   ];
   const submit = async () => {
     const missing = fields.find((f) => f.required && (getPath(value, f.key) ?? "") === "");
-    if (missing) return setError(`${missing.label} is required`);
+    if (missing) return setError(t("{field} is required", { field: t(missing.label) }));
     setBusy(true);
     try {
       await sendJson("/api/finance/transfer", "POST", { ...value, from: from.id, to: to.id });
@@ -202,7 +206,7 @@ function TransferDialog({ accounts, onClose, onDone }: { accounts: AccountWithBa
     }
   };
   return (
-    <Dialog title="Transfer between accounts" submitLabel="Transfer" onClose={onClose} onSubmit={() => void submit()} error={error} busy={busy}>
+    <Dialog title={t("Transfer between accounts")} submitLabel={t("Transfer")} onClose={onClose} onSubmit={() => void submit()} error={error} busy={busy}>
       {fields.map((f, i) => (
         <FieldInput key={f.key} spec={f} autoFocus={i === 0} value={getPath(value, f.key) as FormValue} onChange={(v) => setValue((cur) => setPath(cur, f.key, v))} />
       ))}

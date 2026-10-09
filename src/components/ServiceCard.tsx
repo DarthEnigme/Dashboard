@@ -7,6 +7,7 @@ import { StatusDot } from "./StatusDot";
 import { WidgetFields } from "./WidgetFields";
 import { History } from "./History";
 import { ActionMenu } from "./ActionMenu";
+import { useT } from "@/i18n/client";
 
 const sizeClass = { small: "", wide: "tile-wide", tall: "tile-tall", large: "tile-large" } as const;
 
@@ -22,6 +23,7 @@ interface Props {
  * status and history link to the detail page and sit above it. No nested links.
  */
 export function ServiceCard({ service: s, settings, canAct }: Props) {
+  const t = useT();
   const size = s.size ?? "small";
   const big = size === "tall" || size === "large";
   const detail = `/service/${encodeURIComponent(s.id)}`;
@@ -51,7 +53,7 @@ export function ServiceCard({ service: s, settings, canAct }: Props) {
           {s.description && <div className="truncate text-sm text-muted">{s.description}</div>}
         </div>
         {s.ping && (
-          <Link href={detail} className="relative z-10 rounded-full" title="Status details">
+          <Link href={detail} className="relative z-10 rounded-full" title={t("Status details")}>
             <StatusDot id={s.id} interval={settings.pingInterval} />
           </Link>
         )}
@@ -61,7 +63,7 @@ export function ServiceCard({ service: s, settings, canAct }: Props) {
         <WidgetFields id={s.id} interval={settings.refreshInterval} size={size} canAct={!!(canAct && s.actions)} />
       )}
       {s.ping && (
-        <Link href={detail} className="relative z-10 mt-auto block rounded-lg" aria-label={`${s.name}: uptime details`}>
+        <Link href={detail} className="relative z-10 mt-auto block rounded-lg" aria-label={t("{name}: uptime details", { name: s.name })}>
           <History id={s.id} detailed={big} />
         </Link>
       )}

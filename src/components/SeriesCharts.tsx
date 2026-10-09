@@ -6,16 +6,19 @@ import { Loader2 } from "lucide-react";
 import { fetcher } from "@/lib/fetcher";
 import type { SeriesSet } from "@/integrations/types";
 import { LineChart } from "./charts/LineChart";
+import { formatLocale } from "@/i18n/format";
+import { useT } from "@/i18n/client";
 
 type Range = "1h" | "24h" | "7d";
 
 const formatTime = (range: Range) => (t: number) =>
   range === "7d"
-    ? new Date(t).toLocaleDateString([], { month: "short", day: "numeric" })
-    : new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    ? new Date(t).toLocaleDateString(formatLocale(), { month: "short", day: "numeric" })
+    : new Date(t).toLocaleTimeString(formatLocale(), { hour: "2-digit", minute: "2-digit" });
 
 /** Charts for one widget row (Integration.series), e.g. a Proxmox guest's CPU, memory, network and disk. */
 export function SeriesCharts({ id, target, label }: { id: string; target: string; label: string }) {
+  const t = useT();
   const [range, setRange] = useState<Range>("1h");
   const { data, error, isLoading } = useSWR<SeriesSet>(
     `/api/widget/${encodeURIComponent(id)}/series?target=${encodeURIComponent(target)}&range=${range}`,
@@ -23,10 +26,10 @@ export function SeriesCharts({ id, target, label }: { id: string; target: string
     { refreshInterval: range === "1h" ? 60_000 : 0, keepPreviousData: true },
   );
   return (
-    <div className="flex flex-col gap-3 rounded-2xl bg-chip p-3" role="region" aria-label={`Charts for ${label}`}>
+    <div className="flex flex-col gap-3 rounded-2xl bg-chip p-3" role="region" aria-label={t("Charts for {name}", { name: label })}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium">{label}</span>
-        <div className="flex rounded-full bg-track p-0.5 text-xs" role="tablist" aria-label={`Time range for ${label}`}>
+        <div className="flex rounded-full bg-track p-0.5 text-xs" role="tablist" aria-label={t("Time range for {name}", { name: label })}>
           {(["1h", "24h", "7d"] as const).map((r) => (
             <button
               key={r}
@@ -43,7 +46,7 @@ export function SeriesCharts({ id, target, label }: { id: string; target: string
       {error && !data && <p className="text-sm text-[var(--err)]">{(error as Error).message}</p>}
       {isLoading && !data && (
         <p className="flex items-center gap-2 py-6 text-sm text-muted">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading charts…
+          <Loader2 className="h-4 w-4 animate-spin" /> {t("Loading charts…")}
         </p>
       )}
       {data && (
@@ -61,7 +64,7 @@ export function SeriesCharts({ id, target, label }: { id: string; target: string
                 unit={c.unit === "%" ? "%" : ""}
                 area={c.series.length === 1}
                 formatX={formatTime(range)}
-                ariaLabel={`${label}: ${c.title} over the last ${range}`}
+                ariaLabel={`${label}: ${t("{name} over the last {range}", { name: c.title, range })}`}
               />
             </div>
           ))}

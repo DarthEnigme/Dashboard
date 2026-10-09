@@ -11,13 +11,15 @@ import type { FieldSpec } from "@/integrations/fields";
 import { FieldsDialog } from "../edit/FieldsDialog";
 import { DeleteButton, IconButton } from "../edit/controls";
 import { inputBase } from "../edit/FieldInput";
+import { useT } from "@/i18n/client";
+import { msg } from "@/i18n";
 
 const editFields = (accounts: string[]): FieldSpec[] => [
-  { key: "date", label: "Date (YYYY-MM-DD)", required: true },
-  { key: "description", label: "Description", required: true },
-  { key: "category", label: "Category" },
-  ...(accounts.length ? [{ key: "account", label: "Account", kind: "select" as const, options: accounts, placeholder: "No account" }] : []),
-  { key: "amount", label: "Amount (negative = expense)", kind: "number", required: true },
+  { key: "date", label: msg("Date (YYYY-MM-DD)"), required: true },
+  { key: "description", label: msg("Description"), required: true },
+  { key: "category", label: msg("Category") },
+  ...(accounts.length ? [{ key: "account", label: msg("Account"), kind: "select" as const, options: accounts, placeholder: msg("No account") }] : []),
+  { key: "amount", label: msg("Amount (negative = expense)"), kind: "number", required: true },
 ];
 
 const sourceIcon = { manual: PenLine, csv: FileSpreadsheet, firefly: RefreshCw, recurring: Repeat, transfer: ArrowLeftRight } as const;
@@ -36,6 +38,7 @@ export function TransactionList({
   accounts?: Account[];
   onChanged: () => void;
 }) {
+  const t = useT();
   const [q, setQ] = useState("");
   const [category, setCategory] = useState<string>();
   const [editing, setEditing] = useState<Transaction>();
@@ -48,15 +51,15 @@ export function TransactionList({
   return (
     <section className="glass flex flex-col gap-3 rounded-3xl p-4">
       <div className="flex flex-wrap gap-2">
-        <input aria-label="Search transactions" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} className={`${inputBase} max-w-xs`} />
+        <input aria-label={t("Search transactions")} placeholder={t("Search…")} value={q} onChange={(e) => setQ(e.target.value)} className={`${inputBase} max-w-xs`} />
         <select
-          aria-label="Filter by category"
+          aria-label={t("Filter by category")}
           value={category ?? "*"}
           onChange={(e) => setCategory(e.target.value === "*" ? undefined : e.target.value)}
           className={`${inputBase} w-48`}
         >
-          <option value="*">All categories</option>
-          <option value="">Uncategorised</option>
+          <option value="*">{t("All categories")}</option>
+          <option value="">{t("Uncategorised")}</option>
           {categories?.map((c) => (
             <option key={c.name} value={c.name}>
               {c.name}
@@ -64,67 +67,67 @@ export function TransactionList({
           ))}
         </select>
         <div className="ml-auto flex flex-wrap gap-1 text-sm">
-          <a href={`/api/finance/export?${params}`} download className="flex h-10 items-center gap-1.5 rounded-xl px-3 hover:bg-hover" title="This period, with the filters above">
-            <Download className="h-4 w-4" /> Export CSV
+          <a href={`/api/finance/export?${params}`} download className="flex h-10 items-center gap-1.5 rounded-xl px-3 hover:bg-hover" title={t("This period, with the filters above")}>
+            <Download className="h-4 w-4" /> {t("Export CSV")}
           </a>
-          <a href="/api/finance/export" download className="flex h-10 items-center rounded-xl px-3 text-muted hover:bg-hover hover:text-fg" title="Every transaction, as CSV">
-            All
+          <a href="/api/finance/export" download className="flex h-10 items-center rounded-xl px-3 text-muted hover:bg-hover hover:text-fg" title={t("Every transaction, as CSV")}>
+            {t("All")}
           </a>
-          <a href={`/api/finance/export?${params}&format=json`} download className="flex h-10 items-center rounded-xl px-3 text-muted hover:bg-hover hover:text-fg" title="This period as JSON">
-            JSON
+          <a href={`/api/finance/export?${params}&format=json`} download className="flex h-10 items-center rounded-xl px-3 text-muted hover:bg-hover hover:text-fg" title={t("This period as JSON")}>
+            {t("JSON")}
           </a>
         </div>
       </div>
       {error && <p className="text-sm text-[var(--err)]">{error.message}</p>}
-      {data?.length === 0 && <p className="py-8 text-center text-sm text-muted">No transactions in this period.</p>}
+      {data?.length === 0 && <p className="py-8 text-center text-sm text-muted">{t("No transactions in this period.")}</p>}
       {!!data?.length && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-muted">
-                <th className="px-2 py-1.5 font-medium">Date</th>
-                <th className="px-2 py-1.5 font-medium">Description</th>
-                <th className="px-2 py-1.5 font-medium">Category</th>
-                {showAccount && <th className="px-2 py-1.5 font-medium">Account</th>}
-                <th className="px-2 py-1.5 text-right font-medium">Amount</th>
+                <th className="px-2 py-1.5 font-medium">{t("Date")}</th>
+                <th className="px-2 py-1.5 font-medium">{t("Description")}</th>
+                <th className="px-2 py-1.5 font-medium">{t("Category")}</th>
+                {showAccount && <th className="px-2 py-1.5 font-medium">{t("Account")}</th>}
+                <th className="px-2 py-1.5 text-right font-medium">{t("Amount")}</th>
                 <th className="w-20" />
               </tr>
             </thead>
             <tbody>
-              {data.map((t) => {
-                const Src = sourceIcon[t.source] ?? PenLine;
-                const color = (t.category && colorOf.get(t.category.toLowerCase())) || categoryColor(null);
+              {data.map((tx) => {
+                const Src = sourceIcon[tx.source] ?? PenLine;
+                const color = (tx.category && colorOf.get(tx.category.toLowerCase())) || categoryColor(null);
                 return (
-                  <tr key={t.id} className="border-t border-line/50">
-                    <td className="px-2 py-1.5 whitespace-nowrap tabular-nums text-muted">{t.date}</td>
+                  <tr key={tx.id} className="border-t border-line/50">
+                    <td className="px-2 py-1.5 whitespace-nowrap tabular-nums text-muted">{tx.date}</td>
                     <td className="max-w-80 truncate px-2 py-1.5">
                       <span className="flex items-center gap-2">
-                        <Src className="h-3.5 w-3.5 shrink-0 text-muted" aria-label={`Source: ${t.source}`} />
-                        {t.description}
+                        <Src className="h-3.5 w-3.5 shrink-0 text-muted" aria-label={t("Source: {source}", { source: tx.source })} />
+                        {tx.description}
                       </span>
                     </td>
                     <td className="px-2 py-1.5">
-                      {t.category ? (
+                      {tx.category ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-chip px-2 py-0.5 text-xs">
                           <span className="h-2 w-2 rounded-[2px]" style={{ background: color }} />
-                          {t.category}
+                          {tx.category}
                         </span>
                       ) : (
                         <span className="text-xs text-muted">–</span>
                       )}
                     </td>
-                    {showAccount && <td className="max-w-40 truncate px-2 py-1.5 text-xs text-muted">{t.account ?? "–"}</td>}
-                    <td className={`px-2 py-1.5 text-right whitespace-nowrap tabular-nums ${t.amount_cents > 0 ? "text-[var(--ok)]" : ""}`}>
-                      {money(t.amount_cents, t.currency || currency, true)}
+                    {showAccount && <td className="max-w-40 truncate px-2 py-1.5 text-xs text-muted">{tx.account ?? "–"}</td>}
+                    <td className={`px-2 py-1.5 text-right whitespace-nowrap tabular-nums ${tx.amount_cents > 0 ? "text-[var(--ok)]" : ""}`}>
+                      {money(tx.amount_cents, tx.currency || currency, true)}
                     </td>
                     <td className="px-1 py-1 text-right whitespace-nowrap">
-                      <IconButton label="Edit transaction" onClick={() => setEditing(t)}>
+                      <IconButton label={t("Edit transaction")} onClick={() => setEditing(tx)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </IconButton>
                       <DeleteButton
-                        label="Delete transaction"
+                        label={t("Delete transaction")}
                         onConfirm={async () => {
-                          await sendJson(`/api/finance/transactions/${t.id}`, "DELETE");
+                          await sendJson(`/api/finance/transactions/${tx.id}`, "DELETE");
                           onChanged();
                         }}
                       />
@@ -138,7 +141,7 @@ export function TransactionList({
       )}
       {editing && (
         <FieldsDialog
-          title="Edit transaction"
+          title={t("Edit transaction")}
           fields={editFields(accounts.map((a) => a.name))}
           initial={{ date: editing.date, description: editing.description, category: editing.category ?? "", account: editing.account ?? "", amount: editing.amount_cents / 100 }}
           onClose={() => setEditing(undefined)}

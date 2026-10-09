@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/i18n/client";
 import { compact, Legend, niceRange, Tooltip, useWidth } from "./common";
 
 export interface LineSeries {
@@ -26,6 +27,7 @@ const PAD = { top: 10, right: 12, bottom: 22, left: 44 };
 
 /** Time-series line chart: one y-axis, 2px lines, crosshair + tooltip on hover. */
 export function LineChart({ x, series, height = 220, unit = "", formatX, area, ariaLabel }: Props) {
+  const t = useT();
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number>();
   const all = series.flatMap((s) => s.values.filter((v): v is number => v !== null));
@@ -57,7 +59,7 @@ export function LineChart({ x, series, height = 220, unit = "", formatX, area, a
 
   return (
     <div className="flex flex-col gap-2">
-      {series.length > 1 && <Legend items={series.map((s) => ({ label: s.dashed ? `${s.name} (dashed)` : s.name, color: s.color, line: true }))} />}
+      {series.length > 1 && <Legend items={series.map((s) => ({ label: s.dashed ? t("{name} (dashed)", { name: s.name }) : s.name, color: s.color, line: true }))} />}
       <div ref={ref} className="relative" style={{ height }}>
         {width > 0 && (
           <svg width={width} height={height} role="img" aria-label={ariaLabel}>

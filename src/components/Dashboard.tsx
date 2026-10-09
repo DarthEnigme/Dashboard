@@ -20,6 +20,7 @@ import { BookmarkGroup } from "./BookmarkGroup";
 import { UserMenu } from "./auth/UserMenu";
 import { MonitorPanel } from "./MonitorPanel";
 import { LiveReload } from "./LiveReload";
+import { useT } from "@/i18n/client";
 
 // The editor (drag and drop, YAML parsing) is only downloaded when someone starts editing.
 const Editor = dynamic(() => import("./edit/Editor").then((m) => m.Editor), { ssr: false });
@@ -27,6 +28,7 @@ const Editor = dynamic(() => import("./edit/Editor").then((m) => m.Editor), { ss
 const matches = (q: string, ...fields: (string | undefined)[]) => fields.some((f) => f?.toLowerCase().includes(q));
 
 export function Dashboard({ config, auth, tabs, version }: { config: ClientConfig; auth: ClientAuth; tabs: Tab[]; version?: string }) {
+  const t = useT();
   const { settings } = config;
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -110,7 +112,7 @@ export function Dashboard({ config, auth, tabs, version }: { config: ClientConfi
 
       {!online && (
         <div className="glass flex w-fit items-center gap-2 rounded-full px-4 py-2 text-sm text-[var(--warn)]">
-          <WifiOff className="h-4 w-4" /> Offline: showing the last loaded dashboard
+          <WifiOff className="h-4 w-4" /> {t("Offline: showing the last loaded dashboard")}
         </div>
       )}
 
@@ -122,7 +124,7 @@ export function Dashboard({ config, auth, tabs, version }: { config: ClientConfi
         <div className="glass flex gap-3 rounded-2xl p-4 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--err)]" />
           <div className="space-y-1">
-            <p className="font-medium">Config problems: the affected file is shown empty until fixed.</p>
+            <p className="font-medium">{t("Config problems: the affected file is shown empty until fixed.")}</p>
             {config.errors.map((e) => (
               <p key={e} className="font-mono text-xs break-all text-muted">{e}</p>
             ))}
@@ -136,7 +138,7 @@ export function Dashboard({ config, auth, tabs, version }: { config: ClientConfi
 
       {bookmarks.length > 0 && (
         <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}>
-          <h2 className="mb-3 px-1 text-sm font-semibold tracking-wider text-muted uppercase">Bookmarks</h2>
+          <h2 className="mb-3 px-1 text-sm font-semibold tracking-wider text-muted uppercase">{t("Bookmarks")}</h2>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] items-start gap-3.5">
             {bookmarks.map((g) => (
               <BookmarkGroup key={`${g.tab}|${g.name}`} group={g} target={settings.target} />
@@ -145,7 +147,7 @@ export function Dashboard({ config, auth, tabs, version }: { config: ClientConfi
         </motion.section>
       )}
 
-      {q && !services.length && !bookmarks.length && <p className="py-16 text-center text-muted">Nothing matches “{query}”.</p>}
+      {q && !services.length && !bookmarks.length && <p className="py-16 text-center text-muted">{t("Nothing matches “")}{query}”.</p>}
 
     </main>
   );

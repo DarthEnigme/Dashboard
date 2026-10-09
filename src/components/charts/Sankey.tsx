@@ -6,6 +6,7 @@ import { categoryColor, money } from "@/lib/finance/format";
 import { FLOW_FROM_SAVINGS, FLOW_MIDDLE, FLOW_SAVED } from "@/lib/finance/flowCsv";
 import { Tooltip, useWidth } from "./common";
 import { foldSmall, layoutSankey, placeLabels, type FlowItem } from "./sankeyLayout";
+import { useT } from "@/i18n/client";
 
 const TOP = 20; // room for the middle node's label
 const SAVED = FLOW_SAVED;
@@ -16,7 +17,11 @@ const FROM_SAVINGS = FLOW_FROM_SAVINGS;
  * was left over ("Saved", or "From savings" when spending was higher). Hovering a node or band
  * dims the rest; every node is labelled and a hidden table lists the numbers.
  */
-export function Sankey({ flow, currency, height = 260, ariaLabel = "Where the money came from and where it went" }: { flow: Flow; currency: string; height?: number; ariaLabel?: string }) {
+export function Sankey({ flow, currency, height = 260, ariaLabel: label }: { flow: Flow; currency: string; height?: number; ariaLabel?: string }) {
+  const t = useT();
+  const ariaLabel = label ?? t("Where the money came from and where it went");
+  // Names Page adds itself; categories are the user's own words.
+  const flowName = (name: string) => (name === SAVED ? (t.locale === "en" ? SAVED : t("Saved money")) : name === FROM_SAVINGS ? t("From savings") : name === "Other" ? t("Other") : name === "Income" ? t("Income") : name);
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<{ index: number; x: number; y: number }>();
   // Savings are not a category: a neutral hatch keeps them apart from the eight category colours.
@@ -57,10 +62,10 @@ export function Sankey({ flow, currency, height = 260, ariaLabel = "Where the mo
     placeLabels(specs, fontSize + 1, height).forEach((y, k) => labelY.set(idx[k], { y, lines: specs[k].lines }));
   }
 
-  if (!income && !spent) return <p className="py-6 text-center text-sm text-muted">No income or spending in this period.</p>;
+  if (!income && !spent) return <p className="py-6 text-center text-sm text-muted">{t("No income or spending in this period.")}</p>;
 
   const base = income || spent;
-  const share = (v: number) => `${Math.round((v / base) * 100)}% of ${income ? "income" : "spending"}`;
+  const share = (v: number) => t(income ? "{pct}% of income" : "{pct}% of spending", { pct: Math.round((v / base) * 100) });
   const focus = hover ? layout.nodes[hover.index] : undefined;
   const lit = (i: number) => hover === undefined || hover.index === i || focus?.side === "middle";
   const track = (index: number) => (e: React.PointerEvent) => {
@@ -103,7 +108,7 @@ export function Sankey({ flow, currency, height = 260, ariaLabel = "Where the mo
                   <rect x={n.x - 6} y={n.y} width={22} height={Math.max(n.h, 6)} fill="transparent" />
                   {showName && (
                     <text x={labelX} y={showValue ? cy - 1 : cy} dy={showValue ? 0 : "0.35em"} textAnchor={anchor} fontSize={fontSize} className="pointer-events-none fill-fg">
-                      {n.name}
+                      {flowName(n.name)}
                     </text>
                   )}
                   {showValue && (
@@ -130,7 +135,7 @@ export function Sankey({ flow, currency, height = 260, ariaLabel = "Where the mo
               className="h-2.5 w-2.5 rounded-[3px]"
               style={{ background: focus.color === hatch ? "repeating-linear-gradient(45deg, var(--fg-muted) 0 2px, transparent 2px 4px)" : focus.color }}
             />
-            {focus.side === "middle" ? (income ? "Income" : "Spending") : focus.name}
+            {focus.side === "middle" ? (income ? t("Income") : t("Spending")) : flowName(focus.name)}
           </div>
           <div className="mt-0.5 flex justify-between gap-4 tabular-nums">
             <span>{money(focus.value, currency)}</span>
@@ -142,16 +147,16 @@ export function Sankey({ flow, currency, height = 260, ariaLabel = "Where the mo
         <caption>{ariaLabel}</caption>
         <thead>
           <tr>
-            <th scope="col">Flow</th>
-            <th scope="col">Name</th>
-            <th scope="col">Amount</th>
+            <th scope="col">{t("Flow")}</th>
+            <th scope="col">{t("Name")}</th>
+            <th scope="col">{t("Amount")}</th>
           </tr>
         </thead>
         <tbody>
-          {[...sources.map((s) => ["In", s] as const), ...sinks.map((s) => ["Out", s] as const)].map(([dir, s]) => (
+          {[...sources.map((s) => [t("In"), s] as const), ...sinks.map((s) => [t("Out"), s] as const)].map(([dir, s]) => (
             <tr key={`${dir}-${s.name}`}>
               <td>{dir}</td>
-              <td>{s.name}</td>
+              <td>{flowName(s.name)}</td>
               <td>{money(s.value, currency)}</td>
             </tr>
           ))}

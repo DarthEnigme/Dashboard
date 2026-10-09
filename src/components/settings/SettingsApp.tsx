@@ -36,6 +36,8 @@ import { UpdatesPanel } from "./UpdatesPanel";
 import { ThemeEditor } from "./ThemeEditor";
 import { BackupsPanel } from "./BackupsPanel";
 import { changedFields, validateSettings } from "./validate";
+import { msg } from "@/i18n";
+import { useT } from "@/i18n/client";
 
 type Obj = Record<string, unknown>;
 
@@ -50,6 +52,7 @@ function clientSettings(s: Settings): ClientSettings {
 const matches = (f: FieldSpec, q: string) => [f.label, f.key, f.help ?? ""].some((t) => t.toLowerCase().includes(q));
 
 export function SettingsApp({ initial, fallback, version }: { initial: Obj; fallback: ClientSettings; version?: string }) {
+  const t = useT();
   const router = useRouter();
   const [saved, setSaved] = useState<Obj>(initial);
   const [draft, setDraft] = useState<Obj>(initial);
@@ -158,7 +161,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
           accent: HEX.test(preview.accent) ? preview.accent : restore.current.accent,
         };
       }
-      setToast({ message: "Settings saved" });
+      setToast({ message: t("Settings saved") });
       router.refresh();
     } catch (e) {
       setToast({ message: (e as Error).message, error: true });
@@ -217,9 +220,9 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link href="/" className="mb-2 flex w-fit items-center gap-1.5 text-sm text-muted hover:text-fg">
-              <ArrowLeft className="h-4 w-4" /> Dashboard
+              <ArrowLeft className="h-4 w-4" /> {t("Dashboard")}
             </Link>
-            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t("Settings")}</h1>
           </div>
           <label className="glass flex h-11 w-full items-center gap-2 rounded-full px-4 focus-within:ring-2 focus-within:ring-accent/60 sm:w-72">
             <Search className="h-4 w-4 shrink-0 text-muted" />
@@ -227,12 +230,12 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Escape" && setQuery("")}
-              placeholder="Search settings…"
-              aria-label="Search settings"
+              placeholder={t("Search settings…")}
+              aria-label={t("Search settings")}
               className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
             />
             {query && (
-              <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="text-muted hover:text-fg">
+              <button type="button" onClick={() => setQuery("")} aria-label={t("Clear search")} className="text-muted hover:text-fg">
                 <X className="h-4 w-4" />
               </button>
             )}
@@ -242,7 +245,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
         <div className="grid gap-6 lg:grid-cols-[15rem_1fr]">
           {/* Phones: a select; wider: a sidebar. */}
           <select
-            aria-label="Section"
+            aria-label={t("Section")}
             value={active}
             onChange={(e) => select(e.target.value)}
             className="glass h-11 rounded-full px-4 text-sm lg:hidden"
@@ -253,7 +256,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
               </option>
             ))}
           </select>
-          <nav aria-label="Settings sections" className="hidden lg:block">
+          <nav aria-label={t("Settings sections")} className="hidden lg:block">
             <ul className="glass sticky top-6 flex flex-col gap-0.5 rounded-2xl p-2">
               {sections.map((s) => {
                 const n = changedIn(s);
@@ -267,11 +270,11 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                       className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition ${!q && active === s.id ? "bg-accent text-white" : "text-fg/90 hover:bg-hover"}`}
                     >
                       <s.icon className="h-4 w-4 shrink-0" />
-                      <span className="flex-1 truncate">{s.label}</span>
+                      <span className="flex-1 truncate">{t(s.label)}</span>
                       {e > 0 ? (
-                        <AlertTriangle className="h-3.5 w-3.5 text-[var(--err)]" aria-label={`${e} problems`} />
+                        <AlertTriangle className="h-3.5 w-3.5 text-[var(--err)]" aria-label={t.plural(e, "{n} problem", "{n} problems")} />
                       ) : n > 0 ? (
-                        <span className="h-2 w-2 rounded-full bg-[var(--warn)]" aria-label={`${n} unsaved`} />
+                        <span className="h-2 w-2 rounded-full bg-[var(--warn)]" aria-label={t("{n} unsaved", { n })} />
                       ) : null}
                     </button>
                   </li>
@@ -285,9 +288,9 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
               <section key={section.id} className="glass flex flex-col gap-5 rounded-3xl p-5 sm:p-6" aria-labelledby={`s-${section.id}`}>
                 <header>
                   <h2 id={`s-${section.id}`} className="flex items-center gap-2 text-lg font-semibold">
-                    <section.icon className="h-5 w-5 text-accent" /> {section.label}
+                    <section.icon className="h-5 w-5 text-accent" /> {t(section.label)}
                   </h2>
-                  <p className="text-sm text-muted">{section.description}</p>
+                  <p className="text-sm text-muted">{t(section.description)}</p>
                 </header>
                 {!q && section.extra === "looks" && (
                   <LookPicker
@@ -311,7 +314,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                       return h ? (
                         <Fragment key={f.key}>
                           <h3 id={h.id} className="mt-2 scroll-mt-6 border-t border-line pt-5 text-sm font-semibold tracking-wider text-muted uppercase">
-                            {h.label}
+                            {t(h.label)}
                           </h3>
                           {field(f)}
                         </Fragment>
@@ -341,7 +344,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                 {!q && section.extra === "updates" && <UpdatesPanel />}
                 {!q && section.extra === "users" && (
                   <div className="flex flex-col gap-3 border-t border-line pt-5">
-                    <h3 className="text-sm font-semibold tracking-wider text-muted uppercase">Accounts</h3>
+                    <h3 className="text-sm font-semibold tracking-wider text-muted uppercase">{t("Accounts")}</h3>
                     <UsersPanel />
                     <div className="mt-4">
                       <GroupsPanel />
@@ -354,16 +357,16 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                 {!q && section.extra === "backup" && (
                   <>
                     <BackupsPanel />
-                    <h3 className="border-t border-line pt-5 text-sm font-semibold tracking-wider text-muted uppercase">Config files</h3>
+                    <h3 className="border-t border-line pt-5 text-sm font-semibold tracking-wider text-muted uppercase">{t("Config files")}</h3>
                     <div className="flex flex-wrap gap-2">
                       <a href="/api/config/export" download className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110">
-                        <Download className="h-4 w-4" /> Download config (.zip)
+                        <Download className="h-4 w-4" /> {t("Download config (.zip)")}
                       </a>
                       <button type="button" onClick={() => setImporting(true)} className="flex items-center gap-1.5 rounded-full bg-track px-4 py-2 text-sm hover:bg-hover">
-                        <FileUp className="h-4 w-4" /> Import from Homepage
+                        <FileUp className="h-4 w-4" /> {t("Import from Homepage")}
                       </button>
                     </div>
-                    <p className="text-xs text-muted">The download contains the files as they are on disk, including secrets that are not in env vars.</p>
+                    <p className="text-xs text-muted">{t("The download contains the files as they are on disk, including secrets that are not in env vars.")}</p>
                     <HistoryPanel
                       onRestored={() => {
                         void reload();
@@ -374,26 +377,26 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                 )}
               </section>
             ))}
-            {q && !visible.length && <p className="py-16 text-center text-muted">No setting matches “{query}”.</p>}
+            {q && !visible.length && <p className="py-16 text-center text-muted">{t("No setting matches “")}{query}”.</p>}
           </div>
         </div>
       </main>
 
       {(dirty || errorCount > 0) && (
-        <div role="region" aria-label="Unsaved changes" className="glass fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-2xl flex-wrap items-center gap-3 rounded-2xl px-4 py-3 text-sm">
+        <div role="region" aria-label={t("Unsaved changes")} className="glass fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-2xl flex-wrap items-center gap-3 rounded-2xl px-4 py-3 text-sm">
           <span className="mr-auto">
             {errorCount > 0 ? (
               <span className="text-[var(--err)]">
-                {errorCount} {errorCount === 1 ? "problem" : "problems"} to fix
+                {errorCount} {errorCount === 1 ? "problem" : "problems"} {t("to fix")}
               </span>
             ) : (
               <>
-                {changed.length} unsaved {changed.length === 1 ? "change" : "changes"}
+                {changed.length} {t("unsaved")}{" "}{changed.length === 1 ? "change" : "changes"}
               </>
             )}
           </span>
           <button type="button" onClick={discard} className="rounded-full px-3 py-1.5 hover:bg-hover">
-            Discard
+            {t("Discard")}
           </button>
           <button
             type="button"
@@ -401,7 +404,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
             disabled={busy || errorCount > 0 || !dirty}
             className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 font-medium text-white hover:brightness-110 disabled:opacity-50"
           >
-            <Check className="h-4 w-4" /> Save
+            <Check className="h-4 w-4" /> {t("Save")}
           </button>
         </div>
       )}
@@ -443,23 +446,24 @@ function applyTheme(root: HTMLElement, theme: string, custom: CustomTheme[] = []
 }
 
 const plainThemes: { id: string; label: string; note: string }[] = [
-  { id: "dark", label: "Dark", note: "Default" },
-  { id: "light", label: "Light", note: "Bright panes" },
-  { id: "system", label: "System", note: "Follows the OS" },
-  { id: "oled", label: "OLED", note: "Pure black" },
-  { id: "sepia", label: "Sepia", note: "Warm paper" },
+  { id: "dark", label: msg("Dark"), note: msg("Default") },
+  { id: "light", label: msg("Light"), note: msg("Bright panes") },
+  { id: "system", label: msg("System"), note: msg("Follows the OS") },
+  { id: "oled", label: "OLED", note: msg("Pure black") },
+  { id: "sepia", label: msg("Sepia"), note: msg("Warm paper") },
 ];
 
 /** Built-in themes, colour palettes and custom themes, each drawn in its own colours. */
 function ThemePicker({ value, custom, onChange }: { value: string; custom: CustomTheme[]; onChange: (v: string) => void }) {
+  const t = useT();
   const options = [
-    ...plainThemes.map((t) => ({ ...t, colors: baseThemeColors[t.id === "system" ? "dark" : t.id].colors })),
-    ...Object.entries(paletteThemes).map(([id, t]) => ({ id, label: t.label, note: t.base === "light" ? "Light palette" : "Dark palette", colors: t.colors })),
-    ...custom.map((t) => ({ id: `${CUSTOM_PREFIX}${t.id}`, label: t.label, note: "Custom", colors: t.colors })),
+    ...plainThemes.map((p) => ({ ...p, label: t(p.label), note: t(p.note), colors: baseThemeColors[p.id === "system" ? "dark" : p.id].colors })),
+    ...Object.entries(paletteThemes).map(([id, p]) => ({ id, label: p.label, note: p.base === "light" ? t("Light palette") : t("Dark palette"), colors: p.colors })),
+    ...custom.map((c) => ({ id: `${CUSTOM_PREFIX}${c.id}`, label: c.label, note: t("Custom"), colors: c.colors })),
   ];
   return (
     <fieldset className="flex flex-col gap-1.5">
-      <legend className="mb-1.5 text-xs font-medium text-muted">Theme</legend>
+      <legend className="mb-1.5 text-xs font-medium text-muted">{t("Theme")}</legend>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {options.map((t) => (
           <label key={t.id} className="cursor-pointer" data-theme-option={t.id}>
@@ -486,29 +490,30 @@ function ThemePicker({ value, custom, onChange }: { value: string; custom: Custo
 }
 
 const styleNotes: Record<(typeof stylePresets)[number], string> = {
-  glass: "Frosted",
-  liquid: "Liquid glass",
-  aero: "Frutiger Aero",
-  neon: "Glowing edges",
-  brutal: "Bold & flat",
-  soft: "Neumorphic",
-  retro: "Windows 98",
-  minimal: "Light touch",
-  solid: "Opaque",
+  glass: msg("Frosted"),
+  liquid: msg("Liquid glass"),
+  aero: msg("Frutiger Aero"),
+  neon: msg("Glowing edges"),
+  brutal: msg("Bold & flat"),
+  soft: msg("Neumorphic"),
+  retro: msg("Windows 98"),
+  minimal: msg("Light touch"),
+  solid: msg("Opaque"),
 };
 
 /** Each option is drawn with its own style tokens (data-style scopes the CSS variables). */
 function StylePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const t = useT();
   return (
     <fieldset className="flex flex-col gap-1.5">
-      <legend className="mb-1.5 text-xs font-medium text-muted">Card style</legend>
+      <legend className="mb-1.5 text-xs font-medium text-muted">{t("Card style")}</legend>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {stylePresets.map((s) => (
           <label key={s} data-style={s} className="cursor-pointer">
             <input type="radio" name="style" value={s} checked={value === s} onChange={() => onChange(s)} className="peer sr-only" />
             <div className="glass flex h-20 flex-col justify-end rounded-2xl p-3 transition peer-checked:ring-2 peer-checked:ring-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent">
               <span className="text-sm font-semibold capitalize">{s}</span>
-              <span className="text-xs text-muted">{styleNotes[s]}</span>
+              <span className="text-xs text-muted">{t(styleNotes[s])}</span>
             </div>
           </label>
         ))}
@@ -518,13 +523,14 @@ function StylePicker({ value, onChange }: { value: string; onChange: (v: string)
 }
 
 function GradientPicker({ value, custom, onChange }: { value: string; custom: CustomTheme[]; onChange: (v: string) => void }) {
+  const t = useT();
   const names: { id: string; label: string }[] = [
     ...gradientPresets.map((g) => ({ id: g as string, label: g.replace("-", " ") })),
     ...custom.filter((t) => t.gradient).map((t) => ({ id: `${CUSTOM_PREFIX}${t.id}`, label: t.label })),
   ];
   return (
     <fieldset className="flex flex-col gap-1.5">
-      <legend className="mb-1.5 text-xs font-medium text-muted">Gradient</legend>
+      <legend className="mb-1.5 text-xs font-medium text-muted">{t("Gradient")}</legend>
       <div className="flex flex-wrap gap-3">
         {names.map(({ id: g, label }) => {
           const c = gradientFor(g, custom);
@@ -546,6 +552,7 @@ function GradientPicker({ value, custom, onChange }: { value: string; custom: Cu
 
 /** One-click looks: style, background, accent and glow together (still only a draft until saved). */
 function LookPicker({ draft, custom, onApply }: { draft: Obj; custom: CustomTheme[]; onApply: (look: LookPreset) => void }) {
+  const t = useT();
   const style = (getPath(draft, "style") as string | undefined) ?? "glass";
   const glow = (getPath(draft, "glow") as string | number | undefined) ?? "subtle";
   const looks: LookPreset[] = [
@@ -568,7 +575,7 @@ function LookPicker({ draft, custom, onApply }: { draft: Obj; custom: CustomThem
     (!l.theme || getPath(draft, "theme") === l.theme);
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-muted">Looks</span>
+      <span className="text-xs font-medium text-muted">{t("Looks")}</span>
       <div className="flex flex-wrap gap-2">
         {looks.map((l) => {
           const c = gradientFor(l.gradient, custom);

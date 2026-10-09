@@ -10,19 +10,22 @@ import { DeleteButton, IconButton } from "./controls";
 import { Dialog } from "./Dialog";
 import { Avatar } from "../auth/ProfileDialog";
 import type { Group } from "@/lib/auth/groups";
+import { useT } from "@/i18n/client";
+import { msg } from "@/i18n";
 
 type Row = User & { identities: { provider: string; subject: string }[]; groups: { name: string; source: string }[] };
 
 const newUserFields: FieldSpec[] = [
-  { key: "username", label: "Username", required: true },
-  { key: "name", label: "Display name" },
-  { key: "email", label: "Email", help: "SSO and directory logins with this verified email are linked to this account." },
-  { key: "role", label: "Role", kind: "select", options: ["user", "admin"], required: true },
-  { key: "password", label: "Password", secret: true, help: "Optional: leave empty for SSO/LDAP-only accounts." },
+  { key: "username", label: msg("Username"), required: true },
+  { key: "name", label: msg("Display name") },
+  { key: "email", label: msg("Email"), help: msg("SSO and directory logins with this verified email are linked to this account.") },
+  { key: "role", label: msg("Role"), kind: "select", options: ["user", "admin"], required: true },
+  { key: "password", label: msg("Password"), secret: true, help: msg("Optional: leave empty for SSO/LDAP-only accounts.") },
 ];
-const passwordFields: FieldSpec[] = [{ key: "password", label: "New password (8+ characters)", secret: true, required: true }];
+const passwordFields: FieldSpec[] = [{ key: "password", label: msg("New password (8+ characters)"), secret: true, required: true }];
 
 export function UsersPanel() {
+  const t = useT();
   const [rows, setRows] = useState<Row[]>();
   const [error, setError] = useState<string>();
   const [dialog, setDialog] = useState<
@@ -61,12 +64,12 @@ export function UsersPanel() {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold tracking-wider text-muted uppercase">Users</h2>
+        <h2 className="text-sm font-semibold tracking-wider text-muted uppercase">{t("Users")}</h2>
         <button
           onClick={() => setDialog({ kind: "new" })}
           className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-white hover:brightness-110"
         >
-          <Plus className="h-4 w-4" /> Add user
+          <Plus className="h-4 w-4" /> {t("Add user")}
         </button>
       </div>
       {error && <p role="alert" className="rounded-xl bg-[var(--err)]/15 px-3 py-2 text-sm text-[var(--err)]">{error}</p>}
@@ -79,20 +82,20 @@ export function UsersPanel() {
               <span className="truncate">{u.name || u.username}</span>
               {u.role === "admin" && (
                 <span className="flex items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-[11px] text-accent">
-                  <ShieldCheck className="h-3 w-3" /> admin
+                  <ShieldCheck className="h-3 w-3" /> {t("admin")}
                 </span>
               )}
-              {u.disabled && <span className="rounded-full bg-[var(--err)]/15 px-2 py-0.5 text-[11px] text-[var(--err)]">disabled</span>}
+              {u.disabled && <span className="rounded-full bg-[var(--err)]/15 px-2 py-0.5 text-[11px] text-[var(--err)]">{t("disabled")}</span>}
               {u.twoFactor && (
-                <span className="flex items-center gap-1 rounded-full bg-[var(--ok)]/15 px-2 py-0.5 text-[11px] text-[var(--ok)]" title="Two-factor sign-in is on">
-                  <ShieldCheck className="h-3 w-3" /> 2FA
+                <span className="flex items-center gap-1 rounded-full bg-[var(--ok)]/15 px-2 py-0.5 text-[11px] text-[var(--ok)]" title={t("Two-factor sign-in is on")}>
+                  <ShieldCheck className="h-3 w-3" /> {t("2FA")}
                 </span>
               )}
             </div>
             <div className="truncate text-xs text-muted">
               {u.username}
               {u.email && ` · ${u.email}`}
-              {u.hasPassword ? " · password" : ""}
+              {u.hasPassword ? t(" · password") : ""}
             </div>
             {u.groups.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -100,10 +103,10 @@ export function UsersPanel() {
                   <span
                     key={g.name}
                     className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] text-accent"
-                    title={g.source === "sso" ? "From the groups the sign-in reported" : "Added by an admin"}
+                    title={g.source === "sso" ? t("From the groups the sign-in reported") : t("Added by an admin")}
                   >
                     {g.name}
-                    {g.source === "sso" && " · sso"}
+                    {g.source === "sso" && t(" · sso")}
                   </span>
                 ))}
               </div>
@@ -114,8 +117,8 @@ export function UsersPanel() {
                   <span key={`${i.provider}|${i.subject}`} className="flex items-center gap-1 rounded-full bg-chip py-0.5 pr-1 pl-2 text-[11px]" title={i.subject}>
                     {i.provider}
                     <button
-                      aria-label={`Unlink ${i.provider}`}
-                      title="Unlink this sign-in"
+                      aria-label={t("Unlink {name}", { name: i.provider })}
+                      title={t("Unlink this sign-in")}
                       onClick={() => patch(u.id, { unlink: i })}
                       className="rounded-full p-0.5 text-muted hover:bg-hover hover:text-[var(--err)]"
                     >
@@ -131,16 +134,16 @@ export function UsersPanel() {
               onClick={() => patch(u.id, { role: u.role === "admin" ? "user" : "admin" })}
               className="rounded-full px-3 py-1 text-xs text-muted hover:bg-hover hover:text-fg"
             >
-              {u.role === "admin" ? "Make user" : "Make admin"}
+              {u.role === "admin" ? t("Make user") : t("Make admin")}
             </button>
-            <IconButton label="Groups" onClick={() => setDialog({ kind: "groups", user: u })}>
+            <IconButton label={t("Groups")} onClick={() => setDialog({ kind: "groups", user: u })}>
               <Users2 className="h-3.5 w-3.5" />
             </IconButton>
-            <IconButton label="Set password" onClick={() => setDialog({ kind: "password", user: u })}>
+            <IconButton label={t("Set password")} onClick={() => setDialog({ kind: "password", user: u })}>
               <KeyRound className="h-3.5 w-3.5" />
             </IconButton>
             <IconButton
-              label="Link to set a password"
+              label={t("Link to set a password")}
               onClick={async () => {
                 const r = await patch(u.id, { resetLink: true });
                 if (r?.link) setDialog({ kind: "link", user: u, link: r.link, hours: r.linkHours ?? 48 });
@@ -149,24 +152,24 @@ export function UsersPanel() {
               <Link className="h-3.5 w-3.5" />
             </IconButton>
             {u.twoFactor && (
-              <IconButton label="Turn off two-factor sign-in (lost phone)" onClick={() => patch(u.id, { resetTwoFactor: true })}>
+              <IconButton label={t("Turn off two-factor sign-in (lost phone)")} onClick={() => patch(u.id, { resetTwoFactor: true })}>
                 <ShieldOff className="h-3.5 w-3.5" />
               </IconButton>
             )}
-            <IconButton label="Sign out everywhere" onClick={() => patch(u.id, { signOut: true })}>
+            <IconButton label={t("Sign out everywhere")} onClick={() => patch(u.id, { signOut: true })}>
               <LogOut className="h-3.5 w-3.5" />
             </IconButton>
-            <IconButton label={u.disabled ? "Enable account" : "Disable account"} onClick={() => patch(u.id, { disabled: !u.disabled })}>
+            <IconButton label={u.disabled ? t("Enable account") : t("Disable account")} onClick={() => patch(u.id, { disabled: !u.disabled })}>
               <UserX className="h-3.5 w-3.5" />
             </IconButton>
-            <DeleteButton label={`Delete ${u.username}`} onConfirm={() => remove(u.id)} />
+            <DeleteButton label={t("Delete {name}", { name: u.username })} onConfirm={() => remove(u.id)} />
           </div>
         </div>
       ))}
 
       {dialog?.kind === "new" && (
         <FieldsDialog
-          title="Add user"
+          title={t("Add user")}
           fields={newUserFields}
           initial={{ role: "user" }}
           onClose={() => setDialog(undefined)}
@@ -178,7 +181,7 @@ export function UsersPanel() {
       )}
       {dialog?.kind === "password" && (
         <FieldsDialog
-          title={`Set password for ${dialog.user.username}`}
+          title={t("Set password for {name}", { name: dialog.user.username })}
           fields={passwordFields}
           initial={{}}
           onClose={() => setDialog(undefined)}
@@ -199,9 +202,9 @@ export function UsersPanel() {
         />
       )}
       {dialog?.kind === "link" && (
-        <Dialog title={`Password link for ${dialog.user.username}`} onClose={() => setDialog(undefined)} onSubmit={() => setDialog(undefined)} submitLabel="Done">
+        <Dialog title={t("Password link for {name}", { name: dialog.user.username })} onClose={() => setDialog(undefined)} onSubmit={() => setDialog(undefined)} submitLabel={t("Done")}>
           <p className="text-sm">
-            Send this to {dialog.user.name || dialog.user.username}. It works once, within {dialog.hours} hours, and signs them out everywhere when used.
+            {t("Send this to")}{" "}{dialog.user.name || dialog.user.username}{t(". It works once, within")}{" "}{dialog.hours} {t("hours, and signs them out everywhere when used.")}
           </p>
           <div className="flex gap-2">
             <input
@@ -209,10 +212,10 @@ export function UsersPanel() {
               value={dialog.link}
               onFocus={(e) => e.target.select()}
               className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-chip px-3 font-mono text-xs"
-              aria-label="Link"
+              aria-label={t("Link")}
             />
             <button type="button" onClick={() => navigator.clipboard?.writeText(dialog.link)} className="flex items-center gap-1.5 rounded-xl bg-chip px-3 text-sm hover:bg-hover">
-              <Copy className="h-4 w-4" /> Copy
+              <Copy className="h-4 w-4" /> {t("Copy")}
             </button>
           </div>
         </Dialog>
@@ -223,6 +226,7 @@ export function UsersPanel() {
 
 /** Pick the groups an admin adds a user to; groups from SSO are shown but follow the provider. */
 function GroupsDialog({ user, onClose, onSave }: { user: Row; onClose: () => void; onSave: (groups: string[]) => Promise<void> }) {
+  const t = useT();
   const [groups, setGroups] = useState<Group[]>();
   const [chosen, setChosen] = useState(new Set(user.groups.filter((g) => g.source === "manual").map((g) => g.name.toLowerCase())));
   const [error, setError] = useState<string>();
@@ -233,7 +237,7 @@ function GroupsDialog({ user, onClose, onSave }: { user: Row; onClose: () => voi
   const sso = new Set(user.groups.filter((g) => g.source === "sso").map((g) => g.name.toLowerCase()));
   return (
     <Dialog
-      title={`Groups of ${user.username}`}
+      title={t("Groups of {name}", { name: user.username })}
       onClose={onClose}
       busy={busy}
       error={error}
@@ -248,7 +252,7 @@ function GroupsDialog({ user, onClose, onSave }: { user: Row; onClose: () => voi
         }
       }}
     >
-      {groups?.length === 0 && <p className="text-sm text-muted">No groups yet. Create them under Groups below.</p>}
+      {groups?.length === 0 && <p className="text-sm text-muted">{t("No groups yet. Create them under Groups below.")}</p>}
       {groups?.map((g) => {
         const key = g.name.toLowerCase();
         return (
@@ -267,7 +271,7 @@ function GroupsDialog({ user, onClose, onSave }: { user: Row; onClose: () => voi
             />
             <span>
               <span className="font-medium">{g.name}</span>
-              {sso.has(key) && <span className="text-xs text-muted"> · from sign-in groups</span>}
+              {sso.has(key) && <span className="text-xs text-muted"> {t("· from sign-in groups")}</span>}
               {g.description && <span className="block text-xs text-muted">{g.description}</span>}
             </span>
           </label>

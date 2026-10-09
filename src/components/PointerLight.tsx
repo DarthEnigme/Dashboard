@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { LensCache } from "./liquidLens";
+import { useT } from "@/i18n/client";
 
 // Fallback for panes without their own lens yet (see liquidLens.ts).
 // Displacement map: neutral grey in the middle, pushing inward along each edge (red = x, green = y),
@@ -37,6 +38,7 @@ const channels = [
  * in the settings applies without a reload.
  */
 export function PointerLight() {
+  const t = useT();
   const svg = useRef<SVGSVGElement>(null);
 
   // Liquid style in Chromium: every raised pane (dialogs, menus, the search field…) gets a lens of its own size.

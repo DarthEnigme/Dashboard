@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { categoryColor } from "@/lib/finance/format";
+import { useT } from "@/i18n/client";
 
 export interface DonutSlice {
   name: string;
@@ -32,6 +33,7 @@ export function Donut({
   compact?: boolean;
   ariaLabel: string;
 }) {
+  const t = useT();
   const [hover, setHover] = useState<number>();
   const sum = slices.reduce((a, s) => a + s.value, 0);
   const r = size / 2;
@@ -50,7 +52,7 @@ export function Donut({
   const focus = hover !== undefined ? slices[hover] : undefined;
   const legend = compact ? slices.slice(0, 4) : slices;
 
-  if (!sum) return <p className="py-4 text-center text-sm text-muted">No spending in this period.</p>;
+  if (!sum) return <p className="py-4 text-center text-sm text-muted">{t("No spending in this period.")}</p>;
 
   return (
     <div className="flex flex-wrap items-center gap-4">
@@ -79,7 +81,7 @@ export function Donut({
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
           <div>
             <div className="text-sm leading-tight font-semibold">{focus ? focus.label : total}</div>
-            <div className="max-w-20 truncate text-[10px] text-muted">{focus ? focus.name : "spent"}</div>
+            <div className="max-w-20 truncate text-[10px] text-muted">{focus ? (focus.name === "Other" ? t("Other") : focus.name) : t("spent")}</div>
           </div>
         </div>
       </div>
@@ -92,11 +94,11 @@ export function Donut({
             onPointerLeave={() => setHover(undefined)}
           >
             <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: colorOf(s) }} />
-            <span className="min-w-0 flex-1 truncate text-fg/90">{s.name}</span>
+            <span className="min-w-0 flex-1 truncate text-fg/90">{s.name === "Other" ? t("Other") : s.name}</span>
             <span className="shrink-0 tabular-nums text-muted">{s.label}</span>
           </li>
         ))}
-        {compact && slices.length > legend.length && <li className="px-1 text-muted">+{slices.length - legend.length} more</li>}
+        {compact && slices.length > legend.length && <li className="px-1 text-muted">+{slices.length - legend.length} {t("more")}</li>}
       </ul>
     </div>
   );

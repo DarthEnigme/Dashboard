@@ -6,14 +6,17 @@ import { AlertTriangle, ArrowUpCircle, CheckCircle2, ExternalLink, History, Load
 import { fetcher, sendJson } from "@/lib/fetcher";
 import type { FullStatus } from "@/app/api/update/_shared";
 import { Markdown } from "./Markdown";
+import type { T } from "@/i18n";
+import { dateOnly } from "@/i18n/format";
+import { useT } from "@/i18n/client";
 
-const ago = (iso?: string) => {
-  if (!iso) return "never";
+const ago = (iso: string | undefined, t: T) => {
+  if (!iso) return t("never");
   const s = Math.round((Date.now() - Date.parse(iso)) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
-  return new Date(iso).toLocaleDateString();
+  if (s < 60) return t("just now");
+  if (s < 3600) return t("{n} min ago", { n: Math.round(s / 60) });
+  if (s < 86400) return t("{n} h ago", { n: Math.round(s / 3600) });
+  return dateOnly(iso);
 };
 
 type Live = { phase: string; percent?: number; target?: string };
@@ -23,6 +26,7 @@ type Live = { phase: string; percent?: number; target?: string };
  * helper container; this panel follows along over /api/events and notices the new build.
  */
 export function UpdatesPanel() {
+  const t = useT();
   const { data, mutate, error } = useSWR<FullStatus>("/api/update", fetcher);
   const [busy, setBusy] = useState<"check" | "apply">();
   const [confirm, setConfirm] = useState(false);
@@ -51,7 +55,7 @@ export function UpdatesPanel() {
     try {
       const s = await sendJson<FullStatus>("/api/update/check", "POST");
       await mutate(s, { revalidate: false });
-      setMessage(s.error ? { text: s.error, error: true } : { text: s.available ? `${s.latest?.version} is available` : "You're on the latest version" });
+      setMessage(s.error ? { text: s.error, error: true } : { text: s.available ? t("{version} is available", { version: s.latest?.version ?? "" }) : t("You're on the latest version") });
     } catch (e) {
       setMessage({ text: (e as Error).message, error: true });
     } finally {
@@ -77,7 +81,7 @@ export function UpdatesPanel() {
   if (!data) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+        <Loader2 className="h-4 w-4 animate-spin" /> {t("Loading…")}
       </p>
     );
   }
@@ -90,9 +94,9 @@ export function UpdatesPanel() {
       {newBuild ? (
         <div role="status" className="flex flex-wrap items-center gap-3 rounded-2xl bg-chip p-4 text-sm">
           <CheckCircle2 className="h-5 w-5 text-[var(--ok)]" />
-          <span className="flex-1">Page is now running {newBuild}.</span>
+          <span className="flex-1">{t("Page is now running")}{" "}{newBuild}.</span>
           <button type="button" onClick={() => window.location.reload()} className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 font-medium text-white">
-            <RefreshCw className="h-4 w-4" /> Reload
+            <RefreshCw className="h-4 w-4" /> {t("Reload")}
           </button>
         </div>
       ) : running ? (
@@ -100,13 +104,13 @@ export function UpdatesPanel() {
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
             {phase === "pulling"
-              ? `Downloading ${live?.target ?? data.progress.target ?? "the update"}… ${live?.percent ?? data.progress.percent ?? 0}%`
+              ? t("Downloading {version}… {percent}%", { version: live?.target ?? data.progress.target ?? "", percent: live?.percent ?? data.progress.percent ?? 0 })
               : phase === "restarting"
-                ? "Restarting with the new version. This page reconnects by itself (usually under a minute)."
-                : "Preparing…"}
+                ? t("Restarting with the new version. This page reconnects by itself (usually under a minute).")
+                : t("Preparing…")}
           </div>
           {phase === "pulling" && (
-            <div className="h-1.5 overflow-hidden rounded-full bg-track" role="progressbar" aria-label="Download" aria-valuenow={live?.percent ?? 0} aria-valuemin={0} aria-valuemax={100}>
+            <div className="h-1.5 overflow-hidden rounded-full bg-track" role="progressbar" aria-label={t("Download")} aria-valuenow={live?.percent ?? 0} aria-valuemin={0} aria-valuemax={100}>
               <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${live?.percent ?? data.progress.percent ?? 0}%` }} />
             </div>
           )}
@@ -115,24 +119,24 @@ export function UpdatesPanel() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl bg-chip p-4">
-          <div className="text-xs text-muted">Running</div>
+          <div className="text-xs text-muted">{t("Running")}</div>
           <div className="text-xl font-semibold">{current.version}</div>
           <div className="text-xs text-muted">
-            {current.commit ? `commit ${current.commit.slice(0, 7)}` : "local build"} · {data.channel} channel
+            {current.commit ? `commit ${current.commit.slice(0, 7)}` : t("local build")} · {t("{name} channel", { name: data.channel })}
           </div>
         </div>
         <div className="rounded-2xl bg-chip p-4">
-          <div className="text-xs text-muted">Latest</div>
+          <div className="text-xs text-muted">{t("Latest")}</div>
           <div className="flex items-center gap-2 text-xl font-semibold">
             {latest?.version ?? "–"}
             {data.available ? (
-              <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-white">New</span>
+              <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-white">{t("New")}</span>
             ) : latest ? (
-              <CheckCircle2 className="h-4 w-4 text-[var(--ok)]" aria-label="Up to date" />
+              <CheckCircle2 className="h-4 w-4 text-[var(--ok)]" aria-label={t("Up to date")} />
             ) : null}
           </div>
           <div className="text-xs text-muted">
-            Checked {ago(data.checkedAt)}
+            {t("Checked")}{" "}{ago(data.checkedAt, t)}
             {data.repo ? ` · ${data.repo}` : ""}
           </div>
         </div>
@@ -146,16 +150,16 @@ export function UpdatesPanel() {
 
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={check} disabled={!!busy || running} className="flex items-center gap-1.5 rounded-full bg-track px-4 py-2 text-sm hover:bg-hover disabled:opacity-50">
-          {busy === "check" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Check now
+          {busy === "check" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} {t("Check now")}
         </button>
         {data.available && preflight.canApply && !running && !newBuild && !confirm && (
           <button type="button" onClick={() => setConfirm(true)} className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110">
-            <ArrowUpCircle className="h-4 w-4" /> Update to {latest?.version}
+            <ArrowUpCircle className="h-4 w-4" /> {t("Update to")}{" "}{latest?.version}
           </button>
         )}
         {latest?.url && (
           <a href={latest.url} target="_blank" rel="noreferrer noopener" className="flex items-center gap-1 text-sm text-muted hover:text-fg">
-            Release page <ExternalLink className="h-3.5 w-3.5" />
+            {t("Release page")}{" "}<ExternalLink className="h-3.5 w-3.5" />
           </a>
         )}
         {message && (
@@ -168,16 +172,15 @@ export function UpdatesPanel() {
       {confirm && (
         <div className="flex flex-col gap-3 rounded-2xl border border-line p-4 text-sm">
           <p>
-            Page downloads <code className="rounded bg-track px-1">{preflight.image}:{data.channel === "edge" ? "latest" : latest?.version}</code>, then replaces the{" "}
-            <code className="rounded bg-track px-1">{preflight.container}</code> container with the same settings and volumes. It is unavailable for about a minute.
-            If the new version doesn&apos;t start, the current one is put back automatically.
+            {t("Page downloads")}{" "}<code className="rounded bg-track px-1">{preflight.image}:{data.channel === "edge" ? "latest" : latest?.version}</code>{t(", then replaces the")}{" "}
+            <code className="rounded bg-track px-1">{preflight.container}</code> {t("container with the same settings and volumes. It is unavailable for about a minute. If the new version doesn't start, the current one is put back automatically.")}
           </p>
           <div className="flex gap-2">
             <button type="button" onClick={apply} disabled={!!busy} className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 font-medium text-white disabled:opacity-50">
-              {busy === "apply" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpCircle className="h-4 w-4" />} Update now
+              {busy === "apply" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpCircle className="h-4 w-4" />} {t("Update now")}
             </button>
             <button type="button" onClick={() => setConfirm(false)} className="rounded-full px-3 py-1.5 hover:bg-hover">
-              Cancel
+              {t("Cancel")}
             </button>
           </div>
         </div>
@@ -186,7 +189,7 @@ export function UpdatesPanel() {
       {data.available && !preflight.canApply && (
         <div className="flex flex-col gap-2 rounded-2xl border border-line p-4 text-sm">
           <p className="text-muted">{preflight.reason}</p>
-          <p>To update by hand:</p>
+          <p>{t("To update by hand:")}</p>
           <pre className="overflow-x-auto rounded-xl bg-track p-3 text-xs">
             {`# Docker Compose (in the folder with docker-compose.yml)
 docker compose pull && docker compose up -d
@@ -200,7 +203,7 @@ git pull && npm ci && npm run build && npm start`}
       {notes && (data.available || allNotes) && (
         <section aria-labelledby="notes-title" className="flex flex-col gap-2">
           <h3 id="notes-title" className="text-sm font-semibold">
-            What&apos;s new in {latest?.version}
+            {t("What's new in")}{" "}{latest?.version}
           </h3>
           <div className={`relative overflow-hidden ${allNotes ? "" : "max-h-56"}`}>
             <Markdown text={notes} />
@@ -208,7 +211,7 @@ git pull && npm ci && npm run build && npm start`}
           </div>
           {!allNotes && notes.length > 600 && (
             <button type="button" onClick={() => setAllNotes(true)} className="w-fit text-sm text-accent hover:underline">
-              Show all
+              {t("Show all")}
             </button>
           )}
         </section>
@@ -217,7 +220,7 @@ git pull && npm ci && npm run build && npm start`}
       {data.history.length > 0 && (
         <section aria-labelledby="history-title" className="flex flex-col gap-2">
           <h3 id="history-title" className="flex items-center gap-1.5 text-sm font-semibold">
-            <History className="h-4 w-4" /> History
+            <History className="h-4 w-4" /> {t("History")}
           </h3>
           <ul className="flex flex-col gap-1 text-sm">
             {data.history.map((h) => (

@@ -94,6 +94,7 @@ Config lives in `./config` (override with `HOMEPAGE_CONFIG_DIR`); history lives 
 ```yaml
 title: Homelab
 description: Optional subtitle
+language: auto         # auto (each visitor's browser) | en | fr
 theme: dark            # dark | light | system | oled (pure black) | sepia (warm paper)
                        # or a palette: nord | dracula | catppuccin-mocha | catppuccin-latte | solarized | gruvbox | tokyo-night
                        # or one of your own: custom:<id> (see "Custom themes")
@@ -497,6 +498,12 @@ Discovered services join a YAML group with the same name, or get a new group. Th
 ## Install as an app
 
 Open the page in Chrome, Edge or Safari and choose **Install** / **Add to Home Screen**. Browsers only allow this over **HTTPS** (or on `localhost`), so put Page behind your reverse proxy. Offline, the app shows the last loaded dashboard with an "Offline" badge.
+
+## Language
+
+Page speaks English and French. `language: auto` (the default) follows each visitor's browser and falls back to English; `en` or `fr` sets one language for everyone. It's also under **Settings → General**. Dates, numbers and amounts follow the language too (`1 234,56 €` in French).
+
+Your own words stay as you wrote them (service, group and category names), and so do the values integrations report on tiles ("running", "CPU"…): thresholds and history use those labels as keys. To add a language, translate `src/i18n/fr.ts` into a new file; `npm test` checks that every text the UI shows has a translation (`node scripts/i18n-keys.mjs --missing` lists what's left).
 
 ## Settings page
 

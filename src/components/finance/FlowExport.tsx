@@ -5,12 +5,14 @@ import { Download, FileImage, FileSpreadsheet, FileText, PenTool } from "lucide-
 import type { Flow } from "@/lib/finance/aggregate";
 import { flowCsv } from "@/lib/finance/flowCsv";
 import { downloadBlob, downloadPng, downloadSvg } from "@/lib/exportSvg";
+import { useT } from "@/i18n/client";
 
 /**
  * Export for the money-flow chart: the picture (PNG, SVG), the numbers (CSV), or a printable
  * one-page report to save as PDF. `chart` wraps the rendered Sankey.
  */
 export function FlowExport({ chart, flow, currency, period }: { chart: RefObject<HTMLElement | null>; flow: Flow; currency: string; period: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string>();
   const box = useRef<HTMLDivElement>(null);
@@ -41,26 +43,26 @@ export function FlowExport({ chart, flow, currency, period }: { chart: RefObject
 
   const items = [
     {
-      label: "Image (PNG)",
+      label: t("Image (PNG)"),
       icon: FileImage,
       run: () => {
         const s = svg();
-        if (!s) throw new Error("Nothing to export");
+        if (!s) throw new Error(t("Nothing to export"));
         return downloadPng(s, `${base}.png`);
       },
     },
     {
-      label: "Vector (SVG)",
+      label: t("Vector (SVG)"),
       icon: PenTool,
       run: () => {
         const s = svg();
-        if (!s) throw new Error("Nothing to export");
+        if (!s) throw new Error(t("Nothing to export"));
         downloadSvg(s, `${base}.svg`);
       },
     },
-    { label: "Flows (CSV)", icon: FileSpreadsheet, run: () => downloadBlob(new Blob([flowCsv(flow, currency)], { type: "text/csv;charset=utf-8" }), `${base}.csv`) },
+    { label: t("Flows (CSV)"), icon: FileSpreadsheet, run: () => downloadBlob(new Blob([flowCsv(flow, currency)], { type: "text/csv;charset=utf-8" }), `${base}.csv`) },
     {
-      label: "Report (PDF)",
+      label: t("Report (PDF)"),
       icon: FileText,
       run: () => void window.open(`/finance/report?period=${encodeURIComponent(period)}&currency=${encodeURIComponent(currency)}&print=1`, "_blank", "noopener"),
     },
@@ -75,10 +77,10 @@ export function FlowExport({ chart, flow, currency, period }: { chart: RefObject
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-muted transition hover:bg-hover hover:text-fg"
       >
-        <Download className="h-3.5 w-3.5" /> Export
+        <Download className="h-3.5 w-3.5" /> {t("Export")}
       </button>
       {open && (
-        <div role="menu" aria-label="Export the money flow" className="glass absolute top-full right-0 z-30 mt-1 flex w-44 flex-col rounded-xl p-1 text-sm" style={{ background: "var(--dialog)" }}>
+        <div role="menu" aria-label={t("Export the money flow")} className="glass absolute top-full right-0 z-30 mt-1 flex w-44 flex-col rounded-xl p-1 text-sm" style={{ background: "var(--dialog)" }}>
           {items.map((it) => (
             <button key={it.label} type="button" role="menuitem" onClick={() => void run(it.run)} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-hover">
               <it.icon className="h-4 w-4 text-muted" /> {it.label}

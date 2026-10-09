@@ -2,11 +2,13 @@
 
 import { motion } from "framer-motion";
 import type { Tab } from "@/lib/tabs";
+import { useT } from "@/i18n/client";
 
 export function TabBar({ tabs, active, onSelect }: { tabs: Tab[]; active: string; onSelect: (t: Tab) => void }) {
+  const t = useT();
   if (tabs.length < 2) return null;
   return (
-    <nav aria-label="Tabs" className="glass glass-lens -mx-1 flex w-fit max-w-full gap-1 overflow-x-auto rounded-full p-1">
+    <nav aria-label={t("Tabs")} className="glass glass-lens -mx-1 flex w-fit max-w-full gap-1 overflow-x-auto rounded-full p-1">
       {tabs.map((t) => {
         const selected = t.name === active;
         return (

@@ -106,6 +106,8 @@ export type AuthConfig = z.infer<typeof authSchema>;
 export const settingsSchema = z
   .object({
     title: z.string().default("Page"),
+    /** UI language; auto follows the browser (English when it asks for neither). */
+    language: z.enum(["auto", "en", "fr"]).default("auto"),
     description: z.string().optional(),
     /** Image shown next to the title, on the sign-in page and as the app icon (URL or an upload). */
     logo: z.string().optional(),

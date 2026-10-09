@@ -26,8 +26,12 @@ import { fetcher } from "@/lib/fetcher";
 import type { ClientInfoWidget } from "@/lib/config/sanitize";
 import type { CurrencyData, MarketsData, ResourcesData, StatsData, WeatherData } from "@/info/types";
 import { bytes, duration } from "@/integrations/format";
+import { msg } from "@/i18n";
+import { formatLocale } from "@/i18n/format";
+import { useT } from "@/i18n/client";
 
 export function InfoBar({ widgets }: { widgets: ClientInfoWidget[] }) {
+  const t = useT();
   return (
     <div className="flex flex-wrap items-stretch gap-3">
       {widgets.map((w, i) => {
@@ -47,7 +51,7 @@ export function InfoBar({ widgets }: { widgets: ClientInfoWidget[] }) {
           case "currency":
             return <Remote key={i} index={i} interval={3600}>{(d: CurrencyData) => <Currency d={d} />}</Remote>;
           default:
-            return <Chip key={i}><span className="text-sm text-muted">Unknown widget “{w.type}”</span></Chip>;
+            return <Chip key={i}><span className="text-sm text-muted">{t("Unknown widget “")}{w.type}”</span></Chip>;
         }
       })}
     </div>
@@ -75,6 +79,7 @@ function Remote<T>({ index, interval, children }: { index: number; interval: num
 }
 
 function Greeting({ name, hour12, timezone }: { name?: string; hour12: boolean; timezone?: string }) {
+  const t = useT();
   const [now, setNow] = useState<Date>();
   useEffect(() => {
     setNow(new Date());
@@ -86,17 +91,17 @@ function Greeting({ name, hour12, timezone }: { name?: string; hour12: boolean; 
 
   const opts = { timeZone: timezone || undefined };
   const hour = Number(new Intl.DateTimeFormat("en-GB", { ...opts, hour: "numeric", hour12: false }).format(now));
-  const part = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const part = hour < 5 ? t("Good night") : hour < 12 ? t("Good morning") : hour < 18 ? t("Good afternoon") : t("Good evening");
   return (
     <Chip className="mr-auto">
       <div>
         <div className="text-sm text-muted">{name ? `${part}, ${name}` : part}</div>
         <div className="flex items-baseline gap-3">
           <span className="text-2xl font-semibold tabular-nums">
-            {now.toLocaleTimeString([], { ...opts, hour: "2-digit", minute: "2-digit", hour12 })}
+            {now.toLocaleTimeString(formatLocale(), { ...opts, hour: "2-digit", minute: "2-digit", hour12 })}
           </span>
           <span className="text-sm text-muted">
-            {now.toLocaleDateString([], { ...opts, weekday: "long", day: "numeric", month: "long" })}
+            {now.toLocaleDateString(formatLocale(), { ...opts, weekday: "long", day: "numeric", month: "long" })}
           </span>
         </div>
       </div>
@@ -106,14 +111,14 @@ function Greeting({ name, hour12, timezone }: { name?: string; hour12: boolean; 
 
 /** WMO weather interpretation codes, as used by Open-Meteo. */
 function weatherLook(code: number, isDay: boolean): { icon: LucideIcon; text: string } {
-  if (code === 0) return { icon: isDay ? Sun : Moon, text: "Clear" };
-  if (code <= 2) return { icon: isDay ? CloudSun : Cloud, text: "Partly cloudy" };
-  if (code === 3) return { icon: Cloud, text: "Overcast" };
-  if (code <= 48) return { icon: CloudFog, text: "Fog" };
-  if (code <= 57) return { icon: CloudDrizzle, text: "Drizzle" };
-  if (code <= 67 || (code >= 80 && code <= 82)) return { icon: CloudRain, text: "Rain" };
-  if (code <= 77 || code === 85 || code === 86) return { icon: CloudSnow, text: "Snow" };
-  return { icon: CloudLightning, text: "Thunderstorm" };
+  if (code === 0) return { icon: isDay ? Sun : Moon, text: msg("Clear") };
+  if (code <= 2) return { icon: isDay ? CloudSun : Cloud, text: msg("Partly cloudy") };
+  if (code === 3) return { icon: Cloud, text: msg("Overcast") };
+  if (code <= 48) return { icon: CloudFog, text: msg("Fog") };
+  if (code <= 57) return { icon: CloudDrizzle, text: msg("Drizzle") };
+  if (code <= 67 || (code >= 80 && code <= 82)) return { icon: CloudRain, text: msg("Rain") };
+  if (code <= 77 || code === 85 || code === 86) return { icon: CloudSnow, text: msg("Snow") };
+  return { icon: CloudLightning, text: msg("Thunderstorm") };
 }
 
 function Weather({ d }: { d: WeatherData }) {
@@ -153,6 +158,7 @@ function Meter({ icon: MIcon, label, ratio, detail }: { icon: LucideIcon; label:
 }
 
 function Resources({ d, label }: { d: ResourcesData; label?: string }) {
+  const t = useT();
   return (
     <Chip className="flex-wrap">
       {label && <span className="text-sm font-medium">{label}</span>}
@@ -167,7 +173,7 @@ function Resources({ d, label }: { d: ResourcesData; label?: string }) {
             <Thermometer className="h-3.5 w-3.5" /> <span className="text-fg tabular-nums">{Math.round(d.temp)}°C</span>
           </span>
         )}
-        <span>up {duration(d.uptime)}</span>
+        <span>{t("up")}{" "}{duration(d.uptime)}</span>
       </div>
     </Chip>
   );
@@ -191,7 +197,7 @@ function Stats({ d }: { d: StatsData }) {
 
 const money = (n: number, currency: string) => {
   try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: n < 10 ? 4 : 2 }).format(n);
+    return new Intl.NumberFormat(formatLocale(), { style: "currency", currency, maximumFractionDigits: n < 10 ? 4 : 2 }).format(n);
   } catch {
     return `${n.toFixed(2)} ${currency}`;
   }
@@ -228,9 +234,10 @@ function Markets({ d }: { d: MarketsData }) {
 }
 
 function Currency({ d }: { d: CurrencyData }) {
+  const t = useT();
   return (
     <Chip className="flex-wrap gap-x-5" >
-      <span className="text-xs text-muted" title={`ECB reference rates, ${d.date}`}>1 {d.base} =</span>
+      <span className="text-xs text-muted" title={t("ECB reference rates, {date}", { date: d.date })}>1 {d.base} =</span>
       {d.rates.map((r) => (
         <div key={r.symbol}>
           <div className="text-xs font-medium text-muted">{r.symbol}</div>

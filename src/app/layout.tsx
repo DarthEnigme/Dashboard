@@ -3,6 +3,8 @@ import type { CSSProperties, ReactNode } from "react";
 import { loadConfig } from "@/lib/config/load";
 import { glowAmount, glowAttr, paletteCss, resolveTheme, serverAccent } from "@/lib/theme";
 import { buildInfo } from "@/lib/version";
+import { getLocale } from "@/i18n/server";
+import { I18nProvider } from "@/i18n/client";
 import { iconVersion } from "@/lib/logo";
 import { PwaRegister } from "@/components/PwaRegister";
 import { PointerLight } from "@/components/PointerLight";
@@ -24,12 +26,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const viewport: Viewport = { themeColor: "#0b0b14", viewportFit: "cover" };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
   const { settings } = loadConfig();
+  const locale = await getLocale();
   const look = resolveTheme(settings.theme, settings.customThemes);
   return (
     <html
-      lang="en"
+      lang={locale}
       data-theme={look.theme}
       data-tone={look.tone}
       data-palette={look.palette ? "" : undefined}
@@ -42,10 +45,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         {/* Colour theme (Nord, a custom one…); the settings preview rewrites it in place. */}
         <style id="page-palette">{paletteCss(look.palette)}</style>
-        <PointerLight />
-        {children}
-        <PaletteLauncher />
-        <PwaRegister />
+        <I18nProvider locale={locale}>
+          <PointerLight />
+          {children}
+          <PaletteLauncher />
+          <PwaRegister />
+        </I18nProvider>
       </body>
     </html>
   );

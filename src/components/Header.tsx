@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Command, Pencil, Search, Settings, X } from "lucide-react";
 import type { AppSection } from "@/lib/sections";
 import { AppsMenu } from "./AppsMenu";
+import { useT } from "@/i18n/client";
 
 interface Props {
   title: string;
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export function Header({ title, logo, description, query, onQuery, onSubmit, onEdit, showSettings, updateAvailable, sections = [], monitor, account }: Props) {
+  const t = useT();
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -74,12 +76,12 @@ export function Header({ title, logo, description, query, onQuery, onSubmit, onE
             value={query}
             onChange={(e) => onQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && onQuery("")}
-            placeholder="Filter services…"
-            aria-label="Filter services and bookmarks"
+            placeholder={t("Filter services…")}
+            aria-label={t("Filter services and bookmarks")}
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
           />
           {query ? (
-            <button type="button" onClick={() => onQuery("")} aria-label="Clear filter" className="text-muted hover:text-fg">
+            <button type="button" onClick={() => onQuery("")} aria-label={t("Clear filter")} className="text-muted hover:text-fg">
               <X className="h-4 w-4" />
             </button>
           ) : (
@@ -90,8 +92,8 @@ export function Header({ title, logo, description, query, onQuery, onSubmit, onE
           type="button"
           onClick={() => window.dispatchEvent(new Event("page:palette"))}
           className="glass glass-interactive hidden h-11 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-xs text-muted sm:flex"
-          aria-label="Open command palette"
-          title="Command palette (Ctrl+K)"
+          aria-label={t("Open command palette")}
+          title={t("Command palette (Ctrl+K)")}
         >
           <Command className="h-3.5 w-3.5" /> K
         </button>
@@ -99,8 +101,8 @@ export function Header({ title, logo, description, query, onQuery, onSubmit, onE
           <button
             onClick={onEdit}
             className="glass glass-interactive grid h-11 w-11 shrink-0 place-items-center rounded-full"
-            aria-label="Edit dashboard"
-            title="Edit dashboard"
+            aria-label={t("Edit dashboard")}
+            title={t("Edit dashboard")}
           >
             <Pencil className="h-4 w-4" />
           </button>
@@ -111,8 +113,8 @@ export function Header({ title, logo, description, query, onQuery, onSubmit, onE
           <Link
             href={updateAvailable ? "/settings#updates" : "/settings"}
             className="glass glass-interactive grid h-11 w-11 shrink-0 place-items-center rounded-full"
-            aria-label={updateAvailable ? `Settings (update ${updateAvailable} available)` : "Settings"}
-            title={updateAvailable ? `Page ${updateAvailable} is available` : "Settings"}
+            aria-label={updateAvailable ? t("Settings (update {version} available)", { version: updateAvailable }) : t("Settings")}
+            title={updateAvailable ? t("Page {version} is available", { version: updateAvailable }) : t("Settings")}
           >
             <Settings className="h-4 w-4" />
             {updateAvailable && <span aria-hidden className="absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-[var(--page)]" />}

@@ -8,6 +8,7 @@ import type { FieldStatus, WidgetField, WidgetResult } from "@/integrations/type
 import type { TileSize } from "@/lib/config/schema";
 import { FinanceCharts } from "./charts/FinanceCharts";
 import { Sparkline } from "./charts/Sparkline";
+import { useT } from "@/i18n/client";
 import { SeriesCharts } from "./SeriesCharts";
 
 const statusColor: Record<FieldStatus, string> = {
@@ -180,6 +181,7 @@ export function WidgetFields({ id, interval, size, canAct }: Props) {
  * link, so tapping it never opens the service.
  */
 function ControlButton({ field: f, busy, onRun, inline }: { field: WidgetField; busy: boolean; onRun: () => void; inline?: boolean }) {
+  const t = useT();
   const c = f.control!;
   const place = inline ? "relative z-10" : "absolute top-1 right-1 z-10";
   if (c.on === undefined) {
@@ -188,8 +190,8 @@ function ControlButton({ field: f, busy, onRun, inline }: { field: WidgetField; 
         type="button"
         onClick={onRun}
         disabled={busy}
-        aria-label={`${c.label ?? "Run"} ${f.label}`}
-        title={`${c.label ?? "Run"} ${f.label}`}
+        aria-label={`${t(c.label ?? "Run")} ${f.label}`}
+        title={`${t(c.label ?? "Run")} ${f.label}`}
         className={`${place} grid h-5 w-5 place-items-center rounded-full bg-accent/20 text-accent hover:bg-accent hover:text-white disabled:opacity-50`}
       >
         <Play className="h-3 w-3" />
@@ -202,7 +204,7 @@ function ControlButton({ field: f, busy, onRun, inline }: { field: WidgetField; 
       role="switch"
       aria-checked={c.on}
       aria-label={f.label}
-      title={`${c.on ? "Turn off" : "Turn on"} ${f.label}`}
+      title={`${c.on ? t("Turn off") : t("Turn on")} ${f.label}`}
       onClick={onRun}
       disabled={busy}
       className={`${place} flex h-4 w-7 items-center rounded-full p-0.5 transition disabled:opacity-50 ${c.on ? "bg-accent" : "bg-track"}`}

@@ -7,6 +7,7 @@ import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
 import type { FieldSpec } from "@/integrations/fields";
 import { MASK } from "@/lib/config/schema";
+import { useT } from "@/i18n/client";
 
 /** Strings, numbers and booleans, plus string[] for "list" and any YAML value for "yaml". */
 export type FormValue = unknown;
@@ -27,6 +28,9 @@ export function FieldInput({
   onChange: (v: FormValue) => void;
   autoFocus?: boolean;
 }) {
+  const t = useT();
+  // Labels, help and placeholders are English keys: shown in the page's language (untranslated ones stay English).
+  spec = { ...spec, label: t(spec.label), help: spec.help && t(spec.help), placeholder: spec.placeholder && t(spec.placeholder) };
   const id = `f-${spec.key}`;
 
   if (spec.kind === "boolean") {
@@ -69,7 +73,7 @@ export function FieldInput({
   } else if (spec.kind === "select") {
     control = (
       <select id={id} value={String(value ?? "")} onChange={(e) => onChange(e.target.value || undefined)} className={inputClass}>
-        {!spec.required && <option value="">{spec.placeholder ? `${spec.placeholder} (default)` : "—"}</option>}
+        {!spec.required && <option value="">{spec.placeholder ? t("{value} (default)", { value: spec.placeholder }) : "—"}</option>}
         {spec.options?.map((o) => (
           <option key={o} value={o}>
             {o}
@@ -116,7 +120,7 @@ export function FieldInput({
         step="any"
         required={spec.required && !isMasked}
         value={isMasked ? "" : String(value ?? "")}
-        placeholder={isMasked ? "•••••••• (unchanged)" : spec.placeholder}
+        placeholder={isMasked ? t("•••••••• (unchanged)") : spec.placeholder}
         autoComplete={spec.secret ? "new-password" : "off"}
         onChange={(e) => {
           const v = e.target.value;
@@ -142,6 +146,7 @@ export function FieldInput({
 
 /** public / users / admins, or a list of groups (visible: [family, media]). */
 function AudienceInput({ id, value, onChange }: { id: string; value: unknown; onChange: (v: FormValue) => void }) {
+  const t = useT();
   const { data: groups } = useSWR<{ id: number; name: string }[]>("/api/groups", fetcher);
   const picked = Array.isArray(value) ? (value as string[]) : undefined;
   const mode = picked ? "groups" : typeof value === "string" ? value : "";
@@ -156,14 +161,14 @@ function AudienceInput({ id, value, onChange }: { id: string; value: unknown; on
         }}
         className={inputClass}
       >
-        <option value="">public (default)</option>
-        <option value="users">users</option>
-        <option value="admins">admins</option>
-        <option value="groups">specific groups…</option>
+        <option value="">{t("public (default)")}</option>
+        <option value="users">{t("users")}</option>
+        <option value="admins">{t("admins")}</option>
+        <option value="groups">{t("specific groups…")}</option>
       </select>
       {picked && (
         <div className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-xl border border-line px-3 py-2 text-sm">
-          {groups?.length === 0 && <span className="text-xs text-muted">No groups yet: create them in Settings → Accounts & sign-in.</span>}
+          {groups?.length === 0 && <span className="text-xs text-muted">{t("No groups yet: create them in Settings → Accounts & sign-in.")}</span>}
           {[...new Set([...(groups ?? []).map((g) => g.name), ...picked])].map((name) => (
             <label key={name} className="flex cursor-pointer items-center gap-1.5">
               <input
@@ -176,7 +181,7 @@ function AudienceInput({ id, value, onChange }: { id: string; value: unknown; on
                 }}
               />
               {name}
-              {!groups?.some((g) => g.name.toLowerCase() === name.toLowerCase()) && groups && <span className="text-xs text-[var(--warn)]">(no such group)</span>}
+              {!groups?.some((g) => g.name.toLowerCase() === name.toLowerCase()) && groups && <span className="text-xs text-[var(--warn)]">{t("(no such group)")}</span>}
             </label>
           ))}
         </div>
@@ -197,6 +202,7 @@ export async function uploadFile(endpoint: string, file: File): Promise<string> 
 
 /** A URL field with a thumbnail, an upload button and a clear button. */
 function ImageInput({ id, value, placeholder, upload, onChange }: { id: string; value: unknown; placeholder?: string; upload?: string; onChange: (v: FormValue) => void }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const url = typeof value === "string" ? value : "";
@@ -222,7 +228,7 @@ function ImageInput({ id, value, placeholder, upload, onChange }: { id: string; 
         <input id={id} value={url} placeholder={placeholder} onChange={(e) => onChange(e.target.value || undefined)} className={inputClass} />
         {upload && (
           <label className={`flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl bg-track px-3 text-sm hover:bg-hover ${busy ? "pointer-events-none opacity-60" : ""}`}>
-            <Upload className="h-4 w-4" /> {busy ? "Uploading…" : "Upload"}
+            <Upload className="h-4 w-4" /> {busy ? t("Uploading…") : t("Upload")}
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
@@ -235,7 +241,7 @@ function ImageInput({ id, value, placeholder, upload, onChange }: { id: string; 
           </label>
         )}
         {url && (
-          <button type="button" onClick={() => onChange(undefined)} aria-label="Remove image" title="Remove image" className="shrink-0 rounded-lg p-2 text-muted hover:bg-hover hover:text-fg">
+          <button type="button" onClick={() => onChange(undefined)} aria-label={t("Remove image")} title={t("Remove image")} className="shrink-0 rounded-lg p-2 text-muted hover:bg-hover hover:text-fg">
             <X className="h-4 w-4" />
           </button>
         )}

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import type { FieldSpec } from "@/integrations/fields";
 import { Dialog } from "./Dialog";
+import { useT } from "@/i18n/client";
 import { FieldInput, type FormValue } from "./FieldInput";
 
 type Obj = Record<string, unknown>;
@@ -32,13 +33,14 @@ interface Props {
 
 /** Generic form over dot-path fields; unknown keys on `initial` are preserved. */
 export function FieldsDialog({ title, fields, initial, onClose, onSave, extra }: Props) {
+  const t = useT();
   const [value, setValue] = useState<Obj>(initial);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     const missing = fields.find((f) => f.required && (getPath(value, f.key) ?? "") === "");
-    if (missing) return setError(`${missing.label} is required`);
+    if (missing) return setError(t("{field} is required", { field: t(missing.label) }));
     setBusy(true);
     try {
       await onSave(value);

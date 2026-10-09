@@ -16,6 +16,10 @@ import { MetricsSection } from "./MetricsSection";
 import { ActionMenu } from "./ActionMenu";
 import { LineChart } from "./charts/LineChart";
 import { Legend, Tooltip, useWidth } from "./charts/common";
+import { msg } from "@/i18n";
+import { dateTime } from "@/i18n/format";
+import { formatLocale } from "@/i18n/format";
+import { useT } from "@/i18n/client";
 
 interface HistoryData {
   range: Range;
@@ -32,8 +36,8 @@ const pctText = (u: number | null) => (u === null ? "–" : `${(u * 100).toFixed
 function formatTime(range: Range) {
   return (t: number) =>
     range === "24h"
-      ? new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-      : new Date(t).toLocaleDateString([], { month: "short", day: "numeric", ...(range === "7d" ? { hour: "2-digit" } : {}) });
+      ? new Date(t).toLocaleTimeString(formatLocale(), { hour: "2-digit", minute: "2-digit" })
+      : new Date(t).toLocaleDateString(formatLocale(), { month: "short", day: "numeric", ...(range === "7d" ? { hour: "2-digit" } : {}) });
 }
 
 interface Props {
@@ -44,6 +48,7 @@ interface Props {
 }
 
 export function ServiceDetail({ service: s, group, settings, canAct }: Props) {
+  const t = useT();
   const [range, setRange] = useState<Range>("24h");
   const { data, isLoading } = useSWR<HistoryData>(
     s.ping ? `/api/history/${encodeURIComponent(s.id)}?range=${range}&incidents=1` : null,
@@ -56,7 +61,7 @@ export function ServiceDetail({ service: s, group, settings, canAct }: Props) {
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 lg:py-12">
       <Link href="/" className="flex w-fit items-center gap-1.5 text-sm text-muted hover:text-fg">
-        <ArrowLeft className="h-4 w-4" /> Dashboard
+        <ArrowLeft className="h-4 w-4" /> {t("Dashboard")}
       </Link>
 
       <header className="glass flex flex-wrap items-center gap-4 rounded-3xl p-5">
@@ -75,14 +80,14 @@ export function ServiceDetail({ service: s, group, settings, canAct }: Props) {
             rel="noreferrer"
             className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-accent/30 hover:brightness-110"
           >
-            Open <ExternalLink className="h-4 w-4" />
+            {t("Open")}{" "}<ExternalLink className="h-4 w-4" />
           </a>
         )}
       </header>
 
       {s.widget && (
         <section className="glass flex flex-col gap-3 rounded-3xl p-5">
-          <h2 className="text-sm font-semibold tracking-wider text-muted uppercase">Live data</h2>
+          <h2 className="text-sm font-semibold tracking-wider text-muted uppercase">{t("Live data")}</h2>
           <WidgetFields id={s.id} interval={settings.refreshInterval} size="detail" canAct={!!(canAct && s.actions)} />
         </section>
       )}
@@ -92,8 +97,8 @@ export function ServiceDetail({ service: s, group, settings, canAct }: Props) {
       {s.ping ? (
         <section className="glass flex flex-col gap-5 rounded-3xl p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold tracking-wider text-muted uppercase">Availability</h2>
-            <div className="flex rounded-full bg-chip p-1 text-sm" role="tablist" aria-label="Time range">
+            <h2 className="text-sm font-semibold tracking-wider text-muted uppercase">{t("Availability")}</h2>
+            <div className="flex rounded-full bg-chip p-1 text-sm" role="tablist" aria-label={t("Time range")}>
               {RANGES.map((r) => (
                 <button
                   key={r}
@@ -109,11 +114,11 @@ export function ServiceDetail({ service: s, group, settings, canAct }: Props) {
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Uptime" value={pctText(data?.uptime ?? null)} />
-            <Stat label="Avg response" value={data?.avgLatency == null ? "–" : `${data.avgLatency} ms`} />
+            <Stat label={t("Uptime")} value={pctText(data?.uptime ?? null)} />
+            <Stat label={t("Avg response")} value={data?.avgLatency == null ? "–" : `${data.avgLatency} ms`} />
             <Stat label="95th percentile" value={data?.p95Latency == null ? "–" : `${data.p95Latency} ms`} />
             <Stat
-              label="Incidents"
+              label={t("Incidents")}
               value={data ? String(data.incidents.length) : "–"}
               note={ongoing ? "1 ongoing" : undefined}
             />
@@ -122,50 +127,50 @@ export function ServiceDetail({ service: s, group, settings, canAct }: Props) {
           {data && <AvailabilityBars buckets={data.buckets} format={fmt} />}
 
           <div>
-            <h3 className="mb-2 text-sm font-medium">Response time</h3>
+            <h3 className="mb-2 text-sm font-medium">{t("Response time")}</h3>
             {data && data.buckets.some((b) => b.avgLatency !== null) ? (
               <LineChart
                 x={data.buckets.map((b) => b.start)}
                 series={[
-                  { name: "Average", color: "var(--series-1)", values: data.buckets.map((b) => b.avgLatency) },
+                  { name: t("Average"), color: "var(--series-1)", values: data.buckets.map((b) => b.avgLatency) },
                   { name: "95th percentile", color: "var(--series-2)", values: data.buckets.map((b) => b.p95Latency) },
                 ]}
                 unit=" ms"
                 formatX={fmt}
-                ariaLabel={`Response time over the last ${range}`}
+                ariaLabel={t("Response time over the last {range}", { range })}
               />
             ) : (
-              <p className="py-10 text-center text-sm text-muted">{isLoading ? "Loading…" : "No measurements in this range yet."}</p>
+              <p className="py-10 text-center text-sm text-muted">{isLoading ? t("Loading…") : t("No measurements in this range yet.")}</p>
             )}
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-medium">Incidents</h3>
+            <h3 className="mb-2 text-sm font-medium">{t("Incidents")}</h3>
             {data?.incidents.length ? (
               <ol className="flex flex-col gap-1.5">
                 {data.incidents.map((i) => (
                   <li key={i.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-xl bg-chip px-3 py-2 text-sm">
                     {i.end === null ? (
-                      <CircleAlert className="h-4 w-4 shrink-0 text-[var(--err)]" aria-label="Ongoing" />
+                      <CircleAlert className="h-4 w-4 shrink-0 text-[var(--err)]" aria-label={t("Ongoing")} />
                     ) : (
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--ok)]" aria-label="Resolved" />
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--ok)]" aria-label={t("Resolved")} />
                     )}
-                    <span className="font-medium">{i.end === null ? "Down now" : "Outage"}</span>
-                    <span className="text-muted">{new Date(i.start).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>
+                    <span className="font-medium">{i.end === null ? t("Down now") : t("Outage")}</span>
+                    <span className="text-muted">{dateTime(i.start)}</span>
                     <span className="text-muted">
-                      {i.end === null ? `for ${duration((Date.now() - i.start) / 1000)}` : `lasted ${duration((i.end - i.start) / 1000)}`}
+                      {i.end === null ? t("for {time}", { time: duration((Date.now() - i.start) / 1000) }) : t("lasted {time}", { time: duration((i.end - i.start) / 1000) })}
                     </span>
                     {i.cause && <span className="ml-auto text-xs text-muted">{i.cause}</span>}
                   </li>
                 ))}
               </ol>
             ) : (
-              <p className="text-sm text-muted">No outages in this range.</p>
+              <p className="text-sm text-muted">{t("No outages in this range.")}</p>
             )}
           </div>
         </section>
       ) : (
-        <p className="glass rounded-3xl p-5 text-sm text-muted">Turn on a status check for this service to see its availability history.</p>
+        <p className="glass rounded-3xl p-5 text-sm text-muted">{t("Turn on a status check for this service to see its availability history.")}</p>
       )}
     </main>
   );
@@ -183,15 +188,16 @@ function Stat({ label, value, note }: { label: string; value: string; note?: str
 
 const status = (u: number | null) =>
   u === null
-    ? { color: "var(--track)", label: "No data" }
+    ? { color: "var(--track)", label: msg("No data") }
     : u >= 0.999
-      ? { color: "var(--ok)", label: "Up" }
+      ? { color: "var(--ok)", label: msg("Up") }
       : u >= 0.9
-        ? { color: "var(--warn)", label: "Degraded" }
-        : { color: "var(--err)", label: "Down" };
+        ? { color: "var(--warn)", label: msg("Degraded") }
+        : { color: "var(--err)", label: msg("Down") };
 
 /** One bar per bucket, colored by status; the legend names each state so color is never alone. */
 function AvailabilityBars({ buckets, format }: { buckets: Bucket[]; format: (t: number) => string }) {
+  const t = useT();
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number>();
   const gap = 2;
@@ -200,15 +206,15 @@ function AvailabilityBars({ buckets, format }: { buckets: Bucket[]; format: (t: 
     <div className="flex flex-col gap-2">
       <Legend
         items={[
-          { label: "Up", color: "var(--ok)" },
-          { label: "Degraded (90–99.9%)", color: "var(--warn)" },
-          { label: "Down (<90%)", color: "var(--err)" },
-          { label: "No data", color: "var(--track)" },
+          { label: t("Up"), color: "var(--ok)" },
+          { label: t("Degraded (90–99.9%)"), color: "var(--warn)" },
+          { label: t("Down (<90%)"), color: "var(--err)" },
+          { label: t("No data"), color: "var(--track)" },
         ]}
       />
       <div ref={ref} className="relative h-10" onPointerLeave={() => setHover(undefined)}>
         {width > 0 && (
-          <svg width={width} height={40} role="img" aria-label="Availability per time slot">
+          <svg width={width} height={40} role="img" aria-label={t("Availability per time slot")}>
             {buckets.map((b, i) => (
               <rect
                 key={b.start}
@@ -231,7 +237,7 @@ function AvailabilityBars({ buckets, format }: { buckets: Bucket[]; format: (t: 
               {status(buckets[hover].uptime).label}
               {buckets[hover].uptime !== null && ` · ${pctText(buckets[hover].uptime)}`}
             </div>
-            <div className="text-muted">{buckets[hover].checks} checks</div>
+            <div className="text-muted">{buckets[hover].checks} {t("checks")}</div>
           </Tooltip>
         )}
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatLocale } from "@/i18n/format";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /** Width of a container, for drawing SVG in real pixels (crisp 1px gridlines, unscaled text). */
@@ -47,7 +48,7 @@ export function compact(n: number): string {
   if (a >= 1e9) return `${(n / 1e9).toFixed(a >= 1e10 ? 0 : 1)}G`;
   if (a >= 1e6) return `${(n / 1e6).toFixed(a >= 1e7 ? 0 : 1)}M`;
   if (a >= 1e4) return `${(n / 1e3).toFixed(a >= 1e5 ? 0 : 1)}K`;
-  return Math.round(n).toLocaleString("en-US");
+  return Math.round(n).toLocaleString(formatLocale());
 }
 
 export interface LegendItem {

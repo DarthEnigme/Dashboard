@@ -8,11 +8,13 @@ import { fetcher, sendJson } from "@/lib/fetcher";
 import type { ClientService } from "@/lib/config/sanitize";
 import type { ServiceAction } from "@/integrations/types";
 import { Dialog } from "./edit/Dialog";
+import { useT } from "@/i18n/client";
 
 const icons: Record<string, typeof Play> = { start: Play, stop: Square, shutdown: Power, restart: RotateCw, reboot: RotateCw, snapshot: Camera };
 
 /** Admin-only ⋯ menu: lists the actions the integration offers right now, confirms, runs. */
 export function ActionMenu({ service }: { service: ClientService }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [actions, setActions] = useState<ServiceAction[]>();
   const [error, setError] = useState<string>();
@@ -68,7 +70,7 @@ export function ActionMenu({ service }: { service: ClientService }) {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Actions for ${service.name}`}
+        aria-label={t("Actions for {name}", { name: service.name })}
         className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-hover hover:text-fg"
       >
         <MoreHorizontal className="h-4 w-4" />
@@ -86,11 +88,11 @@ export function ActionMenu({ service }: { service: ClientService }) {
           >
             {!actions && !error && (
               <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                <Loader2 className="h-4 w-4 animate-spin" /> {t("Loading…")}
               </div>
             )}
             {error && <div className="px-3 py-2 text-sm text-[var(--err)]">{error}</div>}
-            {actions?.length === 0 && <div className="px-3 py-2 text-sm text-muted">No actions available.</div>}
+            {actions?.length === 0 && <div className="px-3 py-2 text-sm text-muted">{t("No actions available.")}</div>}
             {[...groups].map(([label, list]) => (
               <div key={label} className="py-0.5">
                 {label && <div className="px-3 pt-1.5 pb-0.5 text-[11px] font-semibold tracking-wide text-muted uppercase">{label}</div>}
@@ -100,14 +102,14 @@ export function ActionMenu({ service }: { service: ClientService }) {
                     <button
                       key={`${a.target}|${a.id}`}
                       role="menuitem"
-                      aria-label={a.targetLabel ? `${a.label} ${a.targetLabel}` : a.label}
+                      aria-label={a.targetLabel ? `${t(a.label)} ${a.targetLabel}` : t(a.label)}
                       onClick={() => {
                         setOpen(false);
                         setConfirm(a);
                       }}
                       className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm hover:bg-hover ${a.danger ? "text-[var(--err)]" : ""}`}
                     >
-                      <ActionIcon className="h-4 w-4" /> {a.label}
+                      <ActionIcon className="h-4 w-4" /> {t(a.label)}
                     </button>
                   );
                 })}
@@ -119,18 +121,18 @@ export function ActionMenu({ service }: { service: ClientService }) {
 
       {confirm && (
         <Dialog
-          title={`${confirm.label} ${confirm.targetLabel ?? service.name}?`}
-          submitLabel={confirm.label}
+          title={`${t(confirm.label)} ${confirm.targetLabel ?? service.name}?`}
+          submitLabel={t(confirm.label)}
           busy={busy}
           onClose={() => setConfirm(undefined)}
           onSubmit={run}
         >
           <p className="text-sm text-muted">
             {confirm.danger
-              ? "This cuts power without a clean shutdown and can lose unsaved data."
+              ? t("This cuts power without a clean shutdown and can lose unsaved data.")
               : confirm.id === "snapshot"
-                ? `This takes a snapshot of ${confirm.targetLabel ?? service.name} now (named page-<date>).`
-                : `This will ${confirm.label.toLowerCase()} ${confirm.targetLabel ?? service.name} now.`}
+                ? t("This takes a snapshot of {name} now (named page-<date>).", { name: confirm.targetLabel ?? service.name })
+                : t("{action} {name} now?", { action: t(confirm.label), name: confirm.targetLabel ?? service.name })}
           </p>
         </Dialog>
       )}

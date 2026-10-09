@@ -7,9 +7,11 @@ import { Donut } from "./Donut";
 import { Bars } from "./Bars";
 import { LineChart } from "./LineChart";
 import { Sankey } from "./Sankey";
+import { useT } from "@/i18n/client";
 
 /** Which finance charts a tile shows grows with its size: wide adds the donut, tall the bars, large all three. */
 export function FinanceCharts({ charts, size }: { charts: WidgetCharts; size: TileSize | "detail" }) {
+  const t = useT();
   const cur = charts.currency;
   const sankey = charts.main === "sankey" && !!charts.flow && size !== "small" && size !== "tall";
   const showDonut = size !== "small" && !sankey;
@@ -27,31 +29,31 @@ export function FinanceCharts({ charts, size }: { charts: WidgetCharts; size: Ti
           total={money(spent, cur)}
           size={size === "wide" ? 112 : 128}
           compact={size === "wide" || size === "tall"}
-          ariaLabel="Spending by category"
+          ariaLabel={t("Spending by category")}
         />
       )}
       {showBars && months.length > 0 && (
         <Bars
           groups={months.map((m) => ({ label: monthLabel(m.month), values: [m.income / 100, m.expense / 100] }))}
           series={[
-            { name: "Income", color: "var(--series-1)" },
-            { name: "Spent", color: "var(--series-2)" },
+            { name: t("Income"), color: "var(--series-1)" },
+            { name: t("Spent"), color: "var(--series-2)" },
           ]}
           height={size === "tall" ? 150 : 170}
           format={(v) => money(Math.round(v * 100), cur)}
-          ariaLabel="Income and spending per month"
+          ariaLabel={t("Income and spending per month")}
         />
       )}
       {showBalance && charts.balance && charts.balance.length > 1 && (
         <div>
-          <div className="mb-1 text-xs font-medium text-muted">Balance</div>
+          <div className="mb-1 text-xs font-medium text-muted">{t("Balance")}</div>
           <LineChart
             x={charts.balance.map((b) => Date.parse(`${b.month}-01T00:00:00Z`))}
-            series={[{ name: "Balance", color: "var(--series-1)", values: charts.balance.map((b) => b.cents / 100) }]}
+            series={[{ name: t("Balance"), color: "var(--series-1)", values: charts.balance.map((b) => b.cents / 100) }]}
             height={140}
             area
             formatX={(t) => monthLabel(new Date(t).toISOString().slice(0, 7), true)}
-            ariaLabel="Balance at the end of each month"
+            ariaLabel={t("Balance at the end of each month")}
           />
         </div>
       )}

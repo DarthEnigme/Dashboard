@@ -2,15 +2,18 @@
 
 import { useState } from "react";
 import type { WidgetSpark } from "@/integrations/types";
+import { useT } from "@/i18n/client";
+import { formatLocale } from "@/i18n/format";
 import { useWidth } from "./common";
 
 const HEIGHT = 36;
 const PAD = 3;
 
-const fmt = (n: number) => (Math.abs(n) >= 100 ? Math.round(n).toLocaleString("en-US") : n.toFixed(1));
+const fmt = (n: number) => (Math.abs(n) >= 100 ? Math.round(n).toLocaleString(formatLocale()) : n.toFixed(1));
 
 /** One metric's recent trend: 2px line with a light wash, crosshair and value on hover. */
 export function Sparkline({ spark }: { spark: WidgetSpark }) {
+  const t = useT();
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number>();
   const { values } = spark;
@@ -34,7 +37,7 @@ export function Sparkline({ spark }: { spark: WidgetSpark }) {
       {/* Sits above the card's stretched title link so hovering works. */}
       <div ref={ref} className="relative z-10" style={{ height: HEIGHT }}>
         {width > 0 && values.length > 0 && (
-          <svg width={width} height={HEIGHT} role="img" aria-label={`${spark.label}, latest ${spark.current}`} className="overflow-visible">
+          <svg width={width} height={HEIGHT} role="img" aria-label={t("{label}, latest {value}", { label: spark.label, value: spark.current })} className="overflow-visible">
             <line x1={0} x2={width} y1={HEIGHT - PAD} y2={HEIGHT - PAD} stroke="var(--axis)" strokeWidth={1} />
             <path d={`${line} L${px(values.length - 1)},${HEIGHT - PAD} L${px(0)},${HEIGHT - PAD} Z`} fill="var(--series-1)" opacity={0.14} />
             <path d={line} fill="none" stroke="var(--series-1)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />

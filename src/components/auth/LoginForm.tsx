@@ -6,6 +6,7 @@ import { sendJson } from "@/lib/fetcher";
 import type { ClientAuth } from "@/lib/auth";
 import { Icon } from "../Icon";
 import { inputClass } from "../edit/FieldInput";
+import { useT } from "@/i18n/client";
 
 const providerIcon = (type: string) => (type === "google" ? "si-google" : type === "github" ? "si-github" : undefined);
 
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function LoginForm({ title, logo, methods, error: initialError, canGoBack }: Props) {
+  const t = useT();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -57,8 +59,8 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
         // eslint-disable-next-line @next/next/no-img-element
         <img src={logo} alt="" className="mb-4 h-14 w-14 rounded-2xl object-contain" />
       )}
-      <h1 className="text-2xl font-bold tracking-tight">Sign in</h1>
-      <p className="mb-6 text-sm text-muted">to {title}</p>
+      <h1 className="text-2xl font-bold tracking-tight">{t("Sign in")}</h1>
+      <p className="mb-6 text-sm text-muted">{t("to")}{" "}{title}</p>
 
       {error && (
         <p role="alert" className="mb-4 rounded-xl bg-[var(--err)]/15 px-3 py-2 text-sm text-[var(--err)]">
@@ -69,10 +71,10 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
       {ticket && (
         <form onSubmit={submit} className="flex flex-col gap-3">
           <p className="flex items-center gap-2 text-sm">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-accent" /> Enter the code from your authenticator app.
+            <ShieldCheck className="h-4 w-4 shrink-0 text-accent" /> {t("Enter the code from your authenticator app.")}
           </p>
           <label className="flex flex-col gap-1.5 text-xs font-medium text-muted">
-            Code
+            {t("Code")}
             <input
               autoFocus
               autoComplete="one-time-code"
@@ -83,17 +85,17 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
               className={`${inputClass} text-center font-mono text-lg tracking-[0.3em]`}
             />
           </label>
-          <p className="text-xs text-muted">Lost your phone? Enter one of your recovery codes instead.</p>
+          <p className="text-xs text-muted">{t("Lost your phone? Enter one of your recovery codes instead.")}</p>
           <button
             type="submit"
             disabled={busy || !code.trim()}
             className="mt-2 flex h-10 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:brightness-110 disabled:opacity-60"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            Verify
+            {t("Verify")}
           </button>
           <button type="button" onClick={() => (setTicket(undefined), setCode(""))} className="text-sm text-muted hover:text-fg">
-            Use another account
+            {t("Use another account")}
           </button>
         </form>
       )}
@@ -101,7 +103,7 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
       {passwordLogin && !ticket && (
         <form onSubmit={submit} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1.5 text-xs font-medium text-muted">
-            Username
+            {t("Username")}
             <input
               autoFocus
               autoComplete="username"
@@ -111,7 +113,7 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
             />
           </label>
           <label className="flex flex-col gap-1.5 text-xs font-medium text-muted">
-            Password
+            {t("Password")}
             <input
               type="password"
               autoComplete="current-password"
@@ -122,7 +124,7 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
           </label>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
-            Keep me signed in for 30 days
+            {t("Keep me signed in for 30 days")}
           </label>
           <button
             type="submit"
@@ -130,7 +132,7 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
             className="mt-2 flex h-10 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:brightness-110 disabled:opacity-60"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            Sign in
+            {t("Sign in")}
           </button>
         </form>
       )}
@@ -139,7 +141,7 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
         <>
           {passwordLogin && (
             <div className="my-5 flex items-center gap-3 text-xs text-muted">
-              <span className="h-px flex-1 bg-track" /> or <span className="h-px flex-1 bg-track" />
+              <span className="h-px flex-1 bg-track" /> {t("or")}{" "}<span className="h-px flex-1 bg-track" />
             </div>
           )}
           <div className="flex flex-col gap-2">
@@ -150,7 +152,7 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
                 className="flex h-10 items-center justify-center gap-2.5 rounded-xl border border-line bg-chip text-sm font-medium transition hover:bg-hover"
               >
                 {providerIcon(p.type) ? <Icon icon={providerIcon(p.type)} name={p.label} size={18} /> : <KeyRound className="h-4 w-4" />}
-                Continue with {p.label}
+                {t("Continue with")}{" "}{p.label}
               </a>
             ))}
           </div>
@@ -158,12 +160,12 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
       )}
 
       {!passwordLogin && !methods.providers.length && (
-        <p className="text-sm text-muted">No login method is enabled. Configure one under auth: in settings.yaml.</p>
+        <p className="text-sm text-muted">{t("No login method is enabled. Configure one under auth: in settings.yaml.")}</p>
       )}
 
       {canGoBack && (
         <a href="/" className="mt-6 flex items-center gap-1.5 text-sm text-muted hover:text-fg">
-          <ArrowLeft className="h-4 w-4" /> Back to dashboard
+          <ArrowLeft className="h-4 w-4" /> {t("Back to dashboard")}
         </a>
       )}
     </div>

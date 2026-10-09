@@ -5,6 +5,7 @@ import { FileUp, TriangleAlert } from "lucide-react";
 import { sendJson } from "@/lib/fetcher";
 import { Dialog } from "./Dialog";
 import { inputClass } from "./FieldInput";
+import { useT } from "@/i18n/client";
 
 const NAMES = ["services", "bookmarks", "settings", "widgets", "docker"] as const;
 type Files = Partial<Record<(typeof NAMES)[number], string>>;
@@ -19,6 +20,7 @@ interface Summary {
 
 /** Pick (or paste) Homepage YAML files, preview what converts, then replace or merge. */
 export function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const t = useT();
   const [files, setFiles] = useState<Files>({});
   const [mode, setMode] = useState<"merge" | "replace">("merge");
   const [summary, setSummary] = useState<Summary>();
@@ -62,19 +64,19 @@ export function ImportDialog({ onClose, onImported }: { onClose: () => void; onI
   const loaded = NAMES.filter((n) => files[n]?.trim());
 
   return (
-    <Dialog title="Import from Homepage" onClose={onClose} onSubmit={submit} submitLabel={summary ? "Import" : "Preview"} error={error} busy={busy}>
+    <Dialog title={t("Import from Homepage")} onClose={onClose} onSubmit={submit} submitLabel={summary ? t("Import") : t("Preview")} error={error} busy={busy}>
       <p className="text-sm text-muted">
-        Choose the YAML files from your gethomepage.dev <code>config</code> folder (services, bookmarks, settings, widgets, docker).
+        {t("Choose the YAML files from your gethomepage.dev")}{" "}<code>{t("config")}</code> {t("folder (services, bookmarks, settings, widgets, docker).")}
       </p>
       <label className="flex w-fit cursor-pointer items-center gap-2 rounded-full bg-chip px-4 py-2 text-sm hover:bg-hover">
-        <FileUp className="h-4 w-4" /> Choose files
+        <FileUp className="h-4 w-4" /> {t("Choose files")}
         <input type="file" multiple accept=".yaml,.yml" className="sr-only" onChange={(e) => pick(e.target.files)} />
       </label>
-      {loaded.length > 0 && <p className="text-xs text-muted">Loaded: {loaded.map((n) => `${n}.yaml`).join(", ")}</p>}
+      {loaded.length > 0 && <p className="text-xs text-muted">{t("Loaded:")}{" "}{loaded.map((n) => `${n}.yaml`).join(", ")}</p>}
       <details className="text-sm">
-        <summary className="cursor-pointer text-muted">…or paste services.yaml</summary>
+        <summary className="cursor-pointer text-muted">{t("…or paste services.yaml")}</summary>
         <textarea
-          aria-label="services.yaml"
+          aria-label={t("services.yaml")}
           rows={6}
           value={files.services ?? ""}
           onChange={(e) => {
@@ -88,7 +90,7 @@ export function ImportDialog({ onClose, onImported }: { onClose: () => void; onI
       {summary && (
         <div className="flex flex-col gap-3 rounded-xl bg-chip p-3 text-sm">
           <p>
-            {summary.services} services in {summary.groups} groups, {summary.bookmarks} bookmark groups, {summary.widgets} info widgets.
+            {summary.services} {t("services in")}{" "}{summary.groups} {t("groups,")}{" "}{summary.bookmarks} {t("bookmark groups,")}{" "}{summary.widgets} {t("info widgets.")}
           </p>
           {summary.warnings.length > 0 && (
             <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto text-xs text-[var(--warn)]">
@@ -100,16 +102,16 @@ export function ImportDialog({ onClose, onImported }: { onClose: () => void; onI
             </ul>
           )}
           <fieldset className="flex flex-col gap-1.5">
-            <legend className="mb-1 text-xs font-medium text-muted">How to import</legend>
+            <legend className="mb-1 text-xs font-medium text-muted">{t("How to import")}</legend>
             <label className="flex items-center gap-2">
               <input type="radio" checked={mode === "merge"} onChange={() => setMode("merge")} className="accent-[var(--accent)]" />
-              Merge: keep my groups, add the new ones
+              {t("Merge: keep my groups, add the new ones")}
             </label>
             <label className="flex items-center gap-2">
               <input type="radio" checked={mode === "replace"} onChange={() => setMode("replace")} className="accent-[var(--accent)]" />
-              Replace my services, bookmarks and info bar
+              {t("Replace my services, bookmarks and info bar")}
             </label>
-            <p className="text-xs text-muted">Settings are merged either way. Every change can be undone from History.</p>
+            <p className="text-xs text-muted">{t("Settings are merged either way. Every change can be undone from History.")}</p>
           </fieldset>
         </div>
       )}

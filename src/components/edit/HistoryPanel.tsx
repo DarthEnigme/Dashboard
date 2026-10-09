@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import type { DiffPart, Version } from "@/lib/config/history";
+import { useT } from "@/i18n/client";
 
 const FILES = ["all", "services", "settings", "bookmarks", "widgets"] as const;
 
@@ -12,6 +13,7 @@ const when = (ts: number) =>
 
 /** Config snapshots: each one is a file as it was just before someone changed it. */
 export function HistoryPanel({ onRestored }: { onRestored: () => void }) {
+  const t = useT();
   const [file, setFile] = useState<(typeof FILES)[number]>("all");
   const [versions, setVersions] = useState<Version[]>();
   const [selected, setSelected] = useState<number>();
@@ -36,7 +38,7 @@ export function HistoryPanel({ onRestored }: { onRestored: () => void }) {
     if (!detail) return;
     try {
       await sendJson(`/api/config/history/${detail.id}`, "POST");
-      setMsg({ text: `Restored ${detail.file}.yaml as of ${when(detail.ts)}.` });
+      setMsg({ text: t("Restored {file}.yaml as of {when}.", { file: detail.file, when: when(detail.ts) }) });
       await load();
       onRestored();
     } catch (e) {
@@ -49,7 +51,7 @@ export function HistoryPanel({ onRestored }: { onRestored: () => void }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-        <h2 className="text-sm font-semibold tracking-wider text-muted uppercase">Config history</h2>
+        <h2 className="text-sm font-semibold tracking-wider text-muted uppercase">{t("Config history")}</h2>
         <div className="flex rounded-full bg-chip p-1 text-sm">
           {FILES.map((f) => (
             <button
@@ -69,16 +71,16 @@ export function HistoryPanel({ onRestored }: { onRestored: () => void }) {
       )}
       <div className="grid gap-3 md:grid-cols-[18rem_1fr]">
         <ol className="glass flex max-h-[32rem] flex-col gap-1 overflow-y-auto rounded-2xl p-2">
-          {versions?.length === 0 && <li className="p-3 text-sm text-muted">No changes recorded yet.</li>}
+          {versions?.length === 0 && <li className="p-3 text-sm text-muted">{t("No changes recorded yet.")}</li>}
           {versions?.map((v) => (
             <li key={v.id}>
               <button
                 onClick={() => setSelected(v.id)}
                 className={`w-full rounded-xl px-3 py-2 text-left text-sm ${selected === v.id ? "bg-accent/20" : "hover:bg-hover"}`}
               >
-                <div className="font-medium">{v.file}.yaml</div>
+                <div className="font-medium">{v.file}{t(".yaml")}</div>
                 <div className="text-xs text-muted">
-                  before {v.user ?? "someone"}’s change · {when(v.ts)}
+                  {t("before")}{" "}{v.user ?? "someone"}{t("’s change ·")}{" "}{when(v.ts)}
                 </div>
               </button>
             </li>
@@ -86,19 +88,19 @@ export function HistoryPanel({ onRestored }: { onRestored: () => void }) {
         </ol>
         <div className="glass min-w-0 rounded-2xl p-4">
           {!detail ? (
-            <p className="text-sm text-muted">Select a version to see what restoring it would change.</p>
+            <p className="text-sm text-muted">{t("Select a version to see what restoring it would change.")}</p>
           ) : (
             <>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-muted">
-                  Restoring {detail.file}.yaml from {when(detail.ts)}: {changes ? `${changes} changed block${changes > 1 ? "s" : ""}` : "identical to now"}
+                  {t("Restoring {file}.yaml from {when}:", { file: detail.file, when: when(detail.ts) })} {changes ? t.plural(changes, "{n} changed block", "{n} changed blocks") : t("identical to now")}
                 </p>
                 <button
                   onClick={restore}
                   disabled={!changes}
                   className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40"
                 >
-                  <RotateCcw className="h-4 w-4" /> Restore
+                  <RotateCcw className="h-4 w-4" /> {t("Restore")}
                 </button>
               </div>
               <pre className="max-h-[28rem] overflow-auto rounded-xl bg-chip p-3 font-mono text-xs leading-relaxed">

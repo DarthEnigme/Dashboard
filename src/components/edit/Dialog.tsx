@@ -3,6 +3,7 @@
 import { useEffect, type FormEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
+import { useT } from "@/i18n/client";
 
 interface Props {
   title: string;
@@ -14,7 +15,8 @@ interface Props {
   children: ReactNode;
 }
 
-export function Dialog({ title, onClose, onSubmit, submitLabel = "Save", error, busy, children }: Props) {
+export function Dialog({ title, onClose, onSubmit, submitLabel, error, busy, children }: Props) {
+  const t = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -48,7 +50,7 @@ export function Dialog({ title, onClose, onSubmit, submitLabel = "Save", error, 
       >
         <div className="mb-5 flex shrink-0 items-center justify-between">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-full p-1 text-muted hover:bg-hover hover:text-fg">
+          <button type="button" onClick={onClose} aria-label={t("Close")} className="rounded-full p-1 text-muted hover:bg-hover hover:text-fg">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -56,14 +58,14 @@ export function Dialog({ title, onClose, onSubmit, submitLabel = "Save", error, 
         {error && <p className="mt-4 shrink-0 rounded-xl bg-[var(--err)]/15 px-3 py-2 text-sm text-[var(--err)]">{error}</p>}
         <div className="mt-6 flex shrink-0 justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-full px-4 py-2 text-sm text-muted hover:bg-hover hover:text-fg">
-            Cancel
+            {t("Cancel")}
           </button>
           <button
             type="submit"
             disabled={busy}
             className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:brightness-110 disabled:opacity-50"
           >
-            {submitLabel}
+            {submitLabel ?? t("Save")}
           </button>
         </div>
       </motion.form>

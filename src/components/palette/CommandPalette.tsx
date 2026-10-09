@@ -30,6 +30,8 @@ import type { ClientAuth } from "@/lib/auth";
 import type { ServiceAction } from "@/integrations/types";
 import { sections } from "../settings/sections";
 import { sectionsFor } from "@/lib/sections";
+import { msg } from "@/i18n";
+import { useT } from "@/i18n/client";
 
 export interface PaletteItem {
   id: string;
@@ -76,6 +78,7 @@ async function setSetting(key: string, value: unknown) {
  * few commands. Everything the viewer may not see is already filtered out by /api/config.
  */
 export function CommandPalette({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const router = useRouter();
   const pathname = usePathname();
   const { data: config } = useSWR<ClientConfig>("/api/config", fetcher);
@@ -103,12 +106,12 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     const tabs = listTabs(config.settings.tabs, config.services);
     for (const g of config.services) {
       for (const s of g.services) {
-        const details = { label: "Details", run: () => go(`/service/${encodeURIComponent(s.id)}`) };
+        const details = { label: t("Details"), run: () => go(`/service/${encodeURIComponent(s.id)}`) };
         items.push({
           id: `svc:${s.id}`,
           title: s.name,
           subtitle: [g.name, s.description].filter(Boolean).join(" · "),
-          group: "Services",
+          group: msg("Services"),
           icon: s.href ? ExternalLink : Info,
           keywords: `${g.name} ${s.widget ?? ""}`,
           run: s.href
@@ -122,9 +125,9 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         if (auth?.user?.permissions.includes("actions") && s.actions) {
           items.push({
             id: `act:${s.id}`,
-            title: `Actions for ${s.name}…`,
-            subtitle: "Start, stop, restart",
-            group: "Actions",
+            title: t("Actions for {name}…", { name: s.name }),
+            subtitle: t("Start, stop, restart"),
+            group: msg("Actions"),
             icon: Power,
             keywords: `${s.widget ?? ""} restart start stop reboot`,
             stay: true,
@@ -142,7 +145,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           id: `bm:${g.name}:${l.name}`,
           title: l.name,
           subtitle: g.name,
-          group: "Bookmarks",
+          group: msg("Bookmarks"),
           icon: Bookmark,
           keywords: l.description,
           run: () => {
@@ -153,24 +156,24 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       }
     }
     if (tabs.length > 1) {
-      for (const t of tabs) items.push({ id: `tab:${t.slug}`, title: t.name, subtitle: "Tab", group: "Go to", icon: LayoutGrid, run: () => go(`/${t.slug}`) });
+      for (const tab of tabs) items.push({ id: `tab:${tab.slug}`, title: tab.name, subtitle: t("Tab"), group: t("Go to"), icon: LayoutGrid, run: () => go(`/${tab.slug}`) });
     }
-    if (pathname !== "/" || tabs.length < 2) items.push({ id: "page:/", title: "Dashboard", group: "Go to", icon: LayoutGrid, run: () => go("/") });
+    if (pathname !== "/" || tabs.length < 2) items.push({ id: "page:/", title: t("Dashboard"), group: t("Go to"), icon: LayoutGrid, run: () => go("/") });
     if (onDashboard) {
-      items.push({ id: "panel:monitor", title: "Monitoring", subtitle: "Status of every checked service (m)", group: "Go to", icon: Activity, keywords: "status uptime down", run: () => {
+      items.push({ id: "panel:monitor", title: t("Monitoring"), subtitle: t("Status of every checked service (m)"), group: t("Go to"), icon: Activity, keywords: "status uptime down", run: () => {
           onClose();
           window.dispatchEvent(new Event("page:monitor"));
         },
       });
     }
-    for (const s of sectionsFor(auth?.user?.permissions)) items.push({ id: `page:${s.href}`, title: s.label, group: "Go to", icon: s.icon, keywords: s.keywords, run: () => go(s.href) });
+    for (const s of sectionsFor(auth?.user?.permissions)) items.push({ id: `page:${s.href}`, title: t(s.label), group: t("Go to"), icon: s.icon, keywords: s.keywords, run: () => go(s.href) });
     if (auth?.canEdit) {
       for (const sec of sections) {
         items.push({
           id: `set:${sec.id}`,
-          title: `Settings: ${sec.label}`,
+          title: t("Settings: {name}", { name: t(sec.label) }),
           subtitle: sec.description,
-          group: "Settings",
+          group: msg("Settings"),
           icon: sec.icon ?? Settings2,
           keywords: sec.fields.map((f) => f.label).join(" "),
           run: () => go(`/settings#${sec.id}`),
@@ -178,9 +181,9 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         for (const h of Object.values(sec.headings ?? {}))
           items.push({
             id: `set:${h.id}`,
-            title: `Settings: ${h.label}`,
-            subtitle: `In ${sec.label}`,
-            group: "Settings",
+            title: t("Settings: {name}", { name: t(h.label) }),
+            subtitle: t("In {name}", { name: t(sec.label) }),
+            group: msg("Settings"),
             icon: sec.icon ?? Settings2,
             keywords: "wallpaper image gradient",
             run: () => go(`/settings#${h.id}`),
@@ -189,8 +192,8 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       if (isAdmin) {
         items.push({
           id: "cmd:updates",
-          title: "Check for updates",
-          group: "Commands",
+          title: t("Check for updates"),
+          group: msg("Commands"),
           icon: Settings2,
           keywords: "update upgrade version release",
           run: () => go("/settings#updates"),
@@ -198,8 +201,8 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       }
       items.push({
         id: "cmd:edit",
-        title: "Edit dashboard",
-        group: "Commands",
+        title: t("Edit dashboard"),
+        group: msg("Commands"),
         icon: Pencil,
         keywords: "editor add service",
         run: () => {
@@ -211,7 +214,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       const command = (id: string, title: string, key: string, value: unknown, icon: LucideIcon): PaletteItem => ({
         id,
         title,
-        group: "Commands",
+        group: msg("Commands"),
         icon,
         keywords: `${key} appearance`,
         stay: true,
@@ -219,7 +222,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           setStatus({ text: `${title}…`, busy: true });
           try {
             await setSetting(key, value);
-            setStatus({ text: `${title}: saved` });
+            setStatus({ text: t("{name}: saved", { name: title }) });
             router.refresh();
             setTimeout(onClose, 700);
           } catch (e) {
@@ -232,11 +235,11 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         ...Object.entries(paletteThemes).map(([id, t]): [string, string] => [id, t.label]),
         ...(config.settings.customThemes ?? []).map((t): [string, string] => [`custom:${t.id}`, t.label]),
       ];
-      for (const [t, label] of themeNames) if (config.settings.theme !== t) items.push(command(`cmd:theme:${t}`, `Theme: ${label}`, "theme", t, Palette));
-      for (const s of stylePresets) if (config.settings.style !== s) items.push(command(`cmd:style:${s}`, `Card style: ${s}`, "style", s, Palette));
+      for (const [name, label] of themeNames) if (config.settings.theme !== name) items.push(command(`cmd:theme:${name}`, t("Theme: {name}", { name: label }), "theme", name, Palette));
+      for (const s of stylePresets) if (config.settings.style !== s) items.push(command(`cmd:style:${s}`, t("Card style: {name}", { name: s }), "style", s, Palette));
       const glow = glowAmount(config.settings.glow);
       for (const [label, g] of [["off", 0], ["subtle", 50], ["strong", 100]] as const)
-        if (glow !== g) items.push(command(`cmd:glow:${label}`, `Hover glow: ${label}`, "glow", g, Palette));
+        if (glow !== g) items.push(command(`cmd:glow:${label}`, t("Hover glow: {name}", { name: t(label) }), "glow", g, Palette));
     }
     return items;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -253,7 +256,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       (actions ?? []).map((a) => ({
         id: `${a.target ?? ""}|${a.id}`,
         title: a.targetLabel ? `${a.label} ${a.targetLabel}` : a.label,
-        group: a.targetLabel ? "Guests" : "Service",
+        group: a.targetLabel ? msg("Guests") : msg("Service"),
         icon: Power,
         stay: true,
         run: () => service && setMode({ kind: "confirm", service, action: a }),
@@ -265,7 +268,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     const source = mode.kind === "actions" ? actionItems : mode.kind === "root" ? rootItems : [];
     if (!query.trim()) {
       if (mode.kind !== "root") return source;
-      const recents = recent.flatMap((id) => source.filter((i) => i.id === id)).map((i) => ({ ...i, group: "Recent" }));
+      const recents = recent.flatMap((id) => source.filter((i) => i.id === id)).map((i) => ({ ...i, group: msg("Recent") }));
       // Browsing shows places; actions, settings and commands appear once you type.
       const rest = source.filter((i) => !recent.includes(i.id) && !["Actions", "Commands", "Settings"].includes(i.group));
       return [...recents, ...rest].slice(0, 60);
@@ -352,12 +355,12 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center bg-[var(--scrim)] px-4 pt-[12vh] backdrop-blur-[2px]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label="Command palette" className="glass glass-lens flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl" style={{ background: "var(--dialog)" }}>
+      <div role="dialog" aria-modal="true" aria-label={t("Command palette")} className="glass glass-lens flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl" style={{ background: "var(--dialog)" }}>
         <div className="flex items-center gap-2 border-b border-line px-4">
           {mode.kind === "root" ? (
             <Search className="h-4 w-4 shrink-0 text-muted" />
           ) : (
-            <button type="button" tabIndex={-1} onClick={back} aria-label="Back" className="-ml-1 rounded-full p-1 text-muted hover:bg-hover hover:text-fg">
+            <button type="button" tabIndex={-1} onClick={back} aria-label={t("Back")} className="-ml-1 rounded-full p-1 text-muted hover:bg-hover hover:text-fg">
               <ArrowLeft className="h-4 w-4" />
             </button>
           )}
@@ -367,17 +370,17 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKey}
-            placeholder={mode.kind === "root" ? "Search services, pages, settings, commands…" : mode.kind === "actions" ? "Filter actions…" : "Press Enter to confirm, Esc to go back"}
+            placeholder={mode.kind === "root" ? t("Search services, pages, settings, commands…") : mode.kind === "actions" ? t("Filter actions…") : t("Press Enter to confirm, Esc to go back")}
             readOnly={mode.kind === "confirm"}
             role="combobox"
             aria-expanded="true"
             aria-controls="palette-list"
             aria-activedescendant={shown.length && mode.kind !== "confirm" ? optionId(active) : undefined}
             aria-autocomplete="list"
-            aria-label="Command"
+            aria-label={t("Command")}
             className="h-14 min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted"
           />
-          <kbd className="hidden rounded-md border border-line px-1.5 text-[11px] text-muted sm:block">Esc</kbd>
+          <kbd className="hidden rounded-md border border-line px-1.5 text-[11px] text-muted sm:block">{t("Esc")}</kbd>
         </div>
 
         {mode.kind === "confirm" ? (
@@ -387,7 +390,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
                 {mode.action.label} {mode.action.targetLabel ?? mode.service.name}?
               </span>{" "}
               <span className="text-muted">
-                {mode.action.danger ? "This cuts power without a clean shutdown and can lose unsaved data." : "This happens right away."}
+                {mode.action.danger ? t("This cuts power without a clean shutdown and can lose unsaved data.") : t("This happens right away.")}
               </span>
             </p>
             <div className="flex gap-2">
@@ -401,18 +404,18 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
                 <CornerDownLeft className="h-3.5 w-3.5" /> {mode.action.label}
               </button>
               <button type="button" tabIndex={-1} onClick={back} className="rounded-full px-3 py-1.5 text-sm hover:bg-hover">
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>
         ) : (
-          <ul ref={list} id="palette-list" role="listbox" aria-label="Results" className="min-h-0 flex-1 overflow-y-auto p-2">
-            {!config && <Note><Loader2 className="h-4 w-4 animate-spin" /> Loading…</Note>}
-            {mode.kind === "actions" && !actions && !actionsError && <Note><Loader2 className="h-4 w-4 animate-spin" /> Loading actions…</Note>}
+          <ul ref={list} id="palette-list" role="listbox" aria-label={t("Results")} className="min-h-0 flex-1 overflow-y-auto p-2">
+            {!config && <Note><Loader2 className="h-4 w-4 animate-spin" /> {t("Loading…")}</Note>}
+            {mode.kind === "actions" && !actions && !actionsError && <Note><Loader2 className="h-4 w-4 animate-spin" /> {t("Loading actions…")}</Note>}
             {actionsError && <Note error>{(actionsError as Error).message}</Note>}
-            {config && shown.length === 0 && (mode.kind === "root" || actions) && <Note>Nothing matches “{query}”.</Note>}
+            {config && shown.length === 0 && (mode.kind === "root" || actions) && <Note>{t("Nothing matches “")}{query}”.</Note>}
             {shown.map((item, i) => {
-              const heading = !query.trim() && item.group !== lastGroup ? item.group : undefined;
+              const heading = !query.trim() && item.group !== lastGroup ? t(item.group) : undefined;
               lastGroup = item.group;
               const Icon = item.icon;
               return (
@@ -432,7 +435,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
                       <span className="block truncate">{item.title}</span>
                       {item.subtitle && <span className="block truncate text-xs text-muted">{item.subtitle}</span>}
                     </span>
-                    {query.trim() && <span className="shrink-0 text-[11px] text-muted">{item.group}</span>}
+                    {query.trim() && <span className="shrink-0 text-[11px] text-muted">{t(item.group)}</span>}
                     {i === active && item.alt && <kbd className="hidden shrink-0 rounded-md border border-line px-1.5 text-[10px] text-muted sm:block">⇧↵ {item.alt.label}</kbd>}
                   </div>
                 </li>
@@ -448,10 +451,10 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             </span>
           ) : (
             <>
-              <span>↑↓ move</span>
-              <span>↵ open</span>
-              <span className="hidden sm:inline">⇧↵ details</span>
-              <span>Esc {mode.kind === "root" ? "close" : "back"}</span>
+              <span>{t("↑↓ move")}</span>
+              <span>{t("↵ open")}</span>
+              <span className="hidden sm:inline">{t("⇧↵ details")}</span>
+              <span>{t("Esc")}{" "}{mode.kind === "root" ? "close" : "back"}</span>
               <span className="ml-auto flex items-center gap-1">
                 <Command className="h-3 w-3" /> K
               </span>

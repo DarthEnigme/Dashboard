@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSWRConfig } from "swr";
 import { RefreshCw, Sparkles } from "lucide-react";
 import { lastLocalConfigWrite } from "@/lib/fetcher";
+import { useT } from "@/i18n/client";
 
 const SELF_ECHO_MS = 3000;
 const REFRESH_DEBOUNCE_MS = 300;
@@ -18,6 +19,7 @@ const REFRESH_DEBOUNCE_MS = 300;
  * a tab in the background just reloads.
  */
 export function LiveReload({ paused = false, onReload, version }: { paused?: boolean; onReload?: () => void; version?: string }) {
+  const t = useT();
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const [stale, setStale] = useState(false);
@@ -83,9 +85,9 @@ export function LiveReload({ paused = false, onReload, version }: { paused?: boo
     return (
       <div role="status" className="glass fixed right-4 bottom-4 z-50 flex items-center gap-3 rounded-2xl px-4 py-3 text-sm">
         <Sparkles className="h-4 w-4 text-accent" />
-        <span>Page was updated to {updated}.</span>
+        <span>{t("Page was updated to")}{" "}{updated}.</span>
         <button type="button" onClick={() => window.location.reload()} className="glass-interactive flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-3 py-1 font-medium text-white">
-          <RefreshCw className="h-3.5 w-3.5" /> Reload
+          <RefreshCw className="h-3.5 w-3.5" /> {t("Reload")}
         </button>
       </div>
     );
@@ -93,12 +95,12 @@ export function LiveReload({ paused = false, onReload, version }: { paused?: boo
   if (!stale) return null;
   return (
     <div role="status" className="glass fixed right-4 bottom-4 z-50 flex items-center gap-3 rounded-2xl px-4 py-3 text-sm">
-      <span>Config changed on disk.</span>
+      <span>{t("Config changed on disk.")}</span>
       <button type="button" onClick={apply} className="glass-interactive flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-3 py-1 font-medium text-white">
-        <RefreshCw className="h-3.5 w-3.5" /> Reload
+        <RefreshCw className="h-3.5 w-3.5" /> {t("Reload")}
       </button>
       <button type="button" onClick={() => setStale(false)} className="text-muted hover:text-[var(--fg)]">
-        Dismiss
+        {t("Dismiss")}
       </button>
     </div>
   );

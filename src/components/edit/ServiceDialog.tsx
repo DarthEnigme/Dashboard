@@ -7,6 +7,8 @@ import { visibleField } from "./fields";
 import { Icon } from "../Icon";
 import { Dialog } from "./Dialog";
 import { FieldInput, inputClass, type FormValue } from "./FieldInput";
+import { useT } from "@/i18n/client";
+import { msg } from "@/i18n";
 
 export type RawService = {
   name: string;
@@ -19,100 +21,100 @@ export type RawService = {
 };
 
 const base: FieldSpec[] = [
-  { key: "name", label: "Name", required: true },
-  { key: "href", label: "Link", placeholder: "https://service.local" },
-  { key: "description", label: "Description" },
+  { key: "name", label: msg("Name"), required: true },
+  { key: "href", label: msg("Link"), placeholder: "https://service.local" },
+  { key: "description", label: msg("Description") },
 ];
 
 const sizeSpec: FieldSpec = {
   key: "size",
-  label: "Tile size",
+  label: msg("Tile size"),
   kind: "select",
   options: [...tileSizes],
-  help: "wide = 2×1, tall = 1×2 with latency chart, large = 2×2 with detail list.",
+  help: msg("wide = 2×1, tall = 1×2 with latency chart, large = 2×2 with detail list."),
 };
 
 const iconSpec: FieldSpec = {
   key: "icon",
-  label: "Icon",
-  placeholder: "proxmox, mdi-server, si-docker or a URL",
-  help: "Names come from dashboardicons.com.",
+  label: msg("Icon"),
+  placeholder: msg("proxmox, mdi-server, si-docker or a URL"),
+  help: msg("Names come from dashboardicons.com."),
 };
 
 /** Fields per typed check (`ping: { type: … }`). */
 const checkFields: Record<string, { label: string; fields: FieldSpec[] }> = {
   http: {
-    label: "HTTP (advanced)",
+    label: msg("HTTP (advanced)"),
     fields: [
-      { key: "url", label: "URL", placeholder: "Empty: the service link" },
-      { key: "expect", label: "Expected status codes", kind: "list", placeholder: "200, 204", help: "Empty: anything below 500 is up." },
-      { key: "keyword", label: "Body must contain", placeholder: "OK" },
-      { key: "jsonPath", label: "JSON value", placeholder: "$.status", help: "Up when this value equals the next field (or is truthy when that is empty)." },
+      { key: "url", label: "URL", placeholder: msg("Empty: the service link") },
+      { key: "expect", label: msg("Expected status codes"), kind: "list", placeholder: "200, 204", help: msg("Empty: anything below 500 is up.") },
+      { key: "keyword", label: msg("Body must contain"), placeholder: "OK" },
+      { key: "jsonPath", label: msg("JSON value"), placeholder: "$.status", help: msg("Up when this value equals the next field (or is truthy when that is empty).") },
       { key: "equals", label: "…equals", placeholder: "ok" },
     ],
   },
   tcp: {
-    label: "TCP port",
+    label: msg("TCP port"),
     fields: [
-      { key: "host", label: "Host", required: true, placeholder: "10.0.0.5" },
-      { key: "port", label: "Port", kind: "number", required: true, placeholder: "22" },
+      { key: "host", label: msg("Host"), required: true, placeholder: "10.0.0.5" },
+      { key: "port", label: msg("Port"), kind: "number", required: true, placeholder: "22" },
     ],
   },
   udp: {
-    label: "UDP port",
+    label: msg("UDP port"),
     fields: [
-      { key: "host", label: "Host", required: true, placeholder: "10.0.0.5" },
-      { key: "port", label: "Port", kind: "number", required: true, placeholder: "51820" },
-      { key: "payload", label: "Send", placeholder: "0x00", help: "Text, or bytes as 0x… hex. Up when anything answers; many services only answer their own protocol." },
-      { key: "expect", label: "Reply must contain", placeholder: "optional" },
+      { key: "host", label: msg("Host"), required: true, placeholder: "10.0.0.5" },
+      { key: "port", label: msg("Port"), kind: "number", required: true, placeholder: "51820" },
+      { key: "payload", label: msg("Send"), placeholder: "0x00", help: msg("Text, or bytes as 0x… hex. Up when anything answers; many services only answer their own protocol.") },
+      { key: "expect", label: msg("Reply must contain"), placeholder: "optional" },
     ],
   },
   minecraft: {
-    label: "Minecraft server",
+    label: msg("Minecraft server"),
     fields: [
-      { key: "host", label: "Host", required: true, placeholder: "mc.example.com" },
-      { key: "edition", label: "Edition", kind: "select", options: ["java", "bedrock"], placeholder: "java" },
-      { key: "port", label: "Port", kind: "number", placeholder: "25565 (Java) / 19132 (Bedrock)" },
+      { key: "host", label: msg("Host"), required: true, placeholder: "mc.example.com" },
+      { key: "edition", label: msg("Edition"), kind: "select", options: ["java", "bedrock"], placeholder: "java" },
+      { key: "port", label: msg("Port"), kind: "number", placeholder: msg("25565 (Java) / 19132 (Bedrock)") },
     ],
   },
   icmp: {
-    label: "ICMP ping",
-    fields: [{ key: "host", label: "Host", required: true, placeholder: "10.0.0.1", help: "Needs ping permission in the container; a TCP check works everywhere." }],
+    label: msg("ICMP ping"),
+    fields: [{ key: "host", label: msg("Host"), required: true, placeholder: "10.0.0.1", help: msg("Needs ping permission in the container; a TCP check works everywhere.") }],
   },
   dns: {
-    label: "DNS lookup",
+    label: msg("DNS lookup"),
     fields: [
-      { key: "host", label: "Name to resolve", required: true, placeholder: "nas.home.arpa" },
-      { key: "server", label: "DNS server", placeholder: "10.0.0.53", help: "Empty: the system resolver." },
-      { key: "record", label: "Record", kind: "select", options: ["A", "AAAA", "CNAME", "MX", "TXT"], placeholder: "A" },
-      { key: "expect", label: "Expected answer", placeholder: "10.0.0.20" },
+      { key: "host", label: msg("Name to resolve"), required: true, placeholder: "nas.home.arpa" },
+      { key: "server", label: msg("DNS server"), placeholder: "10.0.0.53", help: msg("Empty: the system resolver.") },
+      { key: "record", label: msg("Record"), kind: "select", options: ["A", "AAAA", "CNAME", "MX", "TXT"], placeholder: "A" },
+      { key: "expect", label: msg("Expected answer"), placeholder: "10.0.0.20" },
     ],
   },
   snmp: {
     label: "SNMP",
     fields: [
-      { key: "host", label: "Host", required: true, placeholder: "10.0.0.2" },
-      { key: "community", label: "Community", placeholder: "public", secret: true },
-      { key: "version", label: "Version", kind: "select", options: ["2c", "1"], placeholder: "2c" },
-      { key: "oid", label: "OID", placeholder: "1.3.6.1.2.1.1.3.0 (sysUpTime)" },
-      { key: "port", label: "Port", kind: "number", placeholder: "161" },
+      { key: "host", label: msg("Host"), required: true, placeholder: "10.0.0.2" },
+      { key: "community", label: msg("Community"), placeholder: "public", secret: true },
+      { key: "version", label: msg("Version"), kind: "select", options: ["2c", "1"], placeholder: "2c" },
+      { key: "oid", label: "OID", placeholder: msg("1.3.6.1.2.1.1.3.0 (sysUpTime)") },
+      { key: "port", label: msg("Port"), kind: "number", placeholder: "161" },
     ],
   },
 };
 
 const recordSpec: FieldSpec = {
   key: "record",
-  label: "Record history",
+  label: msg("Record history"),
   kind: "boolean",
-  help: "Store this widget's numbers every minute: charts on the service page, and sparklines on the tile.",
+  help: msg("Store this widget's numbers every minute: charts on the service page, and sparklines on the tile."),
 };
 
 const thresholdSpec: FieldSpec = {
   key: "thresholds",
-  label: "Alert thresholds",
+  label: msg("Alert thresholds"),
   kind: "yaml",
-  placeholder: 'CPU: { above: 90, for: 5 }     # minutes past the limit before alerting\n"Disk /": { above: 85 }\nBattery: { below: 20 }',
-  help: "Per field label. The field turns red past its limit; the alert channels hear about it (and when it's back).",
+  placeholder: msg("CPU: { above: 90, for: 5 }     # minutes past the limit before alerting\n\"Disk /\": { above: 85 }\nBattery: { below: 20 }"),
+  help: msg("Per field label. The field turns red past its limit; the alert channels hear about it (and when it's back)."),
 };
 
 interface Props {
@@ -123,6 +125,7 @@ interface Props {
 }
 
 export function ServiceDialog({ title, initial, onClose, onSave }: Props) {
+  const t = useT();
   const [s, setS] = useState<RawService>(initial);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -140,13 +143,13 @@ export function ServiceDialog({ title, initial, onClose, onSave }: Props) {
   };
 
   const submit = async () => {
-    if (!s.name?.trim()) return setError("Name is required");
+    if (!s.name?.trim()) return setError(t("Name is required"));
     const missing = widgetSpec?.fields.find((f) => f.required && (s.widget?.[f.key] ?? "") === "");
-    if (missing) return setError(`${widgetSpec.label}: ${missing.label} is required`);
-    if (pingMode === "link" && !s.href) return setError("Pinging the link requires a link");
-    if (pingMode === "http" && !s.href && !(s.ping as { url?: string }).url) return setError("Set a URL for the HTTP check, or a link");
+    if (missing) return setError(`${widgetSpec.label}: ${t("{field} is required", { field: t(missing.label) })}`);
+    if (pingMode === "link" && !s.href) return setError(t("Pinging the link requires a link"));
+    if (pingMode === "http" && !s.href && !(s.ping as { url?: string }).url) return setError(t("Set a URL for the HTTP check, or a link"));
     const missingCheck = checkSpec?.fields.find((f) => f.required && ((s.ping as Record<string, unknown>)[f.key] ?? "") === "");
-    if (missingCheck) return setError(`Status check: ${missingCheck.label} is required`);
+    if (missingCheck) return setError(t("Status check: {field} is required", { field: t(missingCheck.label) }));
     setBusy(true);
     try {
       await onSave(s);
@@ -177,7 +180,7 @@ export function ServiceDialog({ title, initial, onClose, onSave }: Props) {
       <FieldInput spec={visibleField} value={s.visible} onChange={(v) => set("visible", v)} />
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="f-ping" className="text-xs font-medium text-muted">Status check</label>
+        <label htmlFor="f-ping" className="text-xs font-medium text-muted">{t("Status check")}</label>
         <div className="flex gap-2">
           <select
             id="f-ping"
@@ -189,12 +192,12 @@ export function ServiceDialog({ title, initial, onClose, onSave }: Props) {
             }}
             className={`${inputClass} w-44 shrink-0`}
           >
-            <option value="off">Off</option>
-            <option value="link">Ping link</option>
-            <option value="custom">Custom URL</option>
+            <option value="off">{t("Off")}</option>
+            <option value="link">{t("Ping link")}</option>
+            <option value="custom">{t("Custom URL")}</option>
             {Object.entries(checkFields).map(([type, c]) => (
               <option key={type} value={type}>
-                {c.label}
+                {t(c.label)}
               </option>
             ))}
           </select>
@@ -202,7 +205,7 @@ export function ServiceDialog({ title, initial, onClose, onSave }: Props) {
             <input
               value={s.ping as string}
               onChange={(e) => set("ping", e.target.value)}
-              placeholder="http://10.0.0.5:8080/health"
+              placeholder={t("http://10.0.0.5:8080/health")}
               className={inputClass}
               required
             />
@@ -228,20 +231,20 @@ export function ServiceDialog({ title, initial, onClose, onSave }: Props) {
               onChange={(e) => set("alert", e.target.checked ? undefined : false)}
               className="h-4 w-4 accent-[var(--accent)]"
             />
-            Send down/up alerts for this service
+            {t("Send down/up alerts for this service")}
           </label>
         )}
       </div>
 
       <div className="flex flex-col gap-4 rounded-2xl border border-line p-4">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="f-widget" className="text-xs font-medium text-muted">Integration</label>
+          <label htmlFor="f-widget" className="text-xs font-medium text-muted">{t("Integration")}</label>
           <select id="f-widget" value={widgetType} onChange={(e) => setWidgetType(e.target.value)} className={inputClass}>
-            <option value="">None</option>
+            <option value="">{t("None")}</option>
             {Object.entries(integrationFields).map(([type, spec]) => (
               <option key={type} value={type}>{spec.label}</option>
             ))}
-            {widgetType && !widgetSpec && <option value={widgetType}>{widgetType} (unknown)</option>}
+            {widgetType && !widgetSpec && <option value={widgetType}>{widgetType} {t("(unknown)")}</option>}
           </select>
         </div>
         {widgetSpec?.fields.map((f) => (
@@ -268,7 +271,7 @@ export function ServiceDialog({ title, initial, onClose, onSave }: Props) {
         )}
         {widgetSpec && (
           <p className="text-xs text-muted/80">
-            Secrets can reference environment variables, e.g. <code className="text-fg">{"{{HOMEPAGE_VAR_MY_KEY}}"}</code>.
+            {t("Secrets can reference environment variables, e.g.")}{" "}<code className="text-fg">{"{{HOMEPAGE_VAR_MY_KEY}}"}</code>.
           </p>
         )}
       </div>

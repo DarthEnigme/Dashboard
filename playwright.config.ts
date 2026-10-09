@@ -21,7 +21,7 @@ export default defineConfig({
     // Signed in as admin (editor, users, history).
     {
       name: "admin",
-      testMatch: /(visual|flows|detail|finance|monitoring|settings|palette|updates|apps|appearance)\.spec\.ts/,
+      testMatch: /(visual|flows|detail|finance|monitoring|settings|palette|updates|apps|appearance|language)\.spec\.ts/,
       dependencies: ["setup"],
       use: { ...desktop, storageState: "test-results/.auth/admin.json" },
     },

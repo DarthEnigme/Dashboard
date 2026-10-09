@@ -5,11 +5,13 @@ import useSWR from "swr";
 import { Search } from "lucide-react";
 import { fetcher } from "@/lib/fetcher";
 import { inputBase } from "./FieldInput";
+import { useT } from "@/i18n/client";
 
 type Entry = { ts: number; user: string | null; action: string; detail: string | null };
 
 /** Sign-ins, account changes, config saves, actions: who did what, newest first. */
 export function AuditPanel() {
+  const t = useT();
   const [q, setQ] = useState("");
   const [pages, setPages] = useState<Entry[][]>([]);
   const { data, error } = useSWR<Entry[]>(`/api/audit?q=${encodeURIComponent(q)}`, fetcher, { keepPreviousData: true });
@@ -24,7 +26,7 @@ export function AuditPanel() {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-        <h2 className="text-sm font-semibold tracking-wider text-muted uppercase">Audit log</h2>
+        <h2 className="text-sm font-semibold tracking-wider text-muted uppercase">{t("Audit log")}</h2>
         <label className="flex items-center gap-2">
           <Search className="h-4 w-4 text-muted" />
           <input
@@ -33,8 +35,8 @@ export function AuditPanel() {
               setQ(e.target.value);
               setPages([]);
             }}
-            placeholder="user, action…"
-            aria-label="Filter the audit log"
+            placeholder={t("user, action…")}
+            aria-label={t("Filter the audit log")}
             className={`${inputBase} w-48`}
           />
         </label>
@@ -44,10 +46,10 @@ export function AuditPanel() {
         <table className="w-full text-xs">
           <thead className="sticky top-0" style={{ background: "var(--dialog)" }}>
             <tr className="text-left text-muted">
-              <th className="px-3 py-2 font-medium">When</th>
-              <th className="px-3 py-2 font-medium">Who</th>
-              <th className="px-3 py-2 font-medium">What</th>
-              <th className="px-3 py-2 font-medium">Details</th>
+              <th className="px-3 py-2 font-medium">{t("When")}</th>
+              <th className="px-3 py-2 font-medium">{t("Who")}</th>
+              <th className="px-3 py-2 font-medium">{t("What")}</th>
+              <th className="px-3 py-2 font-medium">{t("Details")}</th>
             </tr>
           </thead>
           <tbody>
@@ -64,7 +66,7 @@ export function AuditPanel() {
             {data?.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-muted">
-                  Nothing found.
+                  {t("Nothing found.")}
                 </td>
               </tr>
             )}
@@ -73,7 +75,7 @@ export function AuditPanel() {
       </div>
       {rows.length >= 100 && (pages.length === 0 || pages[pages.length - 1].length === 100) && (
         <button onClick={() => void more()} className="w-fit rounded-full bg-chip px-3 py-1.5 text-sm hover:bg-hover">
-          Older entries
+          {t("Older entries")}
         </button>
       )}
     </section>
