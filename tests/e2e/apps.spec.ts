@@ -48,3 +48,27 @@ test("pelican: power actions reach the panel", async ({ page }) => {
   const calls = await (await page.request.get("http://localhost:4010/pelican/_calls")).json();
   expect(calls).toContainEqual({ server: "5f2b8c10", signal: "start" });
 });
+
+test("home assistant: a light switch and a scene button on the tile", async ({ page }) => {
+  await page.goto("/");
+  const ha = tile(page, "Home Assistant");
+  const lamp = ha.getByRole("switch", { name: "Desk lamp" });
+  await expect(lamp).toHaveAttribute("aria-checked", "false");
+  await lamp.click();
+  await expect(lamp).toHaveAttribute("aria-checked", "true");
+  await ha.getByRole("button", { name: "Activate Movie night" }).click();
+  await expect.poll(async () => (await (await page.request.get("http://localhost:4010/ha/_calls")).json()).length).toBe(2);
+  const calls = await (await page.request.get("http://localhost:4010/ha/_calls")).json();
+  expect(calls).toEqual([
+    { domain: "light", service: "turn_on", entity_id: "light.desk" },
+    { domain: "scene", service: "turn_on", entity_id: "scene.movie_night" },
+  ]);
+  // The real state comes back after the refetch, and the action is in the audit log.
+  await page.waitForTimeout(1500);
+  await expect(lamp).toHaveAttribute("aria-checked", "true");
+  await expect(field(page, "Home Assistant", "Desk lamp")).toContainText("on");
+  await ha.scrollIntoViewIfNeeded();
+  await ha.screenshot({ path: "test-results/shots/82-homeassistant-controls.png" });
+  const audit = await (await page.request.get("/api/audit")).json();
+  expect(JSON.stringify(audit)).toContain("light.desk");
+});

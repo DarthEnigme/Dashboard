@@ -49,7 +49,7 @@
   services:
     - name: Home Assistant
       size: wide
-      widget: { type: homeassistant, url: http://localhost:4010/ha, token: ha-token, entities: [sensor.living_room_temperature, binary_sensor.front_door, sensor.garage] }
+      widget: { type: homeassistant, url: http://localhost:4010/ha, token: ha-token, entities: [sensor.living_room_temperature, binary_sensor.front_door, light.desk, scene.movie_night, sensor.garage] }
     - name: TrueNAS
       widget: { type: truenas, url: http://localhost:4010/truenas, key: tn-key }
     - name: Synology

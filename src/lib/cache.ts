@@ -18,6 +18,11 @@ export function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Pro
   return value;
 }
 
+/** Drop cached values whose key starts with `prefix` (after an action changed what they show). */
+export function forget(prefix: string) {
+  for (const k of store.keys()) if (k.startsWith(prefix)) store.delete(k);
+}
+
 /** Network errors carry the useful part ("ECONNREFUSED") in `cause.code`. */
 export function errorReason(e: unknown): string {
   const err = e as Error & { cause?: { code?: string } };

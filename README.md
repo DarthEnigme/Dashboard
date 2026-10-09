@@ -261,7 +261,7 @@ When no icon is set or it fails to load, the tile shows the service's initials.
 | `firefly` | `url`, `token` (personal access token), `currency` | This month's balance, spent, earned, net worth |
 | `ghostfolio` | `url`, `token` (security token), `currency` | Net worth, today, total return |
 | `customapi` | `url`, `method`, `headers`, `body`, `mappings` | Any JSON values you map |
-| `homeassistant` | `url`, `token` (long-lived access token), `entities` (list of ids, or `{entity, label}`) | Those entities' states; without entities: lights/switches on, unavailable |
+| `homeassistant` | `url`, `token` (long-lived access token), `entities` (list of ids, or `{entity, label}`), `controls` (default true) | Those entities' states; without entities: lights/switches on, unavailable. Listed lights, switches, fans, input booleans and covers get a switch on the tile, scenes and scripts a run button (see "Actions") |
 | `truenas` | `url`, `key` (API key) | Pool health and usage, alerts, uptime; pool list on large tiles |
 | `synology` | `url`, `username`, `password` | CPU, RAM, storage, volume status |
 | `calendar` | `sources` (`{type: ical, url}`, `{type: sonarr\|radarr, url, key}`), `days`, `timezone` | Upcoming events; more rows on bigger tiles |
@@ -468,6 +468,7 @@ Vaultwarden and other apps without a stats API can still be watched with an HTTP
 Admins get a ⋯ menu on Docker and Proxmox tiles:
 - **Docker:** start, stop, restart.
 - **Proxmox:** shut down, reboot, force stop and start, per VM or container.
+- **Home Assistant:** for the entities listed in the widget, the tile itself has a switch for each light, switch, fan, input boolean and cover, and a run button for scenes and scripts. They act at once, without the confirm step. Only these services are ever called (turn on/off, open/close, run), and only on listed entities. Set `controls: false` to show states only.
 
 Every action is confirmed first and recorded in the audit log. Only actions that make sense for the current state are offered, and the server checks that again.
 

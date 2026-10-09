@@ -6,6 +6,8 @@ import { integrations } from "@/integrations";
 import { integrationFields } from "@/integrations/fields";
 import wgd from "./fixtures/wgdashboard.json";
 import { cloudflare, parseZone, type CfHour } from "@/integrations/cloudflare";
+import { controlFor, haActions, homeassistant, parseHomeAssistant, type HaState } from "@/integrations/homeassistant";
+import { ACTION_TYPES } from "@/integrations/fields";
 
 const configs = wgd.configurations.data as WgdConfiguration[];
 const peers = Object.fromEntries(Object.entries(wgd.peers).map(([k, v]) => [k, v.data.configurationPeers as WgdPeer[]]));
@@ -168,6 +170,81 @@ describe("cloudflare zone traffic", () => {
 
     it("explains a zone it can't read", async () => {
       await expect(cloudflare.fetch(cloudflare.schema.parse({ key: "cf", zone: "nope", url }), { serviceName: "site" })).rejects.toThrow(/Zone not found/);
+    });
+  });
+});
+
+describe("home assistant controls", () => {
+  const st = (entity_id: string, state: string, name?: string): HaState => ({ entity_id, state, attributes: { friendly_name: name } });
+  const states = [
+    st("light.kitchen", "on", "Kitchen"),
+    st("switch.heater", "off", "Heater"),
+    st("cover.garage", "closed", "Garage door"),
+    st("scene.movie", "2026-10-01T20:00:00+00:00", "Movie night"),
+    st("script.goodnight", "off", "Good night"),
+    st("sensor.temp", "21.4", "Temp"),
+    st("light.broken", "unavailable", "Broken"),
+  ];
+
+  it("offers the action that fits each entity's state", () => {
+    expect(controlFor(states[0])).toEqual({ action: "turn_off", target: "light.kitchen", on: true });
+    expect(controlFor(states[1])).toEqual({ action: "turn_on", target: "switch.heater", on: false });
+    expect(controlFor(states[2])).toEqual({ action: "open_cover", target: "cover.garage", on: false });
+    expect(controlFor(states[3])).toEqual({ action: "turn_on", target: "scene.movie", label: "Activate" });
+    expect(controlFor(states[5])).toBeUndefined();
+    expect(controlFor(states[6])).toBeUndefined();
+  });
+
+  it("lists actions only for the configured entities", () => {
+    const actions = haActions(states, ["light.kitchen", { entity: "scene.movie", label: "Cinema" }, "sensor.temp"]);
+    expect(actions).toEqual([
+      { id: "turn_off", label: "Turn off", target: "light.kitchen", targetLabel: "Kitchen" },
+      { id: "turn_on", label: "Activate", target: "scene.movie", targetLabel: "Cinema" },
+    ]);
+  });
+
+  it("puts controls on fields only when enabled; scenes show as scenes", () => {
+    const on = parseHomeAssistant(states, ["light.kitchen", "scene.movie"], true);
+    expect(on.fields[0].control?.action).toBe("turn_off");
+    expect(on.fields[1].value).toBe("scene");
+    expect(parseHomeAssistant(states, ["light.kitchen"], false).fields[0].control).toBeUndefined();
+    expect(ACTION_TYPES.has("homeassistant")).toBe(true);
+  });
+
+  describe("against the API", () => {
+    let server: http.Server;
+    let url = "";
+    const calls: { path: string; body: string; auth?: string }[] = [];
+    beforeAll(async () => {
+      server = http.createServer((req, res) => {
+        let body = "";
+        req.on("data", (c) => (body += c));
+        req.on("end", () => {
+          calls.push({ path: req.url ?? "", body, auth: req.headers.authorization });
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(req.url === "/api/states" ? JSON.stringify(states) : "[]");
+        });
+      });
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+      url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    });
+    afterAll(() => server.close());
+
+    it("calls the domain's service with the entity", async () => {
+      const cfg = homeassistant.schema.parse({ url, token: "t", entities: ["light.kitchen"] });
+      expect(await homeassistant.actions!.run(cfg, "turn_off", "light.kitchen")).toBe("light.kitchen: turn off");
+      expect(calls.at(-1)).toEqual({ path: "/api/services/light/turn_off", body: '{"entity_id":"light.kitchen"}', auth: "Bearer t" });
+      expect(await homeassistant.actions!.list(cfg)).toHaveLength(1);
+    });
+
+    it("refuses anything outside the allowed services", async () => {
+      const cfg = homeassistant.schema.parse({ url, token: "t", entities: ["light.kitchen"] });
+      const before = calls.length;
+      await expect(homeassistant.actions!.run(cfg, "unlock", "lock.front_door")).rejects.toThrow(/Can't unlock/);
+      await expect(homeassistant.actions!.run(cfg, "turn_on", "lock.front_door")).rejects.toThrow();
+      await expect(homeassistant.actions!.run(cfg, "turn_on", "../config")).rejects.toThrow();
+      expect(calls.length).toBe(before);
+      expect(await homeassistant.actions!.list(homeassistant.schema.parse({ url, token: "t", entities: ["light.kitchen"], controls: false }))).toEqual([]);
     });
   });
 });

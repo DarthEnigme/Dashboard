@@ -83,7 +83,7 @@ export function ServiceDetail({ service: s, group, settings, canAct }: Props) {
       {s.widget && (
         <section className="glass flex flex-col gap-3 rounded-3xl p-5">
           <h2 className="text-sm font-semibold tracking-wider text-muted uppercase">Live data</h2>
-          <WidgetFields id={s.id} interval={settings.refreshInterval} size="detail" />
+          <WidgetFields id={s.id} interval={settings.refreshInterval} size="detail" canAct={!!(canAct && s.actions)} />
         </section>
       )}
 

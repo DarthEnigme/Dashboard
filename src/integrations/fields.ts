@@ -25,7 +25,7 @@ export interface FieldSpec {
 }
 
 /** Integration types that offer admin actions (start/stop…); kept in sync with the registry by a test. */
-export const ACTION_TYPES = new Set(["docker", "proxmox", "dockhand", "arcane", "pelican"]);
+export const ACTION_TYPES = new Set(["docker", "proxmox", "dockhand", "arcane", "pelican", "homeassistant"]);
 
 const promQueriesPlaceholder =
   '- label: CPU\n  query: 100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))\n  format: percent\n  warn: 75\n  error: 90\n  chart: true\n- label: Memory\n  query: sum(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)\n  format: bytes';
@@ -151,9 +151,10 @@ export const integrationFields: Record<string, { label: string; fields: FieldSpe
         label: "Entities",
         kind: "yaml",
         placeholder: "- sensor.living_room_temperature\n- entity: binary_sensor.front_door\n  label: Front door",
-        help: "Leave empty for a summary (lights on, unavailable entities…).",
+        help: "Leave empty for a summary (lights on, unavailable entities…). Lights, switches, fans, covers, scenes and scripts listed here get a switch or button on the tile.",
       },
       { key: "insecure", label: "Allow self-signed TLS", kind: "boolean" },
+      { key: "controls", label: "Controls on the tile", kind: "boolean", default: true, help: "For people allowed to run actions (admins, or groups with the actions permission)." },
     ],
   },
   truenas: {

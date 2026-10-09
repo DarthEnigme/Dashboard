@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { findService } from "@/lib/config/lookup";
 import { requirePermission, sameOrigin, seeFilter } from "@/lib/auth";
 import { audit } from "@/lib/auth/users";
-import { errorReason } from "@/lib/cache";
+import { errorReason, forget } from "@/lib/cache";
 import { integrations } from "@/integrations";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +43,8 @@ export async function POST(req: Request, { params }: Ctx) {
     if (!action || !allowed) return NextResponse.json({ error: "That action isn't available right now" }, { status: 409 });
     const message = await r.actions.run(r.cfg, action, target);
     audit(r.admin.username, "service-action", { service: id, action, target });
+    // The tile shows the new state on its next fetch, not the cached one.
+    forget(`widget|${id}|`);
     return NextResponse.json({ ok: true, message });
   } catch (e) {
     audit(r.admin.username, "service-action-failed", { service: id, action, target, error: errorReason(e) });

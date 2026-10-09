@@ -13,6 +13,11 @@ export interface WidgetField {
   raw?: number;
   /** Something with its own charts (Integration.series), e.g. a Proxmox guest; rows open them on the service page. */
   target?: string;
+  /**
+   * A one-tap action on this field (a Home Assistant light): runs `action` on `target` through
+   * the service's actions, for people allowed to. `on` makes it a switch; without it, a button.
+   */
+  control?: { action: string; target: string; on?: boolean; label?: string };
 }
 
 /**

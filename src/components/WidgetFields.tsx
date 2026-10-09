@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { AlertTriangle, ChevronRight } from "lucide-react";
-import { fetcher } from "@/lib/fetcher";
-import type { FieldStatus, WidgetResult } from "@/integrations/types";
+import { AlertTriangle, ChevronRight, Play } from "lucide-react";
+import { fetcher, sendJson } from "@/lib/fetcher";
+import type { FieldStatus, WidgetField, WidgetResult } from "@/integrations/types";
 import type { TileSize } from "@/lib/config/schema";
 import { FinanceCharts } from "./charts/FinanceCharts";
 import { Sparkline } from "./charts/Sparkline";
@@ -21,6 +21,8 @@ interface Props {
   interval: number;
   /** Tile size decides how much shows; "detail" (the service page) shows everything. */
   size: TileSize | "detail";
+  /** May run the service's actions: fields with a `control` become switches and buttons. */
+  canAct?: boolean;
 }
 
 function listRows(data: WidgetResult | undefined, size: Props["size"]): number {
@@ -30,12 +32,38 @@ function listRows(data: WidgetResult | undefined, size: Props["size"]): number {
   return size === "wide" ? data.compactList * 2 : data.compactList;
 }
 
-export function WidgetFields({ id, interval, size }: Props) {
-  const { data, error, isLoading } = useSWR<WidgetResult>(`/api/widget/${encodeURIComponent(id)}`, fetcher, {
+export function WidgetFields({ id, interval, size, canAct }: Props) {
+  const { data, error, isLoading, mutate } = useSWR<WidgetResult>(`/api/widget/${encodeURIComponent(id)}`, fetcher, {
     refreshInterval: interval * 1000,
     keepPreviousData: true,
   });
   const [openTarget, setOpenTarget] = useState<string>();
+  const [busy, setBusy] = useState<string>();
+  const [actionError, setActionError] = useState<string>();
+
+  /** Run a field's control: flip it at once, then fetch the real state once the device had a moment. */
+  const runControl = async (f: WidgetField) => {
+    const c = f.control!;
+    setBusy(c.target);
+    setActionError(undefined);
+    try {
+      await sendJson(`/api/actions/${encodeURIComponent(id)}`, "POST", { action: c.action, target: c.target });
+      if (c.on !== undefined) {
+        const flip = (x: WidgetField) =>
+          x.control?.target === c.target ? { ...x, value: c.on ? (x.value === "open" ? "closed" : "off") : x.value === "closed" ? "open" : "on", control: { ...c, on: !c.on } } : x;
+        await mutate((d) => d && { ...d, fields: d.fields.map(flip), list: d.list?.map(flip) }, { revalidate: false });
+      }
+      setTimeout(() => void mutate(), 1200);
+    } catch (e) {
+      setActionError(`${f.label}: ${(e as Error).message}`);
+    } finally {
+      setBusy(undefined);
+    }
+  };
+  const control = (f: WidgetField) =>
+    canAct && f.control ? (
+      <ControlButton field={f} busy={busy === f.control.target} onRun={() => void runControl(f)} />
+    ) : null;
 
   if (error && !data) {
     return (
@@ -55,7 +83,8 @@ export function WidgetFields({ id, interval, size }: Props) {
         {isLoading && !data
           ? Array.from({ length: 3 }, (_, i) => <div key={i} className="h-11 animate-pulse rounded-lg bg-track" />)
           : fields.map((f) => (
-              <div key={f.label} title={`${f.label}: ${f.value}`} className="min-w-0 rounded-lg bg-chip px-1.5 py-1.5 text-center ring-1 ring-chip-ring ring-inset">
+              <div key={f.label} title={`${f.label}: ${f.value}`} className="relative min-w-0 rounded-lg bg-chip px-1.5 py-1.5 text-center ring-1 ring-chip-ring ring-inset">
+                {control(f)}
                 {/* Long values (currencies) step down a size instead of truncating on small tiles. */}
                 <div data-status={f.status} className={`truncate font-semibold tabular-nums ${String(f.value).length > 8 ? "text-xs leading-5" : "text-sm"} ${statusColor[f.status ?? "ok"]}`}>
                   {f.value}
@@ -64,6 +93,11 @@ export function WidgetFields({ id, interval, size }: Props) {
               </div>
             ))}
       </div>
+      )}
+      {actionError && (
+        <p role="alert" className="flex items-center gap-1.5 text-xs text-[var(--err)]">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {actionError}
+        </p>
       )}
       {list.length > 0 && (
         <ul className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto text-sm">
@@ -92,7 +126,10 @@ export function WidgetFields({ id, interval, size }: Props) {
                   ) : (
                     <span className="truncate text-muted">{row.label}</span>
                   )}
-                  <span data-status={row.status} className={`shrink-0 tabular-nums ${row.href ? "text-xs text-muted" : "font-medium"} ${row.href ? "" : statusColor[row.status ?? "ok"]}`}>{row.value}</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span data-status={row.status} className={`tabular-nums ${row.href ? "text-xs text-muted" : "font-medium"} ${row.href ? "" : statusColor[row.status ?? "ok"]}`}>{row.value}</span>
+                    {canAct && row.control && <ControlButton field={row} busy={busy === row.control.target} onRun={() => void runControl(row)} inline />}
+                  </span>
                 </div>
                 {open && <SeriesCharts id={id} target={row.target!} label={row.label} />}
               </li>
@@ -135,5 +172,42 @@ export function WidgetFields({ id, interval, size }: Props) {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * A switch (on/off things) or a small play button (scenes, scripts). Above the card's stretched
+ * link, so tapping it never opens the service.
+ */
+function ControlButton({ field: f, busy, onRun, inline }: { field: WidgetField; busy: boolean; onRun: () => void; inline?: boolean }) {
+  const c = f.control!;
+  const place = inline ? "relative z-10" : "absolute top-1 right-1 z-10";
+  if (c.on === undefined) {
+    return (
+      <button
+        type="button"
+        onClick={onRun}
+        disabled={busy}
+        aria-label={`${c.label ?? "Run"} ${f.label}`}
+        title={`${c.label ?? "Run"} ${f.label}`}
+        className={`${place} grid h-5 w-5 place-items-center rounded-full bg-accent/20 text-accent hover:bg-accent hover:text-white disabled:opacity-50`}
+      >
+        <Play className="h-3 w-3" />
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={c.on}
+      aria-label={f.label}
+      title={`${c.on ? "Turn off" : "Turn on"} ${f.label}`}
+      onClick={onRun}
+      disabled={busy}
+      className={`${place} flex h-4 w-7 items-center rounded-full p-0.5 transition disabled:opacity-50 ${c.on ? "bg-accent" : "bg-track"}`}
+    >
+      <span className={`h-3 w-3 rounded-full bg-white shadow transition ${c.on ? "translate-x-3" : ""}`} />
+    </button>
   );
 }

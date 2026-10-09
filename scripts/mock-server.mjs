@@ -15,6 +15,14 @@ const fixture = (name) => JSON.parse(fs.readFileSync(path.join(fixtures, name), 
 const apps = fixture("apps.json");
 const pelicanData = fixture("pelican.json");
 const pelicanCalls = [];
+/** Home Assistant: the fixture's states plus a few controllable entities; service calls change them. */
+const haStates = () => [
+  ...fixture("homeassistant-states.json"),
+  { entity_id: "light.desk", state: "off", attributes: { friendly_name: "Desk lamp" } },
+  { entity_id: "scene.movie_night", state: "2026-10-01T20:00:00+00:00", attributes: { friendly_name: "Movie night" } },
+];
+let haLive;
+const haCalls = [];
 /** wg-easy clients, with "__RECENT__" handshakes set to a moment ago so they count as connected. */
 const wgClients = () =>
   fixture("wgeasy-clients.json").map((c) => ({ ...c, latestHandshakeAt: c.latestHandshakeAt === "__RECENT__" ? new Date(Date.now() - 30_000).toISOString() : c.latestHandshakeAt }));
@@ -334,8 +342,8 @@ const routes = {
   "GET /arcane/api/environments/0/containers": (req, res) =>
     req.headers["x-api-key"] === "arc_key" ? json(res, 200, fixture("arcane-containers.json")) : json(res, 401, { success: false }),
   "GET /arcane/api/environments/0/projects": (_q, res) => json(res, 200, { success: true, data: [{ name: "proxy" }] }),
-  "GET /ha/api/states": (req, res) =>
-    req.headers.authorization === "Bearer ha-token" ? json(res, 200, fixture("homeassistant-states.json")) : json(res, 401, {}),
+  "GET /ha/api/states": (req, res) => (req.headers.authorization === "Bearer ha-token" ? json(res, 200, (haLive ??= haStates())) : json(res, 401, {})),
+  "GET /ha/_calls": (_q, res) => json(res, 200, haCalls),
   "GET /truenas/api/v2.0/pool": (req, res) =>
     req.headers.authorization === "Bearer tn-key" ? json(res, 200, fixture("truenas.json").pools) : json(res, 401, {}),
   "GET /truenas/api/v2.0/alert/list": (req, res) =>
@@ -448,6 +456,19 @@ const patterns = [
       pelicanCalls.push({ server: m[1], ...JSON.parse((await readBody(req)) || "{}") });
       res.writeHead(204);
       res.end();
+    },
+  ],
+  [
+    "POST",
+    /^\/ha\/api\/services\/(\w+)\/(\w+)$/,
+    async (req, res, m) => {
+      if (req.headers.authorization !== "Bearer ha-token") return json(res, 401, {});
+      const { entity_id } = JSON.parse((await readBody(req)) || "{}");
+      haCalls.push({ domain: m[1], service: m[2], entity_id });
+      const s = (haLive ??= haStates()).find((x) => x.entity_id === entity_id);
+      if (s && m[2] === "turn_on" && m[1] !== "scene") s.state = "on";
+      if (s && m[2] === "turn_off") s.state = "off";
+      json(res, 200, s ? [s] : []);
     },
   ],
   [

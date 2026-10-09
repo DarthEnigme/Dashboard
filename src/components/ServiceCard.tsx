@@ -58,7 +58,7 @@ export function ServiceCard({ service: s, settings, canAct }: Props) {
         {canAct && s.actions && <ActionMenu service={s} />}
       </div>
       {s.widget && (
-        <WidgetFields id={s.id} interval={settings.refreshInterval} size={size} />
+        <WidgetFields id={s.id} interval={settings.refreshInterval} size={size} canAct={!!(canAct && s.actions)} />
       )}
       {s.ping && (
         <Link href={detail} className="relative z-10 mt-auto block rounded-lg" aria-label={`${s.name}: uptime details`}>
