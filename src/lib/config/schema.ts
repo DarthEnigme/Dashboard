@@ -138,6 +138,8 @@ export const settingsSchema = z
     liveReload: z.boolean().default(true),
     tabs: z.array(z.string()).optional(),
     history: z.object({ retentionDays: z.number().min(1).max(400).default(90) }).default({}),
+    /** Device inventory: remind the alert channels this many days before a warranty ends (0 = off). */
+    inventory: z.object({ warrantyDays: z.number().int().min(0).max(365).default(30) }).default({}),
     /** Nightly zip of the config, the database, uploads and the secret key. */
     backup: z
       .object({
@@ -297,6 +299,11 @@ export const serviceSchema = z.object({
   ping: z.union([z.boolean(), z.string(), checkSchema]).optional(),
   size: z.enum(tileSizes).optional(),
   alert: z.boolean().optional(),
+  /** Wake-on-LAN: a Wake action in the service's menu (for people allowed to run actions). */
+  wol: z
+    .union([z.string(), z.object({ mac: z.string(), broadcast: z.string().optional() })])
+    .transform((w) => (typeof w === "string" ? { mac: w } : w))
+    .optional(),
   visible,
   widget: widgetSchema.optional(),
   source: z.literal("docker").optional(), // set on services found through Docker labels

@@ -706,6 +706,19 @@ Each person has their own log. It needs the `travel` permission, which signed-in
 
 Each person's list is private. It needs the `watchlist` permission, which signed-in users have by default.
 
+## Inventory
+
+**Inventory** (in the Apps menu) lists the devices on your network, for everyone with the `inventory` permission (admins, or a group that grants it):
+- name, kind, IP or host name, MAC, location, vendor, model, serial, purchase date and price, warranty end, tags and notes, and the dashboard service it runs (linked to its page)
+- **live status:** each device with an address is checked every 30 seconds, with a ping, or a TCP port if you give one (ping needs `NET_RAW` in Docker; a port works everywhere)
+- **Wake-on-LAN:** the power button sends the magic packet (to the device's broadcast address, default `255.255.255.255:9`). It needs the `actions` permission too, and is in the audit log.
+- **warranty reminders:** the alert channels hear about a warranty ending `inventory.warrantyDays` days before (30 by default, `0` turns it off), once per device
+- **CSV:** **Export CSV** downloads every device; **Import CSV** reads a file whose first row names the columns (any order, as in the export). Devices are matched by MAC (or name), so importing an export again updates instead of duplicating.
+
+Services can be woken too: give one `wol: { mac: AA:BB:CC:DD:EE:FF, broadcast: 192.168.1.255 }` (or just `wol: AA:BB:…`) and its ⋯ menu gets **Wake**.
+
+In Docker, a broadcast only reaches your LAN with `network_mode: host`; on a bridge network, give the subnet's broadcast address of a network the container can route to.
+
 ## Keyboard
 
 - `Ctrl/⌘ K`: command palette, on every page. Fuzzy-search services, bookmarks, tabs, Finance and every settings section; `Enter` opens, `⇧ Enter` opens a service's details page.

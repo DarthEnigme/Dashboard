@@ -3,6 +3,7 @@
 // the real service does. /webhook records alerts; /flaky?up=0|1 toggles a service for alert testing.
 // /oidc is a minimal OpenID provider that signs in whoever GET /oidc/_as?email=… last set.
 import crypto from "node:crypto";
+import dgram from "node:dgram";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -10,6 +11,16 @@ import { fileURLToPath } from "node:url";
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
 
 const PORT = Number(process.env.MOCK_PORT ?? 4010);
+
+/** Wake-on-LAN packets received on UDP 4011 (the inventory test points a device there). */
+const wolPackets = [];
+dgram
+  .createSocket("udp4")
+  .on("message", (m) => {
+    // A magic packet: 6×FF, then the MAC 16 times.
+    if (m.length >= 102 && m.subarray(0, 6).every((b) => b === 0xff)) wolPackets.push(m.subarray(6, 12).toString("hex").toUpperCase().match(/../g).join(":"));
+  })
+  .bind(Number(process.env.MOCK_WOL_PORT ?? 4011), "127.0.0.1");
 const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "tests", "fixtures");
 const fixture = (name) => JSON.parse(fs.readFileSync(path.join(fixtures, name), "utf8"));
 const apps = fixture("apps.json");
@@ -333,6 +344,7 @@ const routes = {
     res.writeHead(200, { "Content-Type": "image/svg+xml" });
     res.end('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="180"><rect width="120" height="180" fill="#c2410c"/><text x="60" y="95" font-size="22" text-anchor="middle" fill="#fff">DUNE</text></svg>');
   },
+  "GET /_wol": (_q, res) => json(res, 200, wolPackets),
   // Open-Meteo place search (travel log city search).
   "GET /geo/v1/search": (req, res) => {
     const name = (new URL(req.url, "http://x").searchParams.get("name") ?? "").toLowerCase();

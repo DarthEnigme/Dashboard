@@ -215,6 +215,27 @@ export function db(): DatabaseSync {
         created_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS watch_items_owner ON watch_items (owner_id, status);
+      CREATE TABLE IF NOT EXISTS devices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'other',
+        ip TEXT,
+        mac TEXT,
+        hostname TEXT,
+        location TEXT,
+        vendor TEXT,
+        model TEXT,
+        serial TEXT,
+        purchase_date TEXT,
+        price_cents INTEGER,
+        warranty_until TEXT,
+        service_id TEXT,
+        tags TEXT,
+        notes TEXT,
+        check_port INTEGER,
+        wol_broadcast TEXT,
+        created_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS config_versions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         file TEXT NOT NULL,

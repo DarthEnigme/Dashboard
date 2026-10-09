@@ -125,6 +125,7 @@ export const sections: Section[] = [
       { key: "alerts.telegramToken", label: msg("Telegram bot token"), secret: true, help: msg("From @BotFather. Send your bot a message first so it may write to you.") },
       { key: "alerts.telegramChat", label: msg("Telegram chat"), placeholder: msg("123456789 or @mychannel"), help: msg("Your user or group id (ask @userinfobot), or a channel the bot is admin of.") },
       { key: "alerts.certDays", label: msg("Warn about expiring TLS certificates (days before)"), kind: "number", placeholder: "14", help: msg("For services with an HTTPS status check. 0 turns it off.") },
+      { key: "inventory.warrantyDays", label: msg("Warn about ending device warranties (days before)"), kind: "number", placeholder: "30", help: msg("For devices in the inventory. 0 turns it off.") },
       { key: "alerts.threshold", label: msg("Alert after N failed checks"), kind: "number", placeholder: "2" },
       { key: "alerts.title", label: msg("Sender name"), placeholder: msg("Page"), help: msg("Discord username, Gotify and ntfy title.") },
       {

@@ -16,6 +16,7 @@
       href: http://localhost:4010/flaky
       ping: true
       size: tall
+      wol: { mac: "DE:AD:BE:EF:00:01", broadcast: "127.0.0.1:4011" }
     - name: Custom
       widget:
         type: customapi

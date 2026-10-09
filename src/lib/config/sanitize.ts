@@ -107,7 +107,7 @@ export function sanitize(cfg: LoadedConfig, canSee: (v: Visibility) => boolean =
           ping: !!s.ping,
           size: s.size,
           widget: s.widget?.type,
-          actions: s.widget ? ACTION_TYPES.has(s.widget.type) : undefined,
+          actions: (s.widget && ACTION_TYPES.has(s.widget.type)) || s.wol ? true : undefined,
           metrics: s.widget && (s.widget as { record?: unknown }).record === true ? true : undefined,
           source: s.source,
         })),
