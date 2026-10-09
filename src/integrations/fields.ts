@@ -36,6 +36,7 @@ export const integrationFields: Record<string, { label: string; fields: FieldSpe
     fields: [
       { key: "container", label: "Container name", placeholder: "jellyfin", required: true },
       { key: "host", label: "Docker host", placeholder: "unix:///var/run/docker.sock or tcp://10.0.0.2:2375", help: "Leave empty to use the local socket." },
+      { key: "updates", label: "Check for a newer image", kind: "boolean", default: true, help: "Asks the registry every 6 hours (through Docker's own logins); the tile says when an update is available." },
     ],
   },
   portainer: {
