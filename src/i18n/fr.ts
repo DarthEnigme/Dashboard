@@ -1139,6 +1139,23 @@ export const fr: Record<string, string> = {
   "Warn about ending device warranties (days before)": "Prévenir de la fin de garantie des appareils (jours avant)",
   "For devices in the inventory. 0 turns it off.": "Pour les appareils de l’inventaire. 0 le désactive.",
 
+  // ---------- Alert channels ----------
+  "SMTP server": "Serveur SMTP",
+  "Email alerts. Fill in the server, from and to; the rest as your provider needs.": "Alertes par e-mail. Renseignez le serveur, l’expéditeur et le destinataire ; le reste selon votre fournisseur.",
+  "SMTP port": "Port SMTP",
+  "587 (STARTTLS) or 465 (TLS).": "587 (STARTTLS) ou 465 (TLS).",
+  "SMTP user": "Utilisateur SMTP",
+  "SMTP password": "Mot de passe SMTP",
+  "Email from": "E-mail de l’expéditeur",
+  "Email to": "E-mail du destinataire",
+  "Pushover app token": "Jeton d’application Pushover",
+  "pushover.net → Create an Application.": "pushover.net → Create an Application.",
+  "Pushover user key": "Clé utilisateur Pushover",
+  "Matrix homeserver": "Serveur d’accueil Matrix",
+  "Matrix access token": "Jeton d’accès Matrix",
+  "Of the account that posts (a bot account is best); it must have joined the room.": "Du compte qui publie (un compte bot de préférence) ; il doit avoir rejoint le salon.",
+  "Matrix room id": "Id du salon Matrix",
+
   // ---------- Not literal in the code: action names, account kinds, glow levels ----------
   Start: "Démarrer",
   Stop: "Arrêter",

@@ -25,7 +25,7 @@ A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Hom
   - local users, LDAP, OpenID Connect (Authentik, Authelia, Keycloak…), Google, GitHub, or your reverse proxy
   - signups off by default
   - admin/user roles and per-item visibility
-- **Alerts:** Discord or a webhook when a service goes down or comes back
+- **Alerts:** Discord, Slack, Telegram, Gotify, ntfy, Pushover, Matrix, email or a webhook when a service goes down or comes back
 - **Docker auto-discovery** from container labels
 - **Installable** as an app (PWA) that shows the last loaded dashboard when offline
 - **Config:**
@@ -126,6 +126,18 @@ alerts:
   slack: "{{HOMEPAGE_VAR_SLACK_WEBHOOK}}"     # Slack incoming-webhook URL
   telegramToken: "{{HOMEPAGE_VAR_TELEGRAM_TOKEN}}"   # bot token from @BotFather
   telegramChat: "123456789"           # your user/group id, or @channel (the bot must be allowed to post there)
+  email:                              # SMTP
+    host: smtp.example.com
+    port: 587                         # 587 STARTTLS, or 465 TLS
+    user: page@example.com
+    password: "{{HOMEPAGE_VAR_SMTP_PASSWORD}}"
+    from: page@example.com
+    to: me@example.com, you@example.com
+  pushoverToken: "{{HOMEPAGE_VAR_PUSHOVER_TOKEN}}"   # an application's API token
+  pushoverUser: "{{HOMEPAGE_VAR_PUSHOVER_USER}}"     # your user (or group) key
+  matrix: https://matrix.org          # homeserver
+  matrixToken: "{{HOMEPAGE_VAR_MATRIX_TOKEN}}"       # access token of the posting account (it must have joined the room)
+  matrixRoom: "!abcdefg:matrix.org"   # room id
   threshold: 2         # failed checks in a row before alerting
   certDays: 14         # warn this many days before an HTTPS certificate expires (0 = off)
   title: Homelab       # sender name (Discord username, Gotify/ntfy title); default "Page"

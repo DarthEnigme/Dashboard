@@ -60,7 +60,17 @@ type Level = "info" | "warn" | "error";
 
 /** Is any alert channel configured? */
 export const hasAlertChannel = (cfg: Settings["alerts"]) =>
-  !!(cfg.discord || cfg.webhook || (cfg.gotify && cfg.gotifyToken) || cfg.ntfy || cfg.slack || (cfg.telegramToken && cfg.telegramChat));
+  !!(
+    cfg.discord ||
+    cfg.webhook ||
+    (cfg.gotify && cfg.gotifyToken) ||
+    cfg.ntfy ||
+    cfg.slack ||
+    (cfg.telegramToken && cfg.telegramChat) ||
+    cfg.email?.host ||
+    (cfg.pushoverToken && cfg.pushoverUser) ||
+    (cfg.matrix && cfg.matrixToken && cfg.matrixRoom)
+  );
 
 /**
  * Fill {{name}} placeholders; unknown names become empty. `escape` adapts values to the target (JSON strings).
@@ -119,7 +129,31 @@ const withCommon = (cfg: Settings["alerts"], vars: Record<string, unknown>) => (
 /** HTTP headers are Latin-1: anything else goes as an RFC 2047 encoded word (ntfy decodes it). */
 const headerText = (s: string) => (/^[\x20-\x7e]*$/.test(s) ? s : `=?UTF-8?B?${Buffer.from(s).toString("base64")}?=`);
 
-const PRIORITY = { gotify: { info: 3, warn: 5, error: 8 }, ntfy: { info: "3", warn: "4", error: "5" } } as const;
+const PRIORITY = { gotify: { info: 3, warn: 5, error: 8 }, ntfy: { info: "3", warn: "4", error: "5" }, pushover: { info: 0, warn: 0, error: 1 } } as const;
+/** Pushover's API; PAGE_PUSHOVER_URL points tests at a mock. */
+const PUSHOVER = process.env.PAGE_PUSHOVER_URL ?? "https://api.pushover.net";
+
+/** Email through SMTP; the subject is the alert's first line. */
+async function sendEmail(cfg: NonNullable<Settings["alerts"]["email"]>, title: string, text: string, url: string | undefined, level: Level) {
+  const { createTransport } = await import("nodemailer");
+  const transport = createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure ?? cfg.port === 465,
+    auth: cfg.user ? { user: cfg.user, pass: cfg.password ?? "" } : undefined,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
+  });
+  const first = text.split("\n")[0].slice(0, 150);
+  await transport.sendMail({
+    from: cfg.from.includes("<") ? cfg.from : `"${title.replace(/"/g, "")}" <${cfg.from}>`,
+    to: cfg.to,
+    subject: level === "error" ? `[${title}] ${first}` : `${title}: ${first}`,
+    text: url ? `${text}\n\n${url}` : text,
+  });
+  transport.close();
+}
 const TAGS = { info: "information_source", warn: "warning", error: "rotating_light" } as const;
 
 async function deliver(
@@ -190,6 +224,35 @@ async function deliver(
         }),
       );
     }
+  }
+  if (cfg.email?.host) {
+    jobs.push(sendEmail(cfg.email, title, text, url, level).catch((e) => void errors.push(`Email: ${(e as Error).message}`)));
+  }
+  if (cfg.pushoverToken && cfg.pushoverUser) {
+    const form = new URLSearchParams({ token: cfg.pushoverToken, user: cfg.pushoverUser, title, message: text, priority: String(PRIORITY.pushover[level]) });
+    if (url) form.set("url", url);
+    jobs.push(post("Pushover", `${PUSHOVER}/1/messages.json`, form.toString(), { "Content-Type": "application/x-www-form-urlencoded" }));
+  }
+  if (cfg.matrix && cfg.matrixToken && cfg.matrixRoom) {
+    // Each message needs its own transaction id, or Matrix treats it as a retry of the last one.
+    const txn = `page-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const target = `${cfg.matrix.replace(/\/+$/, "")}/_matrix/client/v3/rooms/${encodeURIComponent(cfg.matrixRoom)}/send/m.room.message/${txn}`;
+    jobs.push(
+      (async () => {
+        try {
+          const res = await http(target, {
+            method: "PUT",
+            headers: { Authorization: `Bearer ${cfg.matrixToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ msgtype: "m.text", body: url ? `${text}\n${url}` : text }),
+            timeoutMs: 8000,
+          });
+          await res.body?.cancel();
+          if (!res.ok) errors.push(`Matrix: HTTP ${res.status}`);
+        } catch (e) {
+          errors.push(`Matrix: ${(e as Error).message}`);
+        }
+      })(),
+    );
   }
   await Promise.all(jobs);
   if (!jobs.length && !errors.length) errors.push("No alert channel configured");
