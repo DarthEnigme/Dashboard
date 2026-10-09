@@ -27,6 +27,8 @@ const child = spawn(process.execPath, [path.join(root, "node_modules", "next", "
     // Update checks go to the mock GitHub API.
     PAGE_UPDATE_FEED: "http://localhost:4010/gh",
     PAGE_REPO: "test/page",
+    // City search for the travel log.
+    PAGE_GEOCODER_URL: "http://localhost:4010/geo",
   },
 });
 const stop = () => child.kill();

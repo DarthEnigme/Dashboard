@@ -686,6 +686,16 @@ Budget alerts go to the same Discord/webhook channels as service alerts, at most
 
 Add a `finance` widget to a tile to see it on the dashboard; bigger tiles show more charts.
 
+## Travel log
+
+**Travel** (in the Apps menu) keeps track of where you've been:
+- **Map:** a dotted globe that slowly turns (drag it, or pick a country) with the countries you've visited in your accent colour, the ones you want to visit outlined, and the cities you've been to glowing. **Flat map** shows the same as a world map. Pick a country to mark it as visited, lived there or want to go, and see your trips there.
+- **Stats:** countries out of 195 (UN members and the two observers) and the share of the world, continents, cities, trips, days away this year, and your longest trip.
+- **Trips:** a name, dates, the stops in order (search a city, or add a whole country), a rating, notes, and who came along. Companions (other Page users) see the trip on their own map and in their stats; only you can change it, and they can remove it from their list.
+- **Places:** every country and city you've marked, with search to add more.
+
+Each person has their own log. It needs the `travel` permission, which signed-in users have by default (see `auth.userPermissions`). City search uses Open-Meteo's free place search through Page; everything else (the map included) works offline. Country flags use the Twemoji Country Flags font (Twemoji graphics by Twitter, CC-BY 4.0) so they also show on Windows.
+
 ## Keyboard
 
 - `Ctrl/⌘ K`: command palette, on every page. Fuzzy-search services, bookmarks, tabs, Finance and every settings section; `Enter` opens, `⇧ Enter` opens a service's details page.

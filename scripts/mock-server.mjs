@@ -319,6 +319,17 @@ const routes = {
   "GET /pelican/api/client": (req, res) =>
     req.headers.authorization === "Bearer ptlc_key" ? json(res, 200, pelicanData.servers) : json(res, 401, { errors: [{ detail: "Unauthenticated." }] }),
   "GET /pelican/_calls": (_q, res) => json(res, 200, pelicanCalls),
+  // Open-Meteo place search (travel log city search).
+  "GET /geo/v1/search": (req, res) => {
+    const name = (new URL(req.url, "http://x").searchParams.get("name") ?? "").toLowerCase();
+    const places = [
+      { name: "Lisbon", latitude: 38.72, longitude: -9.14, country_code: "PT", admin1: "Lisbon" },
+      { name: "Porto", latitude: 41.15, longitude: -8.61, country_code: "PT", admin1: "Porto" },
+      { name: "Kyoto", latitude: 35.01, longitude: 135.77, country_code: "JP", admin1: "Kyoto" },
+      { name: "Paris", latitude: 48.85, longitude: 2.35, country_code: "FR", admin1: "Île-de-France" },
+    ];
+    json(res, 200, { results: places.filter((p) => p.name.toLowerCase().startsWith(name)) });
+  },
   // WGDashboard: API key header; a wrong key answers 200 with status false, like the real one.
   "GET /wgd/api/getWireguardConfigurations": (req, res) =>
     json(res, 200, req.headers["wg-dashboard-apikey"] === "wgd-key" ? fixture("wgdashboard.json").configurations : { status: false, message: "Unauthorized access", data: null }),

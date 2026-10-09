@@ -158,6 +158,44 @@ export function db(): DatabaseSync {
         archived INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS travel_places (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        country TEXT NOT NULL,
+        city TEXT,
+        lat REAL,
+        lon REAL,
+        status TEXT NOT NULL DEFAULT 'visited',
+        first_date TEXT,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS travel_places_owner ON travel_places (owner_id);
+      CREATE TABLE IF NOT EXISTS travel_trips (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        notes TEXT,
+        rating INTEGER,
+        created_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS travel_stops (
+        trip_id INTEGER NOT NULL REFERENCES travel_trips(id) ON DELETE CASCADE,
+        ord INTEGER NOT NULL,
+        country TEXT NOT NULL,
+        city TEXT,
+        lat REAL,
+        lon REAL,
+        arrive TEXT,
+        depart TEXT,
+        PRIMARY KEY (trip_id, ord)
+      );
+      CREATE TABLE IF NOT EXISTS travel_companions (
+        trip_id INTEGER NOT NULL REFERENCES travel_trips(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (trip_id, user_id)
+      );
       CREATE TABLE IF NOT EXISTS config_versions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         file TEXT NOT NULL,
