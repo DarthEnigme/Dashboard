@@ -11,6 +11,7 @@ import { COUNTRIES, countryIndex, countryName, flag } from "@/lib/travel/geo";
 import { msg } from "@/i18n";
 import { dateOnly } from "@/i18n/format";
 import { useT } from "@/i18n/client";
+import { resolveMapColors, type MapColors } from "@/lib/travel/colors";
 import { Globe, type GlobeCity } from "./Globe";
 import { TripEditor } from "./TripEditor";
 import { CitySearch } from "./CitySearch";
@@ -42,7 +43,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const nights = (t: Trip) => Math.round((Date.parse(t.end_date) - Date.parse(t.start_date)) / 86_400_000);
 
 /** The travel log: a globe of where you've been, your trips, and every country and city you've marked. */
-export function TravelPage() {
+export function TravelPage({ colors }: { colors?: Partial<MapColors> }) {
   const t = useT();
   const { data, mutate, error } = useSWR<Data>(KEY, fetcher);
   const [view, setView] = useState<View>("map");
@@ -54,10 +55,11 @@ export function TravelPage() {
   const trips = data?.trips ?? [];
   const started = trips.filter((tr) => tr.start_date <= today());
   const visited = useMemo(() => new Set([...places.filter((p) => p.status !== "want").map((p) => p.country), ...started.flatMap((tr) => tr.stops.map((s) => s.country))]), [places, started]);
+  const lived = useMemo(() => new Set(places.filter((p) => p.status === "lived").map((p) => p.country)), [places]);
   const wanted = useMemo(() => new Set(places.filter((p) => p.status === "want" && !visited.has(p.country)).map((p) => p.country)), [places, visited]);
   const cities = useMemo<GlobeCity[]>(
     () => [
-      ...places.filter((p) => p.status !== "want" && p.lat !== null && p.lon !== null).map((p) => ({ lat: p.lat!, lon: p.lon!, label: p.city ?? p.country })),
+      ...places.filter((p) => p.status !== "want" && p.lat !== null && p.lon !== null).map((p) => ({ lat: p.lat!, lon: p.lon!, label: p.city ?? p.country, lived: p.status === "lived" })),
       ...started.flatMap((tr) => tr.stops.filter((s) => s.lat !== null && s.lon !== null).map((s) => ({ lat: s.lat!, lon: s.lon!, label: s.city ?? s.country }))),
     ],
     [places, started],
@@ -70,6 +72,8 @@ export function TravelPage() {
     else if (status) await refresh({ places: await sendJson<Place[]>("/api/travel/places", "POST", { country, status }) });
   };
 
+  // CSS can resolve the accent itself, so the legend needs no computed colours.
+  const legend = resolveMapColors(colors, "var(--accent)");
   const s = data?.stats;
   const thisYear = s?.daysByYear.find((d) => d.year === today().slice(0, 4))?.days ?? 0;
 
@@ -117,13 +121,18 @@ export function TravelPage() {
                 </button>
               ))}
             </div>
-            <Globe visited={visited} wanted={wanted} cities={cities} selected={selected} onSelect={setSelected} flat={flat} />
+            <Globe visited={visited} lived={lived} wanted={wanted} cities={cities} selected={selected} onSelect={setSelected} flat={flat} colors={colors} />
             <ul className="mt-2 flex flex-wrap justify-center gap-4 text-xs text-muted" aria-label={t("Legend")}>
               <li className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-accent" /> {t("Visited")}
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: legend.visited }} /> {t("Visited")}
               </li>
+              {(lived.size > 0 || legend.lived !== legend.visited) && (
+                <li className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: legend.lived }} /> {t("Lived there")}
+                </li>
+              )}
               <li className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full ring-1 ring-accent" /> {t("Want to go")}
+                <span className="h-2.5 w-2.5 rounded-full ring-1" style={{ ["--tw-ring-color" as string]: legend.want }} /> {t("Want to go")}
               </li>
               <li className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full bg-fg/30" /> {t("Not yet")}

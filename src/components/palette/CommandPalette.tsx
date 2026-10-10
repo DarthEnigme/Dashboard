@@ -28,7 +28,7 @@ import { glowAmount, paletteThemes } from "@/lib/theme";
 import type { ClientConfig, ClientService } from "@/lib/config/sanitize";
 import type { ClientAuth } from "@/lib/auth";
 import type { ServiceAction } from "@/integrations/types";
-import { sections } from "../settings/sections";
+import { allFields, sections } from "../settings/sections";
 import { sectionsFor } from "@/lib/sections";
 import { msg } from "@/i18n";
 import { useT } from "@/i18n/client";
@@ -175,7 +175,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           subtitle: sec.description,
           group: msg("Settings"),
           icon: sec.icon ?? Settings2,
-          keywords: sec.fields.map((f) => f.label).join(" "),
+          keywords: allFields(sec).map((f) => f.label).join(" "),
           run: () => go(`/settings#${sec.id}`),
         });
         for (const h of Object.values(sec.headings ?? {}))

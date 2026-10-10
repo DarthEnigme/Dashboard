@@ -15,7 +15,7 @@ export default async function Travel() {
   return (
     <>
       <Background settings={settings} />
-      <TravelPage />
+      <TravelPage colors={{ visited: settings.travel.visitedColor, lived: settings.travel.livedColor, want: settings.travel.wantColor }} />
     </>
   );
 }

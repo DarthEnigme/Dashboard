@@ -1,9 +1,12 @@
 import { z } from "zod";
 import { paletteThemes } from "@/lib/theme";
+import { fontIds } from "@/lib/fonts";
 
 export const gradientPresets = [
   "aurora", "sunset", "ocean", "midnight", "forest", "aero", "dawn", "lagoon", "graphite", "nebula", "synthwave",
   "ember", "arctic", "rose", "mint", "dusk", "cyberpunk", "sand", "deep-sea",
+  "mint-apple", "citrus-sherbert", "retro-raincloud", "hanami", "sunrise", "cotton-candy", "lofi-vibes", "desert-khaki",
+  "chroma-glow", "crimson-moon", "midnight-blurple", "under-the-sea", "neon-nights", "strawberry-lemonade",
 ] as const;
 export const stylePresets = ["glass", "liquid", "aero", "neon", "brutal", "soft", "retro", "minimal", "solid"] as const;
 /** oled and sepia are tones of dark and light (see themeAttrs in lib/theme.ts). */
@@ -125,6 +128,16 @@ export const settingsSchema = z
         gradient: z.union([z.enum(gradientPresets), z.string().regex(customRef, "not a known gradient")]).default("aurora"),
         blur: z.number().min(0).max(40).default(0),
         brightness: z.number().min(0).max(1).default(0.7),
+      })
+      .default({}),
+    /** Font of the whole page (lib/fonts.ts); system keeps the platform font. */
+    font: z.enum(fontIds).default("system"),
+    /** Travel map colours: a colour, or "accent" to follow the accent colour. */
+    travel: z
+      .object({
+        visitedColor: z.string().default("accent"),
+        livedColor: z.string().default("accent"),
+        wantColor: z.string().default("#f59e0b"),
       })
       .default({}),
     target: z.enum(["_blank", "_self"]).default("_blank"),

@@ -103,11 +103,11 @@ export function FieldInput({
       <div className="flex gap-2">
         <input
           type="color"
-          value={String(value || "#8b5cf6")}
+          value={/^#[0-9a-f]{6}$/i.test(String(value)) ? String(value) : "#8b5cf6"}
           onChange={(e) => onChange(e.target.value)}
           className="h-10 w-12 shrink-0 cursor-pointer rounded-xl border border-line bg-transparent"
         />
-        <input id={id} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} className={inputClass} />
+        <input id={id} value={String(value ?? "")} placeholder={spec.placeholder} onChange={(e) => onChange(e.target.value)} className={inputClass} />
       </div>
     );
   } else {

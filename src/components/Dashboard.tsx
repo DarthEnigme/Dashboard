@@ -116,7 +116,7 @@ export function Dashboard({ config, auth, tabs, version }: { config: ClientConfi
         </div>
       )}
 
-      {config.widgets.length > 0 && <InfoBar widgets={config.widgets} />}
+      {config.widgets.length > 0 && <InfoBar widgets={config.widgets} refreshSeconds={settings.pingInterval} />}
 
       <TabBar tabs={tabs} active={q ? "" : active} onSelect={selectTab} />
 

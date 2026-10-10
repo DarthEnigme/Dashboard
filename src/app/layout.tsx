@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { loadConfig } from "@/lib/config/load";
 import { glowAmount, glowAttr, paletteCss, resolveTheme, serverAccent } from "@/lib/theme";
 import { buildInfo } from "@/lib/version";
+import { fontFamily } from "@/lib/fonts";
 import { getLocale } from "@/i18n/server";
 import { I18nProvider } from "@/i18n/client";
 import { iconVersion } from "@/lib/logo";
@@ -40,7 +41,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       data-glow={glowAttr(settings.glow)}
       data-build={buildInfo().buildId}
       data-version={buildInfo().version}
-      style={{ "--accent": serverAccent(settings.accent, settings.background.gradient, settings.customThemes), "--glow": glowAmount(settings.glow) / 100 } as CSSProperties}
+      style={{ "--accent": serverAccent(settings.accent, settings.background.gradient, settings.customThemes), "--glow": glowAmount(settings.glow) / 100, "--font-choice": fontFamily(settings.font) } as CSSProperties}
     >
       <body>
         {/* Colour theme (Nord, a custom one…); the settings preview rewrites it in place. */}

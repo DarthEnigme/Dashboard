@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { COUNTRIES, countryIndex, DOTS } from "@/lib/travel/geo";
+import { resolveMapColors, type MapColors } from "@/lib/travel/colors";
 import { useWidth } from "../charts/common";
 import { useT } from "@/i18n/client";
 
@@ -9,11 +10,16 @@ export interface GlobeCity {
   lat: number;
   lon: number;
   label: string;
+  lived?: boolean;
 }
 
 interface Props {
   visited: Set<string>;
+  /** Countries lived in (also in `visited`), drawn in their own colour. */
+  lived: Set<string>;
   wanted: Set<string>;
+  /** From settings.travel; "accent" follows the accent colour. */
+  colors?: Partial<MapColors>;
   cities: GlobeCity[];
   selected?: string;
   onSelect: (code: string | undefined) => void;
@@ -35,11 +41,11 @@ for (let i = 0, j = 0; i < DOTS.length; i += 3, j++) {
 const cssColor = (el: Element, name: string, fallback: string) => getComputedStyle(el).getPropertyValue(name).trim() || fallback;
 
 /**
- * The countries you've been to on a dotted globe: land in faint dots, visited countries in the
- * accent colour, wish-list ones outlined, cities as glowing points. Spins slowly (not with reduced
+ * The countries you've been to on a dotted globe: land in faint dots, visited and lived-in countries
+ * filled in their colours (the accent by default), wish-list ones outlined, cities as glowing points. Spins slowly (not with reduced
  * motion), drags to turn, and a click picks the country under the pointer.
  */
-export function Globe({ visited, wanted, cities, selected, onSelect, flat }: Props) {
+export function Globe({ visited, lived, wanted, cities, selected, onSelect, flat, colors: setting }: Props) {
   const t = useT();
   const [box, width] = useWidth<HTMLDivElement>();
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -49,6 +55,7 @@ export function Globe({ visited, wanted, cities, selected, onSelect, flat }: Pro
   const hover = useRef(false);
   const [reduced, setReduced] = useState(false);
   const height = flat ? Math.round(width / 2) : Math.min(width, 520);
+  const settingKey = JSON.stringify(setting ?? null);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -74,14 +81,14 @@ export function Globe({ visited, wanted, cities, selected, onSelect, flat }: Pro
     if (!ctx) return;
     let raf = 0;
     let last = performance.now();
-    let colors = { fg: "#fff", accent: "#8b5cf6" };
+    let colors: Paint = { fg: "#fff", ...resolveMapColors(setting, "#8b5cf6") };
     let colorAt = 0;
 
     const draw = (now: number) => {
       const dt = Math.min(64, now - last);
       last = now;
       if (now - colorAt > 500) {
-        colors = { fg: cssColor(el, "--fg", "#f4f4f5"), accent: cssColor(el, "--accent", "#8b5cf6") };
+        colors = { fg: cssColor(el, "--fg", "#f4f4f5"), ...resolveMapColors(setting, cssColor(el, "--accent", "#8b5cf6")) };
         colorAt = now;
       }
       const v = view.current;
@@ -98,7 +105,7 @@ export function Globe({ visited, wanted, cities, selected, onSelect, flat }: Pro
       const sel = selected ? countryIndex(selected) : -1;
       const status = (i: number) => {
         const code = COUNTRIES[i]?.code;
-        return code && visited.has(code) ? 2 : code && wanted.has(code) ? 1 : 0;
+        return !code ? 0 : lived.has(code) ? 3 : visited.has(code) ? 2 : wanted.has(code) ? 1 : 0;
       };
 
       if (flat) {
@@ -109,7 +116,7 @@ export function Globe({ visited, wanted, cities, selected, onSelect, flat }: Pro
           paint(ctx, x, y, dot, status(IDX[j]), IDX[j] === sel, 1, colors);
         }
         ctx.globalAlpha = 1;
-        for (const c of cities) glow(ctx, ((c.lon + 180) / 360) * width, ((90 - c.lat) / 180) * height, dot * 1.6, colors.accent);
+        for (const c of cities) glow(ctx, ((c.lon + 180) / 360) * width, ((90 - c.lat) / 180) * height, dot * 1.6, c.lived ? colors.lived : colors.visited);
       } else {
         const r = Math.min(width, height) / 2 - 8;
         const cx = width / 2;
@@ -143,14 +150,15 @@ export function Globe({ visited, wanted, cities, selected, onSelect, flat }: Pro
         ctx.globalAlpha = 1;
         for (const c of cities) {
           const p = project(c.lon * RAD, c.lat * RAD);
-          if (p.z > 0) glow(ctx, p.x, p.y, dot * 1.7, colors.accent);
+          if (p.z > 0) glow(ctx, p.x, p.y, dot * 1.7, c.lived ? colors.lived : colors.visited);
         }
       }
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [width, height, visited, wanted, cities, selected, flat, reduced]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, height, visited, lived, wanted, cities, selected, flat, reduced, settingKey]);
 
   /** The country of the land dot nearest the pointer, if one is close. */
   const pick = (clientX: number, clientY: number) => {
@@ -226,17 +234,21 @@ export function Globe({ visited, wanted, cities, selected, onSelect, flat }: Pro
   );
 }
 
-function paint(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, status: number, selected: boolean, light: number, c: { fg: string; accent: string }) {
+type Paint = MapColors & { fg: string };
+
+/** status: 3 lived, 2 visited, 1 want to go, 0 not yet. */
+function paint(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, status: number, selected: boolean, light: number, c: Paint) {
+  const been = status >= 2;
   ctx.beginPath();
   // Visited countries are drawn a little bigger, so small ones (Portugal, Japan) still stand out.
-  ctx.arc(x, y, selected ? r * 1.35 : status === 2 ? r * 1.3 : r, 0, Math.PI * 2);
-  if (status === 2 || selected) {
+  ctx.arc(x, y, selected ? r * 1.35 : been ? r * 1.3 : r, 0, Math.PI * 2);
+  if (been || selected) {
     ctx.globalAlpha = (selected ? 1 : 0.9) * light;
-    ctx.fillStyle = selected && status !== 2 ? c.fg : c.accent;
+    ctx.fillStyle = selected && !been ? c.fg : status === 3 ? c.lived : c.visited;
     ctx.fill();
   } else if (status === 1) {
     ctx.globalAlpha = 0.85 * light;
-    ctx.strokeStyle = c.accent;
+    ctx.strokeStyle = c.want;
     ctx.lineWidth = 0.9;
     ctx.stroke();
   } else {

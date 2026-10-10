@@ -10,6 +10,30 @@ export const infoFields: Record<string, { label: string; fields: FieldSpec[] }> 
       { key: "timezone", label: "Time zone", placeholder: "Europe/Paris (default: browser)" },
     ],
   },
+  clock: {
+    label: "Clock & world clocks",
+    fields: [
+      { key: "timezone", label: "Time zone", placeholder: "Europe/Paris (default: browser)" },
+      { key: "zones", label: "Other time zones", kind: "list", placeholder: "Tokyo=Asia/Tokyo, America/New_York", help: "Label=Zone, or just the zone. Comma separated." },
+      { key: "hour12", label: "12-hour clock", kind: "boolean" },
+      { key: "seconds", label: "Show seconds", kind: "boolean" },
+    ],
+  },
+  trip: {
+    label: "Next trip",
+    fields: [{ key: "label", label: "Label", placeholder: "Next trip" }],
+  },
+  status: {
+    label: "Services up / down",
+    fields: [],
+  },
+  finance: {
+    label: "Finance this month",
+    fields: [
+      { key: "show", label: "Show", kind: "list", placeholder: "spent, income, budgets", help: "Any of: spent, income, net, balance, budgets." },
+      { key: "currency", label: "Currency", placeholder: "EUR (default: the finance currency)" },
+    ],
+  },
   weather: {
     label: "Weather",
     fields: [

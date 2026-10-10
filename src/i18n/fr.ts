@@ -1169,6 +1169,25 @@ export const fr: Record<string, string> = {
   "never used": "jamais utilisé",
   "Revoke {name}": "Révoquer {name}",
 
+  // ---------- 0.6: fonts, travel colours, alert channels, info widgets ----------
+  "Alert channels": "Canaux d’alerte",
+  "Bundled with Page, so it works offline. system keeps your device's font; atkinson is designed to be easy to read.":
+    "Fournie avec Page, elle marche hors ligne. system garde la police de l’appareil ; atkinson est conçue pour être facile à lire.",
+  Channels: "Canaux",
+  "Colours of the travel map.": "Couleurs de la carte des voyages.",
+  Font: "Police",
+  "Has a problem": "A un problème",
+  Lived: "Habité",
+  Messages: "Messages",
+  "Next trip": "Prochain voyage",
+  "Nothing planned yet": "Rien de prévu pour l’instant",
+  "Type “accent” to follow the accent colour.": "Tapez « accent » pour suivre la couleur d’accent.",
+  Webhook: "Webhook",
+  "day {day} of {n}": "jour {day} sur {n}",
+  "in {n} day": "dans {n} jour",
+  "in {n} days": "dans {n} jours",
+  tomorrow: "demain",
+
   // ---------- Not literal in the code: action names, account kinds, glow levels ----------
   Start: "Démarrer",
   Stop: "Arrêter",

@@ -1,6 +1,7 @@
-import { Activity, Archive, ArrowUpCircle, Container, LayoutGrid, Palette, PiggyBank, RefreshCw, Settings2, Users, type LucideIcon } from "lucide-react";
+import { Activity, Archive, ArrowUpCircle, Container, LayoutGrid, Palette, Plane, PiggyBank, RefreshCw, Settings2, Users, type LucideIcon } from "lucide-react";
 import { gradientPresets, stylePresets, themes } from "@/lib/config/schema";
 import { GLOW_ALIASES } from "@/lib/theme";
+import { fontIds } from "@/lib/fonts";
 import type { FieldSpec } from "@/integrations/fields";
 import { msg } from "@/i18n";
 
@@ -21,6 +22,121 @@ export interface Section {
   extraKeys?: string[];
   extra?: SectionExtra;
 }
+
+/** Alert channels, one chip each in Settings → Monitoring & alerts; "messages" holds the templates. */
+export interface AlertChannel {
+  id: string;
+  label: string;
+  fields: FieldSpec[];
+}
+
+export const alertChannels: AlertChannel[] = [
+  {
+    id: "discord",
+    label: "Discord",
+    fields: [
+      { key: "alerts.discord", label: msg("Discord webhook URL"), secret: true, placeholder: "https://discord.com/api/webhooks/…" },
+    ],
+  },
+  {
+    id: "slack",
+    label: "Slack",
+    fields: [
+      { key: "alerts.slack", label: msg("Slack webhook URL"), secret: true, placeholder: "https://hooks.slack.com/services/…", help: msg("Slack app → Incoming Webhooks.") },
+    ],
+  },
+  {
+    id: "telegram",
+    label: "Telegram",
+    fields: [
+      { key: "alerts.telegramToken", label: msg("Telegram bot token"), secret: true, help: msg("From @BotFather. Send your bot a message first so it may write to you.") },
+      { key: "alerts.telegramChat", label: msg("Telegram chat"), placeholder: msg("123456789 or @mychannel"), help: msg("Your user or group id (ask @userinfobot), or a channel the bot is admin of.") },
+    ],
+  },
+  {
+    id: "gotify",
+    label: "Gotify",
+    fields: [
+      { key: "alerts.gotify", label: msg("Gotify server URL"), placeholder: "https://gotify.example.com" },
+      { key: "alerts.gotifyToken", label: msg("Gotify app token"), secret: true, help: msg("Apps → Create application.") },
+    ],
+  },
+  {
+    id: "ntfy",
+    label: "ntfy",
+    fields: [
+      { key: "alerts.ntfy", label: msg("ntfy topic URL"), secret: true, placeholder: "https://ntfy.sh/my-homelab-alerts" },
+      { key: "alerts.ntfyToken", label: msg("ntfy access token"), secret: true, help: msg("Only for protected topics.") },
+    ],
+  },
+  {
+    id: "email",
+    label: msg("Email"),
+    fields: [
+      { key: "alerts.email.host", label: msg("SMTP server"), placeholder: "smtp.example.com", help: msg("Email alerts. Fill in the server, from and to; the rest as your provider needs.") },
+      { key: "alerts.email.port", label: msg("SMTP port"), kind: "number", placeholder: "587", help: msg("587 (STARTTLS) or 465 (TLS).") },
+      { key: "alerts.email.user", label: msg("SMTP user") },
+      { key: "alerts.email.password", label: msg("SMTP password"), secret: true },
+      { key: "alerts.email.from", label: msg("Email from"), placeholder: "page@example.com" },
+      { key: "alerts.email.to", label: msg("Email to"), placeholder: "me@example.com, you@example.com" },
+    ],
+  },
+  {
+    id: "pushover",
+    label: "Pushover",
+    fields: [
+      { key: "alerts.pushoverToken", label: msg("Pushover app token"), secret: true, help: msg("pushover.net → Create an Application.") },
+      { key: "alerts.pushoverUser", label: msg("Pushover user key"), secret: true },
+    ],
+  },
+  {
+    id: "matrix",
+    label: "Matrix",
+    fields: [
+      { key: "alerts.matrix", label: msg("Matrix homeserver"), placeholder: "https://matrix.org" },
+      { key: "alerts.matrixToken", label: msg("Matrix access token"), secret: true, help: msg("Of the account that posts (a bot account is best); it must have joined the room.") },
+      { key: "alerts.matrixRoom", label: msg("Matrix room id"), placeholder: "!abcdefg:matrix.org" },
+    ],
+  },
+  {
+    id: "webhook",
+    label: msg("Webhook"),
+    fields: [
+      { key: "alerts.webhook", label: msg("Generic webhook URL"), secret: true, placeholder: msg("Home Assistant, n8n…") },
+      {
+        key: "alerts.webhookBody",
+        label: msg("Generic webhook body (JSON)"),
+        kind: "textarea",
+        placeholder: msg("{\n  \"text\": \"{{message}}\",\n  \"service\": \"{{service}}\",\n  \"level\": \"{{level}}\"\n}"),
+        help: msg("Empty sends Page's own JSON. Values are escaped for JSON strings, so keep the quotes around them."),
+      },
+    ],
+  },
+  {
+    id: "messages",
+    label: msg("Messages"),
+    fields: [
+      {
+        key: "alerts.messages.down",
+        label: msg("Message when a service goes down"),
+        kind: "textarea",
+        placeholder: msg("🔴 {{service}} is DOWN ({{reason}})\n{{url}}"),
+        help: `Empty keeps the built-in text. Variables: ${ALERT_VARS}.`,
+      },
+      { key: "alerts.messages.up", label: msg("Message when a service is back up"), kind: "textarea", placeholder: msg("🟢 {{service}} is back UP after {{duration}}") },
+      {
+        key: "alerts.messages.notice",
+        label: msg("Message for other notices"),
+        kind: "textarea",
+        placeholder: msg("[{{level}}] {{message}}"),
+        help: msg("Budgets, updates, certificates and thresholds. {{message}} is Page's own text, {{kind}} is budget, update, cert or threshold."),
+      },
+    ],
+  },
+];
+
+/** Every field of a section, including those inside its own panel (alert channels), for search. */
+export const allFields = (s: Section): FieldSpec[] => (s.id === "monitoring" ? [...s.fields, ...alertChannels.flatMap((c) => c.fields)] : s.fields);
 
 export const sections: Section[] = [
   {
@@ -52,6 +168,14 @@ export const sections: Section[] = [
     fields: [
       { key: "theme", label: msg("Theme"), kind: "select", options: [...themes], required: true, help: msg("oled: pure black. sepia: warm paper.") },
       { key: "style", label: msg("Card style"), kind: "select", options: [...stylePresets] },
+      {
+        key: "font",
+        label: msg("Font"),
+        kind: "select",
+        options: [...fontIds],
+        placeholder: "system",
+        help: msg("Bundled with Page, so it works offline. system keeps your device's font; atkinson is designed to be easy to read."),
+      },
       { key: "accent", label: msg("Accent colour"), kind: "color", help: msg("Type “auto” to take it from the wallpaper.") },
       {
         key: "glow",
@@ -115,53 +239,12 @@ export const sections: Section[] = [
     description: msg("Status history and where to send alerts when a service goes down."),
     fields: [
       { key: "history.retentionDays", label: msg("Keep status history (days)"), kind: "number", placeholder: "90" },
-      { key: "alerts.discord", label: msg("Discord webhook URL"), secret: true, placeholder: "https://discord.com/api/webhooks/…" },
-      { key: "alerts.webhook", label: msg("Generic webhook URL"), secret: true, placeholder: msg("Home Assistant, n8n…") },
-      { key: "alerts.gotify", label: msg("Gotify server URL"), placeholder: "https://gotify.example.com" },
-      { key: "alerts.gotifyToken", label: msg("Gotify app token"), secret: true, help: msg("Apps → Create application.") },
-      { key: "alerts.ntfy", label: msg("ntfy topic URL"), secret: true, placeholder: "https://ntfy.sh/my-homelab-alerts" },
-      { key: "alerts.ntfyToken", label: msg("ntfy access token"), secret: true, help: msg("Only for protected topics.") },
-      { key: "alerts.slack", label: msg("Slack webhook URL"), secret: true, placeholder: "https://hooks.slack.com/services/…", help: msg("Slack app → Incoming Webhooks.") },
-      { key: "alerts.email.host", label: msg("SMTP server"), placeholder: "smtp.example.com", help: msg("Email alerts. Fill in the server, from and to; the rest as your provider needs.") },
-      { key: "alerts.email.port", label: msg("SMTP port"), kind: "number", placeholder: "587", help: msg("587 (STARTTLS) or 465 (TLS).") },
-      { key: "alerts.email.user", label: msg("SMTP user") },
-      { key: "alerts.email.password", label: msg("SMTP password"), secret: true },
-      { key: "alerts.email.from", label: msg("Email from"), placeholder: "page@example.com" },
-      { key: "alerts.email.to", label: msg("Email to"), placeholder: "me@example.com, you@example.com" },
-      { key: "alerts.pushoverToken", label: msg("Pushover app token"), secret: true, help: msg("pushover.net → Create an Application.") },
-      { key: "alerts.pushoverUser", label: msg("Pushover user key"), secret: true },
-      { key: "alerts.matrix", label: msg("Matrix homeserver"), placeholder: "https://matrix.org" },
-      { key: "alerts.matrixToken", label: msg("Matrix access token"), secret: true, help: msg("Of the account that posts (a bot account is best); it must have joined the room.") },
-      { key: "alerts.matrixRoom", label: msg("Matrix room id"), placeholder: "!abcdefg:matrix.org" },
-      { key: "alerts.telegramToken", label: msg("Telegram bot token"), secret: true, help: msg("From @BotFather. Send your bot a message first so it may write to you.") },
-      { key: "alerts.telegramChat", label: msg("Telegram chat"), placeholder: msg("123456789 or @mychannel"), help: msg("Your user or group id (ask @userinfobot), or a channel the bot is admin of.") },
+      { key: "alerts.threshold", label: msg("Alert after N failed checks"), kind: "number", placeholder: "2" },
       { key: "alerts.certDays", label: msg("Warn about expiring TLS certificates (days before)"), kind: "number", placeholder: "14", help: msg("For services with an HTTPS status check. 0 turns it off.") },
       { key: "inventory.warrantyDays", label: msg("Warn about ending device warranties (days before)"), kind: "number", placeholder: "30", help: msg("For devices in the inventory. 0 turns it off.") },
-      { key: "alerts.threshold", label: msg("Alert after N failed checks"), kind: "number", placeholder: "2" },
       { key: "alerts.title", label: msg("Sender name"), placeholder: msg("Page"), help: msg("Discord username, Gotify and ntfy title.") },
-      {
-        key: "alerts.messages.down",
-        label: msg("Message when a service goes down"),
-        kind: "textarea",
-        placeholder: msg("🔴 {{service}} is DOWN ({{reason}})\n{{url}}"),
-        help: `Empty keeps the built-in text. Variables: ${ALERT_VARS}.`,
-      },
-      { key: "alerts.messages.up", label: msg("Message when a service is back up"), kind: "textarea", placeholder: msg("🟢 {{service}} is back UP after {{duration}}") },
-      {
-        key: "alerts.messages.notice",
-        label: msg("Message for other notices"),
-        kind: "textarea",
-        placeholder: msg("[{{level}}] {{message}}"),
-        help: msg("Budgets, updates, certificates and thresholds. {{message}} is Page's own text, {{kind}} is budget, update, cert or threshold."),
-      },
-      {
-        key: "alerts.webhookBody",
-        label: msg("Generic webhook body (JSON)"),
-        kind: "textarea",
-        placeholder: msg("{\n  \"text\": \"{{message}}\",\n  \"service\": \"{{service}}\",\n  \"level\": \"{{level}}\"\n}"),
-        help: msg("Empty sends Page's own JSON. Values are escaped for JSON strings, so keep the quotes around them."),
-      },
     ],
+    extraKeys: alertChannels.flatMap((c) => c.fields.map((f) => f.key)),
     extra: "testAlert",
   },
   {
@@ -213,6 +296,17 @@ export const sections: Section[] = [
     fields: [
       { key: "docker.discovery", label: msg("Discover services from Docker labels"), kind: "boolean" },
       { key: "docker.hosts", label: msg("Docker hosts"), kind: "yaml", placeholder: msg("- name: local\n- name: nas\n  host: tcp://192.168.1.10:2375") },
+    ],
+  },
+  {
+    id: "travel",
+    label: msg("Travel"),
+    icon: Plane,
+    description: msg("Colours of the travel map."),
+    fields: [
+      { key: "travel.visitedColor", label: msg("Visited"), kind: "color", placeholder: "accent", help: msg("Type “accent” to follow the accent colour.") },
+      { key: "travel.livedColor", label: msg("Lived"), kind: "color", placeholder: "accent" },
+      { key: "travel.wantColor", label: msg("Want to go"), kind: "color", placeholder: "#f59e0b" },
     ],
   },
   {

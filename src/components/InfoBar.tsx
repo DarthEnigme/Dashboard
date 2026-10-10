@@ -29,8 +29,9 @@ import { bytes, duration } from "@/integrations/format";
 import { msg } from "@/i18n";
 import { formatLocale } from "@/i18n/format";
 import { useT } from "@/i18n/client";
+import { Chip, ClockWidget, FinanceWidget, StatusWidget, TripWidget } from "./InfoWidgets";
 
-export function InfoBar({ widgets }: { widgets: ClientInfoWidget[] }) {
+export function InfoBar({ widgets, refreshSeconds }: { widgets: ClientInfoWidget[]; refreshSeconds: number }) {
   const t = useT();
   return (
     <div className="flex flex-wrap items-stretch gap-3">
@@ -38,6 +39,14 @@ export function InfoBar({ widgets }: { widgets: ClientInfoWidget[] }) {
         switch (w.type) {
           case "greeting":
             return <Greeting key={i} name={w.name as string} hour12={!!w.hour12} timezone={w.timezone as string} />;
+          case "clock":
+            return <ClockWidget key={i} hour12={!!w.hour12} timezone={w.timezone as string} zones={w.zones} seconds={!!w.seconds} />;
+          case "trip":
+            return <TripWidget key={i} label={w.label as string} />;
+          case "status":
+            return <StatusWidget key={i} refreshSeconds={refreshSeconds} />;
+          case "finance":
+            return <FinanceWidget key={i} show={w.show} currency={w.currency as string} />;
           case "weather":
             return <Remote key={i} index={i} interval={600}>{(d: WeatherData) => <Weather d={d} />}</Remote>;
           case "resources":
@@ -56,10 +65,6 @@ export function InfoBar({ widgets }: { widgets: ClientInfoWidget[] }) {
       })}
     </div>
   );
-}
-
-function Chip({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`glass flex min-h-16 items-center gap-4 rounded-2xl px-4 py-3 ${className}`}>{children}</div>;
 }
 
 function Remote<T>({ index, interval, children }: { index: number; interval: number; children: (d: T) => ReactNode }) {

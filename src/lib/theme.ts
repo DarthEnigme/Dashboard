@@ -15,6 +15,21 @@ export const gradientColors: Record<string, { base: string; blobs: [string, stri
   cyberpunk: { base: "#0a0614", blobs: ["#7aa2f7", "#f7768e", "#bb9af7"] },
   sand: { base: "#1a140b", blobs: ["#d6b37a", "#b45309", "#fde68a"] },
   "deep-sea": { base: "#020b14", blobs: ["#0e7490", "#1e40af", "#268bd2"] },
+  // Discord's Nitro gradient themes.
+  "mint-apple": { base: "#0b1a14", blobs: ["#56b69f", "#63bc61", "#9eca67"] },
+  "citrus-sherbert": { base: "#1c120a", blobs: ["#f3b336", "#ee8558", "#f6c96a"] },
+  "retro-raincloud": { base: "#0d141c", blobs: ["#3a7ca1", "#7f7eb9", "#5b6f9e"] },
+  hanami: { base: "#1c1214", blobs: ["#efaab3", "#efd696", "#a6daa2"] },
+  sunrise: { base: "#1a0d14", blobs: ["#9f4175", "#c49064", "#a6953d"] },
+  "cotton-candy": { base: "#1a0f1b", blobs: ["#f4abb8", "#b1c2fc", "#e8a7d8"] },
+  "lofi-vibes": { base: "#11141c", blobs: ["#a4c0f7", "#a9e4e8", "#b0e2b8"] },
+  "desert-khaki": { base: "#18140d", blobs: ["#e7dbd0", "#dfd0b2", "#e0d6a3"] },
+  "chroma-glow": { base: "#06121a", blobs: ["#0e9ab4", "#a12bd5", "#e3238c"] },
+  "crimson-moon": { base: "#120406", blobs: ["#950909", "#3a0c0c", "#c41c1c"] },
+  "midnight-blurple": { base: "#0b0a1f", blobs: ["#5348ca", "#140730", "#7b6fe0"] },
+  "under-the-sea": { base: "#081410", blobs: ["#647962", "#588575", "#6a6981"] },
+  "neon-nights": { base: "#061018", blobs: ["#01a89e", "#7d60ba", "#b43898"] },
+  "strawberry-lemonade": { base: "#1a0710", blobs: ["#af1a6c", "#c26b20", "#e7c33a"] },
   // Drawn by Background.tsx with their own layers (blobs are only used for "auto" accents).
   nebula: {
     base: "#05030f",
@@ -65,6 +80,17 @@ export const lookPresets: LookPreset[] = [
   { id: "solarized", label: "Solarized", style: "solid", gradient: "deep-sea", accent: "#268bd2", glow: "subtle", theme: "solarized" },
   { id: "gruvbox", label: "Gruvbox", style: "solid", gradient: "ember", accent: "#fe8019", glow: "subtle", theme: "gruvbox" },
   { id: "tokyo-night", label: "Tokyo Night", style: "glass", gradient: "cyberpunk", accent: "#7aa2f7", glow: "strong", theme: "tokyo-night" },
+  { id: "discord", label: "Discord", style: "solid", gradient: "midnight-blurple", accent: "#5865f2", glow: "subtle", theme: "discord-dark" },
+  { id: "discord-onyx", label: "Onyx", style: "solid", gradient: "midnight-blurple", accent: "#5865f2", glow: "subtle", theme: "discord-onyx" },
+  { id: "chroma-glow", label: "Chroma Glow", style: "liquid", gradient: "chroma-glow", accent: "#0e9ab4", glow: "strong", theme: "discord-onyx" },
+  { id: "neon-nights", label: "Neon Nights", style: "neon", gradient: "neon-nights", accent: "#01a89e", glow: "strong", theme: "discord-dark" },
+  { id: "crimson-moon", label: "Crimson Moon", style: "glass", gradient: "crimson-moon", accent: "#e23b3b", glow: "subtle", theme: "discord-onyx" },
+  { id: "mint-apple", label: "Mint Apple", style: "glass", gradient: "mint-apple", accent: "#56b69f", glow: "subtle", theme: "discord-ash" },
+  { id: "retro-raincloud", label: "Retro Raincloud", style: "glass", gradient: "retro-raincloud", accent: "#7f7eb9", glow: "subtle", theme: "discord-ash" },
+  { id: "lofi-vibes", label: "Lofi Vibes", style: "soft", gradient: "lofi-vibes", accent: "#5b8def", glow: "subtle", theme: "discord-dark" },
+  { id: "strawberry-lemonade", label: "Strawberry Lemonade", style: "liquid", gradient: "strawberry-lemonade", accent: "#e7c33a", glow: "subtle", theme: "discord-dark" },
+  { id: "cotton-candy", label: "Cotton Candy", style: "soft", gradient: "cotton-candy", accent: "#d97fc0", glow: "subtle", theme: "discord-light" },
+  { id: "hanami", label: "Hanami", style: "soft", gradient: "hanami", accent: "#d9707f", glow: "subtle", theme: "discord-light" },
 ];
 
 /**
@@ -97,6 +123,10 @@ export const paletteThemes: Record<string, PaletteTheme> = {
   solarized: { label: "Solarized", base: "dark", colors: { page: "#002b36", surface: "#073642", fg: "#eee8d5", accent: "#268bd2", ok: "#859900", warn: "#b58900", err: "#dc322f" } },
   gruvbox: { label: "Gruvbox", base: "dark", colors: { page: "#282828", surface: "#3c3836", fg: "#ebdbb2", accent: "#fe8019", ok: "#b8bb26", warn: "#fabd2f", err: "#fb4934" } },
   "tokyo-night": { label: "Tokyo Night", base: "dark", colors: { page: "#1a1b26", surface: "#24283b", fg: "#c0caf5", accent: "#7aa2f7", ok: "#9ece6a", warn: "#e0af68", err: "#f7768e" } },
+  "discord-dark": { label: "Discord Dark", base: "dark", colors: { page: "#313338", surface: "#2b2d31", fg: "#f2f3f5", accent: "#5865f2", ok: "#23a55a", warn: "#f0b232", err: "#f23f43", surfaceOpacity: 0.75 } },
+  "discord-ash": { label: "Discord Ash", base: "dark", colors: { page: "#323339", surface: "#3b3c42", fg: "#f2f3f5", accent: "#5865f2", ok: "#23a55a", warn: "#f0b232", err: "#f23f43", surfaceOpacity: 0.7 } },
+  "discord-onyx": { label: "Discord Onyx", base: "dark", colors: { page: "#070709", surface: "#121214", fg: "#ececee", accent: "#5865f2", ok: "#23a55a", warn: "#f0b232", err: "#f23f43", surfaceOpacity: 0.7 } },
+  "discord-light": { label: "Discord Light", base: "light", colors: { page: "#f2f3f5", surface: "#ffffff", fg: "#060607", accent: "#5865f2", ok: "#1a8b4c", warn: "#a86f00", err: "#d22d39", surfaceOpacity: 0.7 } },
 };
 
 /** Starting colours for a new custom theme, per built-in theme. */

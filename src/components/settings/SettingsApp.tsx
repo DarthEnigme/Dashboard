@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowLeft, Check, Download, FileUp, Search, X } from "lu
 import { fetcher, sendJson } from "@/lib/fetcher";
 import { gradientPresets, stylePresets, type Settings } from "@/lib/config/schema";
 import type { ClientSettings } from "@/lib/config/sanitize";
+import { fontFamily } from "@/lib/fonts";
 import {
   baseThemeColors,
   CUSTOM_PREFIX,
@@ -30,7 +31,8 @@ import { GroupsPanel } from "../edit/GroupsPanel";
 import { AuditPanel } from "../edit/AuditPanel";
 import { HistoryPanel } from "../edit/HistoryPanel";
 import { ImportDialog } from "../edit/ImportDialog";
-import { sections, type Section } from "./sections";
+import { allFields, sections, type Section } from "./sections";
+import { AlertChannels } from "./AlertChannels";
 import { TestAlertButton } from "./TestAlertButton";
 import { UpdatesPanel } from "./UpdatesPanel";
 import { ThemeEditor } from "./ThemeEditor";
@@ -93,7 +95,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
 
   // Live preview of theme, style and accent on the page itself; the saved look is restored when leaving.
   // `theme` holds the setting (dark, oled, nord, custom:…); data-theme/data-tone/data-palette are derived from it.
-  const restore = useRef<{ theme: string; custom: CustomTheme[]; style?: string; glow?: string | number; accent: string }>(undefined);
+  const restore = useRef<{ theme: string; custom: CustomTheme[]; style?: string; glow?: string | number; accent: string; font: string }>(undefined);
   useEffect(() => {
     const root = document.documentElement;
     restore.current = {
@@ -102,6 +104,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
       style: root.dataset.style,
       glow: Math.round(Number(root.style.getPropertyValue("--glow") || 0.5) * 100),
       accent: root.style.getPropertyValue("--accent"),
+      font: root.style.getPropertyValue("--font-choice"),
     };
     return () => {
       const r = restore.current!;
@@ -110,6 +113,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
       root.dataset.style = r.style;
       setGlow(root, r.glow);
       root.style.setProperty("--accent", r.accent);
+      setFont(root, r.font);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -120,8 +124,9 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
     root.dataset.style = preview.style;
     setGlow(root, preview.glow);
     if (HEX.test(preview.accent)) root.style.setProperty("--accent", preview.accent);
+    setFont(root, fontFamily(preview.font));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preview.theme, customKey, preview.style, preview.glow, preview.accent]);
+  }, [preview.theme, customKey, preview.style, preview.glow, preview.accent, preview.font]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -160,6 +165,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
           style: preview.style,
           glow: preview.glow,
           accent: HEX.test(preview.accent) ? preview.accent : restore.current.accent,
+          font: fontFamily(preview.font) ?? "",
         };
       }
       setToast({ message: t("Settings saved") });
@@ -184,7 +190,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
 
   const q = query.trim().toLowerCase();
   const visible: { section: Section; fields: FieldSpec[] }[] = q
-    ? sections.map((s) => ({ section: s, fields: s.fields.filter((f) => matches(f, q)) })).filter((x) => x.fields.length)
+    ? sections.map((s) => ({ section: s, fields: allFields(s).filter((f) => matches(f, q)) })).filter((x) => x.fields.length)
     : sections.filter((s) => s.id === active).map((s) => ({ section: s, fields: s.fields }));
   const keysOf = (s: Section) => [...s.fields.map((f) => f.key), ...(s.extraKeys ?? [])];
   const changedIn = (s: Section) => keysOf(s).filter((k) => changed.includes(k)).length;
@@ -343,6 +349,7 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
                 )}
                 {!q && section.extra === "testAlert" && (
                   <>
+                    <AlertChannels draft={draft} errors={errors} field={field} />
                     <TestAlertButton />
                     <TokensPanel />
                   </>
@@ -433,6 +440,11 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
       )}
     </>
   );
+}
+
+function setFont(root: HTMLElement, family: string | undefined) {
+  if (family) root.style.setProperty("--font-choice", family);
+  else root.style.removeProperty("--font-choice");
 }
 
 function setGlow(root: HTMLElement, glow: string | number | undefined) {
@@ -531,7 +543,7 @@ function StylePicker({ value, onChange }: { value: string; onChange: (v: string)
 function GradientPicker({ value, custom, onChange }: { value: string; custom: CustomTheme[]; onChange: (v: string) => void }) {
   const t = useT();
   const names: { id: string; label: string }[] = [
-    ...gradientPresets.map((g) => ({ id: g as string, label: g.replace("-", " ") })),
+    ...gradientPresets.map((g) => ({ id: g as string, label: g.replaceAll("-", " ") })),
     ...custom.filter((t) => t.gradient).map((t) => ({ id: `${CUSTOM_PREFIX}${t.id}`, label: t.label })),
   ];
   return (
