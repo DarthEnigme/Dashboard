@@ -3,7 +3,7 @@ import { sameOrigin } from "@/lib/auth";
 import { clearFailures, isLimited, recordFailure } from "@/lib/auth/ratelimit";
 import { verifyToken } from "@/lib/auth/session";
 import { startSession } from "@/lib/auth/sessions";
-import { openSecret, useRecoveryCode, verifyTotp } from "@/lib/auth/totp";
+import { openSecret, spendRecoveryCode, verifyTotp } from "@/lib/auth/totp";
 import * as users from "@/lib/auth/users";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   let ok = !!secret && verifyTotp(secret, code);
   let usedRecovery = false;
   if (!ok) {
-    const left = useRecoveryCode(tf.recovery, code);
+    const left = spendRecoveryCode(tf.recovery, code);
     if (left) {
       users.setTwoFactor(user.id, { secret: tf.secret, recovery: left });
       ok = usedRecovery = true;

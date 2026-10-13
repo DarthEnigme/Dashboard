@@ -51,9 +51,9 @@ export function TravelPage({ colors }: { colors?: Partial<MapColors> }) {
   const [flat, setFlat] = useState(false);
   const [editing, setEditing] = useState<Trip | "new">();
 
-  const places = data?.places ?? [];
-  const trips = data?.trips ?? [];
-  const started = trips.filter((tr) => tr.start_date <= today());
+  const places = useMemo(() => data?.places ?? [], [data]);
+  const trips = useMemo(() => data?.trips ?? [], [data]);
+  const started = useMemo(() => trips.filter((tr) => tr.start_date <= today()), [trips]);
   const visited = useMemo(() => new Set([...places.filter((p) => p.status !== "want").map((p) => p.country), ...started.flatMap((tr) => tr.stops.map((s) => s.country))]), [places, started]);
   const lived = useMemo(() => new Set(places.filter((p) => p.status === "lived").map((p) => p.country)), [places]);
   const wanted = useMemo(() => new Set(places.filter((p) => p.status === "want" && !visited.has(p.country)).map((p) => p.country)), [places, visited]);

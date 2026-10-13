@@ -14,7 +14,7 @@ const samples: Record<string, AlertPayload> = {
 export async function POST(req: Request) {
   if (!(await canEdit()) || !sameOrigin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { sample } = ((await req.json().catch(() => ({}))) ?? {}) as { sample?: string };
-  const payload = (sample && samples[sample]) || { service: "Page", status: "test" as const };
+  const payload = (sample && samples[sample]) || { service: "NanoDash", status: "test" as const };
   const errors = await sendAlert(loadConfig().settings.alerts, payload);
   if (errors.length) return NextResponse.json({ error: errors.join("; ") }, { status: 502 });
   return NextResponse.json({ ok: true });

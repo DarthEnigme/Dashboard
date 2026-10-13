@@ -28,7 +28,7 @@ export function listGoals(): Goal[] {
     goal_id: number;
   })[];
   const today = new Date().toISOString().slice(0, 10);
-  return goals.map((g) => ({ ...g, perMonth: monthlyNeeded(g, today), moves: moves.filter((m) => m.goal_id === g.id).slice(0, 10).map(({ goal_id: _, ...m }) => m) }));
+  return goals.map((g) => ({ ...g, perMonth: monthlyNeeded(g, today), moves: moves.filter((m) => m.goal_id === g.id).slice(0, 10).map((m) => ({ id: m.id, date: m.date, amount: m.amount, note: m.note })) }));
 }
 
 export function createGoal(g: { name: string; target: number; currency: string; deadline: string | null }) {

@@ -1,4 +1,4 @@
-// Page service worker: makes the dashboard installable and usable offline (last loaded view).
+// NanoDash service worker: makes the dashboard installable and usable offline (last loaded view).
 // Registered as /sw.js?v=<build id> (PwaRegister), so every build gets its own caches.
 const VERSION = `page-v3-${new URL(self.location.href).searchParams.get("v") || "dev"}`;
 const SHELL = `${VERSION}-shell`;

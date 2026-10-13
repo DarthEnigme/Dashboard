@@ -94,7 +94,7 @@ export function UpdatesPanel() {
       {newBuild ? (
         <div role="status" className="flex flex-wrap items-center gap-3 rounded-2xl bg-chip p-4 text-sm">
           <CheckCircle2 className="h-5 w-5 text-[var(--ok)]" />
-          <span className="flex-1">{t("Page is now running")}{" "}{newBuild}.</span>
+          <span className="flex-1">{t("NanoDash is now running")}{" "}{newBuild}.</span>
           <button type="button" onClick={() => window.location.reload()} className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 font-medium text-white">
             <RefreshCw className="h-4 w-4" /> {t("Reload")}
           </button>
@@ -172,7 +172,7 @@ export function UpdatesPanel() {
       {confirm && (
         <div className="flex flex-col gap-3 rounded-2xl border border-line p-4 text-sm">
           <p>
-            {t("Page downloads")}{" "}<code className="rounded bg-track px-1">{preflight.image}:{data.channel === "edge" ? "latest" : latest?.version}</code>{t(", then replaces the")}{" "}
+            {t("NanoDash downloads")}{" "}<code className="rounded bg-track px-1">{preflight.image}:{data.channel === "edge" ? "latest" : latest?.version}</code>{t(", then replaces the")}{" "}
             <code className="rounded bg-track px-1">{preflight.container}</code> {t("container with the same settings and volumes. It is unavailable for about a minute. If the new version doesn't start, the current one is put back automatically.")}
           </p>
           <div className="flex gap-2">

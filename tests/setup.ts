@@ -8,3 +8,5 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), "page-test-"));
 process.env.HOMEPAGE_CONFIG_DIR = path.join(root, "config");
 process.env.HOMEPAGE_DATA_DIR = path.join(root, "data");
 process.env.HOMEPAGE_SECRET ??= "unit-test-secret-unit-test-secret";
+// Alert channels are retried once after a wait; tests don't need the wait.
+process.env.PAGE_ALERT_RETRY_MS ??= "10";

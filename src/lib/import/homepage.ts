@@ -1,4 +1,4 @@
-// Converts a gethomepage.dev config into Page's format. Self-contained (only depends on "yaml")
+// Converts a gethomepage.dev config into NanoDash's format. Self-contained (only depends on "yaml")
 // so scripts/import-homepage.mjs can run it directly with Node's TypeScript support.
 import YAML from "yaml";
 
@@ -34,7 +34,7 @@ const COLORS: Record<string, string> = {
 };
 const BLUR: Record<string, number> = { none: 0, sm: 4, "": 8, md: 12, lg: 16, xl: 24, "2xl": 40, "3xl": 40 };
 
-/** "sh-name" (selfh.st icons) has no Page shorthand: point at the CDN. Everything else carries over. */
+/** "sh-name" (selfh.st icons) has no NanoDash shorthand: point at the CDN. Everything else carries over. */
 function icon(v: unknown): string | undefined {
   if (typeof v !== "string" || !v) return undefined;
   const sh = /^sh-(.+?)(?:\.(png|svg|webp))?$/.exec(v);
@@ -86,7 +86,7 @@ function convertWidget(w: Obj, where: string, ctx: Ctx): Obj | undefined {
     case "diskstation":
       return { type: "synology", ...pick("url", "username", "password") };
     case "truenas":
-      if (!w.key) ctx.warn(`${where}: TrueNAS needs an API key in Page (username/password login isn't supported).`);
+      if (!w.key) ctx.warn(`${where}: TrueNAS needs an API key in NanoDash (username/password login isn't supported).`);
       return { type: t, ...pick("url", "key") };
     case "homeassistant": {
       const custom = Array.isArray(w.custom) ? (w.custom as Obj[]) : [];
@@ -122,7 +122,7 @@ function convertWidget(w: Obj, where: string, ctx: Ctx): Obj | undefined {
       return sources.length ? { type: t, sources } : undefined;
     }
     default:
-      ctx.warn(`${where}: widget "${t}" isn't supported by Page yet; the service was kept without it.`);
+      ctx.warn(`${where}: widget "${t}" isn't supported by NanoDash yet; the service was kept without it.`);
       return undefined;
   }
 }
@@ -130,12 +130,16 @@ function convertWidget(w: Obj, where: string, ctx: Ctx): Obj | undefined {
 function convertService(name: string, raw: unknown, group: string, ctx: Ctx): Obj {
   const s = isObj(raw) ? raw : {};
   const where = `${group} › ${name}`;
-  let ping: string | boolean | undefined;
+  let ping: string | { type: "icmp"; host: string } | undefined;
   if (typeof s.siteMonitor === "string") ping = s.siteMonitor;
   else if (typeof s.ping === "string") {
-    // Homepage pings a host with ICMP; Page checks over HTTP.
-    ping = /^https?:\/\//.test(s.ping) ? s.ping : `http://${s.ping}`;
-    ctx.warn(`${where}: ICMP ping isn't available; checking ${ping} over HTTP instead.`);
+    // Homepage pings a host with ICMP: keep that, without any scheme, port or path it was given.
+    let host = s.ping.trim();
+    try {
+      if (/^https?:\/\//.test(host)) host = new URL(host).hostname;
+    } catch {}
+    ping = { type: "icmp", host };
+    ctx.warn(`${where}: ICMP ping of ${host} needs ping permission in the container; switch to a tcp or http check if it shows as down.`);
   }
   let widget = isObj(s.widget) ? convertWidget(s.widget, where, ctx) : undefined;
   if (Array.isArray(s.widgets)) {
@@ -154,7 +158,7 @@ function convertService(name: string, raw: unknown, group: string, ctx: Ctx): Ob
   return clean({ name, href: s.href, icon: icon(s.icon), description: s.description, ping, widget });
 }
 
-/** Homepage groups may nest groups; Page groups are flat, so nested ones become "Parent / Child". */
+/** Homepage groups may nest groups; NanoDash groups are flat, so nested ones become "Parent / Child". */
 function convertGroups(list: unknown, ctx: Ctx, prefix = ""): Obj[] {
   const out: Obj[] = [];
   for (const [gname, items] of entries(list)) {
@@ -210,7 +214,7 @@ function convertSettings(s: Obj, ctx: Ctx): { settings: Obj; layout: Record<stri
   const tabs = [...new Set(Object.values(layout).map((l) => l?.tab).filter((t): t is string => typeof t === "string"))];
   if (tabs.length) out.tabs = tabs;
   for (const k of ["providers", "quicklaunch", "statusStyle", "hideVersion", "language"]) {
-    if (s[k] !== undefined) ctx.warn(`settings.${k} has no equivalent in Page; ignored.`);
+    if (s[k] !== undefined) ctx.warn(`settings.${k} has no equivalent in NanoDash; ignored.`);
   }
   return { settings: out, layout };
 }
@@ -244,7 +248,7 @@ function convertInfoWidgets(list: unknown, ctx: Ctx): Obj[] {
   return out;
 }
 
-/** docker.yaml: { name: { socket } | { host, port } } → Page docker host strings. */
+/** docker.yaml: { name: { socket } | { host, port } } → NanoDash docker host strings. */
 function dockerHosts(text: string | undefined): Record<string, string> {
   const d = text ? YAML.parse(text) : undefined;
   if (!isObj(d)) return {};

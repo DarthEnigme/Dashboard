@@ -21,6 +21,7 @@ export function db(): DatabaseSync {
     const d = new DatabaseSync(path.join(DATA_DIR, "page.db"));
     d.exec(`
       PRAGMA journal_mode = WAL;
+      PRAGMA synchronous = NORMAL;
       CREATE TABLE IF NOT EXISTS pings (
         service_id TEXT NOT NULL,
         ts INTEGER NOT NULL,
@@ -301,6 +302,16 @@ export function latestPing(serviceId: string): PingRow | undefined {
     .get(serviceId) as PingRow | undefined;
 }
 
+/** Checks made and checks that were up since `since`, per service (one pass, for the monitoring panel). */
+export function uptimeSince(since: number): Map<string, { checks: number; up: number }> {
+  const rows = db().prepare("SELECT service_id, COUNT(*) AS checks, SUM(up) AS up FROM pings WHERE ts >= ? GROUP BY service_id").all(since) as unknown as {
+    service_id: string;
+    checks: number;
+    up: number;
+  }[];
+  return new Map(rows.map((r) => [r.service_id, { checks: r.checks, up: r.up }]));
+}
+
 export function pingsSince(serviceId: string, since: number): PingRow[] {
   return db()
     .prepare("SELECT * FROM pings WHERE service_id = ? AND ts >= ? ORDER BY ts")
@@ -369,6 +380,12 @@ export function closeIncident(serviceId: string, end: number) {
 
 export function openIncidents(): IncidentRow[] {
   return db().prepare("SELECT * FROM incidents WHERE end IS NULL").all() as unknown as IncidentRow[];
+}
+
+/** Outages that started since `since`, per service. */
+export function incidentCountsSince(since: number): Map<string, number> {
+  const rows = db().prepare("SELECT service_id, COUNT(*) AS n FROM incidents WHERE start >= ? GROUP BY service_id").all(since) as unknown as { service_id: string; n: number }[];
+  return new Map(rows.map((r) => [r.service_id, r.n]));
 }
 
 export function incidentsSince(serviceId: string, since: number): IncidentRow[] {

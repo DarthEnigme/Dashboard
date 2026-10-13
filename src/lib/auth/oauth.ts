@@ -106,7 +106,7 @@ async function githubIdentity(p: ProviderConfig, origin: string, url: URL, expec
   if (!token.access_token) throw new Error(token.error_description ?? "GitHub login failed");
   const gh = (path: string) =>
     fetch(`https://api.github.com${path}`, {
-      headers: { Authorization: `Bearer ${token.access_token}`, Accept: "application/vnd.github+json", "User-Agent": "Page" },
+      headers: { Authorization: `Bearer ${token.access_token}`, Accept: "application/vnd.github+json", "User-Agent": "NanoDash" },
     }).then((r) => r.json());
   const [user, emails] = (await Promise.all([gh("/user"), gh("/user/emails")])) as [
     { id: number; login: string; name?: string },

@@ -15,7 +15,7 @@ test.describe.serial("inventory", () => {
       await page.getByRole("button", { name: "Save", exact: true }).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
     };
-    // Page itself answers on its port: "up". Nothing listens on port 1: "down".
+    // NanoDash itself answers on its port: "up". Nothing listens on port 1: "down".
     await add({ "Name *": "Page box", "IP address or host name": "127.0.0.1", "Check this TCP port": "3300", "MAC address": "aa-bb-cc-dd-ee-01", "Wake-on-LAN broadcast": "127.0.0.1:4011", Location: "Rack" });
     await add({ "Name *": "Old printer", "IP address or host name": "127.0.0.1", "Check this TCP port": "1", "Warranty until (YYYY-MM-DD)": "2020-01-01", Location: "Office" });
     await expect(page.locator("[data-device='Page box']").getByRole("img", { name: "Up" })).toBeVisible({ timeout: 15_000 });

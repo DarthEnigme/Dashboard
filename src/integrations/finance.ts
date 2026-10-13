@@ -24,7 +24,7 @@ export function financeResult(s: Summary, main: "donut" | "sankey" = "donut"): W
   };
 }
 
-/** Reads Page's own finance tracker (no external service). */
+/** Reads NanoDash's own finance tracker (no external service). */
 export const finance: Integration<typeof schema> = {
   type: "finance",
   schema,

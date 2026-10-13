@@ -106,7 +106,7 @@ export function imageRepo(ref: string): string {
 
 export async function preflight(cfg: Settings["updates"]): Promise<Preflight & { self?: Docker.ContainerInspectInfo; docker?: Docker }> {
   if (!fs.existsSync("/.dockerenv") && !process.env.PAGE_FORCE_DOCKER) {
-    return { canApply: false, reason: "Page isn't running in Docker. Update it the way you installed it (see below)." };
+    return { canApply: false, reason: "NanoDash isn't running in Docker. Update it the way you installed it (see below)." };
   }
   const docker = dockerClient();
   try {

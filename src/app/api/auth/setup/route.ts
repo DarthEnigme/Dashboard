@@ -17,7 +17,10 @@ export async function POST(req: Request) {
   if (password.length < MIN_PASSWORD) {
     return NextResponse.json({ error: `Password: at least ${MIN_PASSWORD} characters` }, { status: 400 });
   }
-  const user = users.createUser({ username, email: email || null, role: "admin", passwordHash: await hashPassword(password) });
+  const passwordHash = await hashPassword(password);
+  // Re-check after the (slow) hash: another setup request may have finished meanwhile.
+  if (users.countUsers() > 0) return NextResponse.json({ error: "Setup is already done" }, { status: 409 });
+  const user = users.createUser({ username, email: email || null, role: "admin", passwordHash });
   users.audit(user.username, "setup");
   const res = NextResponse.json({ ok: true });
   await startSession(res, req, user.id, "setup");

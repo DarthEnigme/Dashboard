@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   if (b.action === "start") {
     if (me.twoFactor) return err("Two-factor sign-in is already on");
     const secret = newTotpSecret();
-    const url = otpauthUrl(secret, me.username, loadConfig().settings.title || "Page");
+    const url = otpauthUrl(secret, me.username, loadConfig().settings.title || "NanoDash");
     return NextResponse.json({
       setup: await signToken({ kind: "2fa-setup", secret: sealSecret(secret) }, String(me.id), "15m"),
       secret,

@@ -45,7 +45,7 @@ const day = (d: unknown, what: string) => {
 };
 const ipOrHost = (s: unknown) => {
   const v = text(s, 255);
-  if (v && !/^[\w.:-]+$/.test(v)) throw new Error("IP must be an address or host name");
+  if (v && (!/^[\w.:-]+$/.test(v) || v.startsWith("-"))) throw new Error("IP must be an address or host name");
   return v;
 };
 
@@ -194,7 +194,7 @@ export async function warrantyJob(now = new Date()) {
     const errors = await sendNotice(settings.alerts, {
       kind: "warranty",
       level: "warn",
-      message: `The warranty of ${d.name} ends in ${left} days (${d.warranty_until}).`,
+      message: `The warranty of ${d.name} ends ${left === 0 ? "today" : left === 1 ? "tomorrow" : `in ${left} days`} (${d.warranty_until}).`,
       device: d.name,
       until: d.warranty_until,
       days: left,

@@ -6,7 +6,7 @@ import snmp from "net-snmp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { checkSpec, describeCheck, jsonAt, parsePingTime, runCheck } from "@/lib/checks";
 import { counterRate, findInterface, OID, parseStorage, parseSupplies, snmpIntegration } from "@/integrations/snmp";
-import { serviceSchema } from "@/lib/config/schema";
+import { checkSchema, serviceSchema } from "@/lib/config/schema";
 
 const svc = (o: Record<string, unknown>) => serviceSchema.parse({ name: "x", ...o });
 
@@ -164,5 +164,58 @@ describe("snmp", () => {
     );
     expect(supplies).toEqual([{ name: "Black Toner", level: 0.12 }, { name: "Drum", level: undefined }]);
     expect(parseStorage([{ oid: `${OID.hrStorageDescr}.1`, value: "x" }], [], [], [])).toEqual([]);
+  });
+});
+
+describe("tcp + udp check", () => {
+  let tcp: net.Server;
+  let udp: dgram.Socket;
+  let silent: dgram.Socket;
+  beforeAll(async () => {
+    tcp = net.createServer((s) => s.end());
+    await new Promise<void>((r) => tcp.listen(0, "127.0.0.1", r));
+    udp = dgram.createSocket("udp4").on("message", (_m, from) => udp.send(Buffer.from("pong"), from.port, from.address));
+    await new Promise<void>((r) => udp.bind(0, "127.0.0.1", r));
+    silent = dgram.createSocket("udp4");
+    await new Promise<void>((r) => silent.bind(0, "127.0.0.1", r));
+  });
+  afterAll(() => {
+    tcp.close();
+    udp.close();
+    silent.close();
+  });
+  const port = () => (tcp.address() as AddressInfo).port;
+  const check = (o: object) => runCheck(checkSchema.parse({ type: "tcpudp", host: "127.0.0.1", ...o }));
+
+  it("is up when both answer, on one port or two", async () => {
+    const r = await check({ port: port(), udpPort: udp.address().port, expect: "pong" });
+    expect(r.up).toBe(true);
+    expect(r.latencyMs).toBeGreaterThanOrEqual(1);
+    expect(describeCheck(checkSchema.parse({ type: "tcpudp", host: "dns", port: 53 }))).toBe("tcp+udp dns:53");
+    expect(describeCheck(checkSchema.parse({ type: "tcpudp", host: "mc", port: 25565, udpPort: 19132 }))).toBe("tcp+udp mc:25565/19132");
+  });
+
+  it("is down when either fails, and says which", async () => {
+    const wrongReply = await check({ port: port(), udpPort: udp.address().port, expect: "nope" });
+    expect(wrongReply).toMatchObject({ up: false, error: "udp: reply without the expected text" });
+
+    const closed = net.createServer();
+    await new Promise<void>((r) => closed.listen(0, "127.0.0.1", r));
+    const free = (closed.address() as AddressInfo).port;
+    closed.close();
+    const noTcp = await check({ port: free, udpPort: udp.address().port });
+    expect(noTcp).toMatchObject({ up: false, error: "tcp: ECONNREFUSED" });
+  });
+
+  it("is down when nothing answers on UDP", async () => {
+    const r = await check({ port: port(), udpPort: silent.address().port });
+    expect(r).toMatchObject({ up: false, error: "udp: no reply" });
+  }, 10_000);
+});
+
+describe("icmp hosts", () => {
+  it("refuses a host that ping would read as an option", async () => {
+    expect(await runCheck({ type: "icmp", host: "-f" })).toMatchObject({ up: false, error: "invalid host" });
+    expect(await runCheck({ type: "icmp", host: "a;b" })).toMatchObject({ up: false, error: "invalid host" });
   });
 });

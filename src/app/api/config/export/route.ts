@@ -17,7 +17,7 @@ export async function GET() {
   return new Response(new Uint8Array(zip(files)), {
     headers: {
       "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="page-config-${stamp}.zip"`,
+      "Content-Disposition": `attachment; filename="nanodash-config-${stamp}.zip"`,
       "Cache-Control": "no-store",
     },
   });

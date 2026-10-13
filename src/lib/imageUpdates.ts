@@ -59,7 +59,7 @@ export function imageUpdate(client: Client, host: string | undefined, ref: strin
     const p = checkImage(client, ref, now)
       .then((r) => {
         cache.set(key, r);
-        if (r.state === "unknown" && r.error) console.warn(`[page] image update check for ${ref} failed: ${r.error}`);
+        if (r.state === "unknown" && r.error) console.warn(`[nanodash] image update check for ${ref} failed: ${r.error}`);
         return r;
       })
       .finally(() => inflight.delete(key));

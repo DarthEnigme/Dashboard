@@ -91,7 +91,7 @@ describe("identity resolution (signup policy)", () => {
   it("refuses unknown people when signups are disabled", () => {
     const repo = fakeRepo();
     const r = resolveIdentity(google(), closed, repo as never);
-    expect(r).toEqual({ ok: false, error: "No Page account for alice@example.com. Ask an admin to add you." });
+    expect(r).toEqual({ ok: false, error: "No NanoDash account for alice@example.com. Ask an admin to add you." });
     expect(repo.rows).toHaveLength(0);
   });
 
@@ -226,5 +226,54 @@ describe("visibility", () => {
     expect(s.auth.providers[0]).toMatchObject({ clientId: "cid", clientSecret: MASK });
     expect(s.auth.ldap).toEqual({ bindPassword: MASK, bindDN: "cn=svc" });
     expect(s.auth.proxy.secret).toBe("{{HOMEPAGE_VAR_PROXY}}");
+  });
+});
+
+describe("login rate limit", () => {
+  it("limits a key after 10 failures and clears it", async () => {
+    const { clearFailures, isLimited, recordFailure } = await import("@/lib/auth/ratelimit");
+    for (let i = 0; i < 9; i++) recordFailure("10.0.0.1|alice");
+    expect(isLimited("10.0.0.1|alice")).toBe(false);
+    recordFailure("10.0.0.1|alice");
+    expect(isLimited("10.0.0.1|alice")).toBe(true);
+    expect(isLimited("10.0.0.2|alice")).toBe(false);
+    clearFailures("10.0.0.1|alice");
+    expect(isLimited("10.0.0.1|alice")).toBe(false);
+  });
+
+  it("limits a username whatever address the failures claim to come from", async () => {
+    const { isLimited, MAX_USER_FAILURES, recordFailure } = await import("@/lib/auth/ratelimit");
+    for (let i = 0; i < MAX_USER_FAILURES - 1; i++) recordFailure("user|bob");
+    expect(isLimited("user|bob", MAX_USER_FAILURES)).toBe(false);
+    recordFailure("user|bob");
+    expect(isLimited("user|bob", MAX_USER_FAILURES)).toBe(true);
+    expect(isLimited("user|carol", MAX_USER_FAILURES)).toBe(false);
+  });
+
+  it("forgets failures after 15 minutes", async () => {
+    const { isLimited, recordFailure } = await import("@/lib/auth/ratelimit");
+    vi.useFakeTimers();
+    try {
+      for (let i = 0; i < 10; i++) recordFailure("10.0.0.9|dave");
+      expect(isLimited("10.0.0.9|dave")).toBe(true);
+      vi.advanceTimersByTime(15 * 60_000 + 1);
+      expect(isLimited("10.0.0.9|dave")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("first-run setup", () => {
+  it("creates one admin when two requests arrive together", async () => {
+    const { POST } = await import("@/app/api/auth/setup/route");
+    const users = await import("@/lib/auth/users");
+    const { db } = await import("@/lib/db");
+    db().exec("DELETE FROM users;");
+    const request = (username: string) =>
+      POST(new Request("http://localhost/api/auth/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password: "long enough" }) }));
+    const statuses = (await Promise.all([request("first"), request("second")])).map((r) => r.status).sort();
+    expect(statuses).toEqual([200, 409]);
+    expect(users.countUsers()).toBe(1);
   });
 });

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Convert a gethomepage.dev config folder into Page's YAML.
+// Convert a gethomepage.dev config folder into NanoDash's YAML.
 //
 //   npm run import:homepage -- /path/to/homepage/config            # preview + warnings
 //   npm run import:homepage -- /path/to/homepage/config --write    # write into ./config (backs up first)

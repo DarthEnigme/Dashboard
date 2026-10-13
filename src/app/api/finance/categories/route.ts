@@ -18,7 +18,8 @@ export async function POST(req: Request) {
   const g = await guard(req);
   if ("error" in g) return g.error;
   const b = ((await req.json().catch(() => ({}))) ?? {}) as { name?: string; rename?: string; slot?: number | null; budget?: number | null; color?: string | null };
-  if (!b.name?.trim()) return bad("Category name required");
+  if (typeof b.name !== "string" || !b.name.trim()) return bad("Category name required");
+  if (b.rename !== undefined && typeof b.rename !== "string") return bad("Category name required");
   try {
     if (b.rename !== undefined) renameCategory(b.name, b.rename);
     else if (b.slot === undefined && b.budget === undefined && b.color === undefined) ensureCategory(b.name);

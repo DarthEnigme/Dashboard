@@ -26,7 +26,14 @@ export interface Sample {
 export function insertMetrics(serviceId: string, ts: number, samples: Sample[]) {
   init();
   const stmt = db().prepare("INSERT INTO metrics (service_id, key, ts, value) VALUES (?, ?, ?, ?)");
-  for (const s of samples) stmt.run(serviceId, s.key, ts, s.value);
+  db().exec("BEGIN");
+  try {
+    for (const s of samples) stmt.run(serviceId, s.key, ts, s.value);
+    db().exec("COMMIT");
+  } catch (e) {
+    db().exec("ROLLBACK");
+    throw e;
+  }
 }
 
 /** The newest value of every recorded field (newer than `since`), for the Prometheus export. */

@@ -44,7 +44,7 @@ export function parseThemeImport(text: string, taken: string[]): CustomTheme[] {
   const list = (Array.isArray(data) ? data : [data]) as Partial<CustomTheme>[];
   const out: CustomTheme[] = [];
   for (const t of list) {
-    if (!t || typeof t !== "object" || !t.colors?.page || !t.colors.surface || !t.colors.fg) throw new Error("Not a Page theme: needs colors.page, surface and fg");
+    if (!t || typeof t !== "object" || !t.colors?.page || !t.colors.surface || !t.colors.fg) throw new Error("Not a NanoDash theme: needs colors.page, surface and fg");
     const id = uniqueId(t.id ?? t.label ?? "theme", [...taken, ...out.map((o) => o.id)]);
     out.push({ id, label: String(t.label ?? id).slice(0, 40), base: t.base === "light" ? "light" : "dark", colors: t.colors, ...(t.gradient ? { gradient: t.gradient } : {}) });
   }
@@ -135,7 +135,7 @@ export function ThemeEditor({
                   >
                     <Copy className="h-4 w-4" />
                   </IconButton>
-                  <IconButton label={t("Export {name}", { name: th.label })} onClick={() => download(`${th.id}.page-theme.json`, th)}>
+                  <IconButton label={t("Export {name}", { name: th.label })} onClick={() => download(`${th.id}.nanodash-theme.json`, th)}>
                     <Download className="h-4 w-4" />
                   </IconButton>
                   <IconButton
@@ -177,7 +177,7 @@ export function ThemeEditor({
           <FileUp className="h-4 w-4" /> {t("Import JSON")}
         </button>
         {themes.length > 1 && (
-          <button type="button" onClick={() => download("page-themes.json", themes)} className="flex items-center gap-1.5 rounded-full bg-track px-4 py-2 text-sm hover:bg-hover">
+          <button type="button" onClick={() => download("nanodash-themes.json", themes)} className="flex items-center gap-1.5 rounded-full bg-track px-4 py-2 text-sm hover:bg-hover">
             <Download className="h-4 w-4" /> {t("Export all")}
           </button>
         )}

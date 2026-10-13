@@ -152,7 +152,7 @@ interface OlDoc {
   cover_i?: number;
 }
 
-/** Search results as Page uses them; `covers` is the Open Library covers host. */
+/** Search results as NanoDash uses them; `covers` is the Open Library covers host. */
 export function parseOpenLibrary(r: { docs?: OlDoc[] }, covers = "https://covers.openlibrary.org"): BookHit[] {
   return (r.docs ?? []).slice(0, 10).map((d) => ({
     title: d.title,

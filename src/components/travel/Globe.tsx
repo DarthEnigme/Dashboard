@@ -172,7 +172,10 @@ export function Globe({ visited, lived, wanted, cities, selected, onSelect, flat
       for (let j = 0; j < LON.length; j++) {
         const dx = ((LON[j] / RAD + 180) / 360) * width - px;
         const dy = ((90 - LAT[j] / RAD) / 180) * height - py;
-        if (dx * dx + dy * dy < bestD) (bestD = dx * dx + dy * dy), (best = IDX[j]);
+        if (dx * dx + dy * dy < bestD) {
+          bestD = dx * dx + dy * dy;
+          best = IDX[j];
+        }
       }
     } else {
       const v = view.current;
@@ -187,7 +190,10 @@ export function Globe({ visited, lived, wanted, cities, selected, onSelect, flat
         if (y * sinP + z * cosP <= 0) continue;
         const dx = width / 2 + x * r - px;
         const dy = height / 2 - (y * cosP - z * sinP) * r - py;
-        if (dx * dx + dy * dy < bestD) (bestD = dx * dx + dy * dy), (best = IDX[j]);
+        if (dx * dx + dy * dy < bestD) {
+          bestD = dx * dx + dy * dy;
+          best = IDX[j];
+        }
       }
     }
     return best >= 0 ? COUNTRIES[best]?.code : undefined;

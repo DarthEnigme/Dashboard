@@ -41,8 +41,8 @@ function walk(dir: string, base = dir): string[] {
 }
 
 /**
- * One zip with everything needed to rebuild this Page: the config files, a consistent copy of
- * the database (taken with VACUUM INTO, safe while Page runs), uploads, and the secret key that
+ * One zip with everything needed to rebuild this NanoDash: the config files, a consistent copy of
+ * the database (taken with VACUUM INTO, safe while NanoDash runs), uploads, and the secret key that
  * signs sessions and encrypts two-factor secrets.
  */
 export function createBackup(by: string, now = new Date()): BackupInfo {
@@ -67,7 +67,7 @@ export function createBackup(by: string, now = new Date()): BackupInfo {
     files.push({
       name: "README.txt",
       data: Buffer.from(
-        `Page backup taken ${now.toISOString()} (by ${by}).\n\nTo restore: stop Page, copy config/ over your config folder and data/ over your data folder\n(delete page.db-wal and page.db-shm there first), then start Page again.\n`,
+        `NanoDash backup taken ${now.toISOString()} (by ${by}).\n\nTo restore: stop NanoDash, copy config/ over your config folder and data/ over your data folder\n(delete page.db-wal and page.db-shm there first), then start NanoDash again.\n`,
       ),
     });
     const out = path.join(dir, name);
@@ -116,7 +116,7 @@ export async function runBackup(by: string, now = new Date()): Promise<BackupSta
     status = { at: now.toISOString(), ok: true, name: b.name, size: b.size, by };
   } catch (e) {
     status = { at: now.toISOString(), ok: false, error: (e as Error).message, by };
-    console.error("[page] backup failed:", e);
+    console.error("[nanodash] backup failed:", e);
     const { alerts } = loadConfig().settings;
     if (hasAlertChannel(alerts)) await sendNotice(alerts, { kind: "backup", level: "error", message: `Backup failed: ${status.error}`, error: status.error });
   }

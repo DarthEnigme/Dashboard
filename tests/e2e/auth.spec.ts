@@ -54,7 +54,7 @@ test.describe.serial("authentication", () => {
     await page.goto("/login");
     await page.getByRole("link", { name: "Continue with Mock SSO" }).click();
     await expect(page).toHaveURL(/\/login\?error=/);
-    await expect(page.getByRole("main").getByRole("alert")).toContainText("No Page account for stranger@example.com");
+    await expect(page.getByRole("main").getByRole("alert")).toContainText("No NanoDash account for stranger@example.com");
   });
 
   test("admin invites a user, who then signs in with SSO by verified email", async ({ page }) => {
@@ -84,7 +84,7 @@ test.describe.serial("authentication", () => {
     await ssoAs(page, "alice@example.com", "&sub=someone-else&verified=0");
     await page.goto("/login");
     await page.getByRole("link", { name: "Continue with Mock SSO" }).click();
-    await expect(page.getByRole("main").getByRole("alert")).toContainText("No Page account");
+    await expect(page.getByRole("main").getByRole("alert")).toContainText("No NanoDash account");
   });
 
   test("editor changes can be undone and appear in history", async ({ page }) => {

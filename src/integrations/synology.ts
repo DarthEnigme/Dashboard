@@ -53,7 +53,7 @@ const sessions = new Map<string, string>();
 const SESSION_ERRORS = new Set([106, 107, 119]);
 
 async function login(cfg: Cfg): Promise<string> {
-  const q = new URLSearchParams({ api: "SYNO.API.Auth", version: "6", method: "login", account: cfg.username, passwd: cfg.password, session: "Page", format: "sid" });
+  const q = new URLSearchParams({ api: "SYNO.API.Auth", version: "6", method: "login", account: cfg.username, passwd: cfg.password, session: "NanoDash", format: "sid" });
   const r = await httpJson<SynoResponse<{ sid: string }>>(`${trimSlash(cfg.url)}/webapi/auth.cgi?${q}`, { insecure: cfg.insecure });
   if (!r.success || !r.data) {
     const code = r.error?.code;

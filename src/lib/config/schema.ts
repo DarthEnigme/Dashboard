@@ -65,7 +65,7 @@ export const authSchema = z
   .object({
     /** Anyone can view the dashboard (items marked users/admins still need a login). */
     publicView: z.boolean().default(true),
-    /** Public URL of Page, used for OAuth redirects when behind a proxy. */
+    /** Public URL of NanoDash, used for OAuth redirects when behind a proxy. */
     baseUrl: z.string().url().optional(),
     defaultRole: z.enum(["user", "admin"]).default("user"),
     /** What every signed-in user may do; groups add more (Settings → Accounts → Groups). */
@@ -108,7 +108,7 @@ export type AuthConfig = z.infer<typeof authSchema>;
 
 export const settingsSchema = z
   .object({
-    title: z.string().default("Page"),
+    title: z.string().default("NanoDash"),
     /** UI language; auto follows the browser (English when it asks for neither). */
     language: z.enum(["auto", "en", "fr"]).default("auto"),
     description: z.string().optional(),
@@ -207,11 +207,11 @@ export const settingsSchema = z
         threshold: z.number().int().min(1).default(2),
         /** Warn this many days before an HTTPS certificate of a checked service expires (0 = never). */
         certDays: z.number().int().min(0).default(14),
-        /** Sender name: Discord username, Gotify and ntfy title (default "Page"). */
+        /** Sender name: Discord username, Gotify and ntfy title, `title` in the webhook's JSON (default "NanoDash"). */
         title: z.string().optional(),
         /** Message templates with {{variables}} (see renderTemplate in lib/alerts.ts); empty keeps the built-in text. */
         messages: z.object({ down: z.string().optional(), up: z.string().optional(), notice: z.string().optional() }).optional(),
-        /** JSON body for the generic webhook, with {{variables}}; empty sends Page's own JSON. */
+        /** JSON body for the generic webhook, with {{variables}}; empty sends NanoDash's own JSON. */
         webhookBody: z.string().optional(),
       })
       .default({}),
@@ -266,7 +266,7 @@ export const settingsSchema = z
 
 export const widgetSchema = z.object({ type: z.string().min(1) }).passthrough();
 
-export const checkTypes = ["http", "tcp", "udp", "icmp", "dns", "snmp", "minecraft"] as const;
+export const checkTypes = ["http", "tcp", "udp", "tcpudp", "icmp", "dns", "snmp", "minecraft"] as const;
 
 /** `ping:` as an object: a typed status check (true / a URL stay the HTTP shorthand). */
 export const checkSchema = z.discriminatedUnion("type", [
@@ -293,6 +293,17 @@ export const checkSchema = z.discriminatedUnion("type", [
     /** What to send: text, or bytes as hex ("0x…"). Default: one zero byte. Up = any reply. */
     payload: z.string().optional(),
     /** The reply must contain this text. */
+    expect: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("tcpudp"),
+    host: z.string().min(1),
+    /** Checked over TCP and over UDP: up only when both answer. */
+    port: z.coerce.number().int().min(1).max(65535),
+    /** The UDP port, when it differs from `port`. */
+    udpPort: z.coerce.number().int().min(1).max(65535).optional(),
+    /** As for a udp check: what to send, and text the reply must contain. */
+    payload: z.string().optional(),
     expect: z.string().optional(),
   }),
   z.object({ type: z.literal("icmp"), host: z.string().min(1) }),

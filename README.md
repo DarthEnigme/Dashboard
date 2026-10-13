@@ -1,4 +1,4 @@
-# Page
+# NanoDash
 
 A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Homepage](https://gethomepage.dev).
 
@@ -18,7 +18,7 @@ A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Hom
   - Firefly III, Ghostfolio
   - Prometheus, Grafana, Glances, Netdata, Dockhand, Arcane
   - calendars (iCal, Sonarr, Radarr), RSS, and any JSON API
-- **Status checks:** HTTP (status codes, keywords, JSON values), TCP, ICMP, DNS and SNMP, with TLS certificate expiry warnings
+- **Status checks:** HTTP (status codes, keywords, JSON values), TCP, UDP, TCP + UDP together, ICMP, DNS, SNMP and Minecraft, with TLS certificate expiry warnings
 - **Widget history:** record any widget's numbers, chart them, and alert when they cross a threshold
 - **Finance tracker:** spending, income and balance charts; a money-flow (Sankey) chart; budgets per category with alerts; CSV bank import; Firefly III sync
 - **Accounts:**
@@ -51,12 +51,12 @@ Open http://localhost:3000 and choose **Set up** to create the admin account (or
 - **One click:** with the image from GHCR and the Docker socket mounted (as in `docker-compose.yml`), **Update to x.y.z** does the rest:
   1. downloads the new image (progress is shown)
   2. starts a short-lived helper container from it
-  3. the helper replaces the Page container with the same name, volumes, ports, networks, env and labels, and waits until it is healthy
+  3. the helper replaces the NanoDash container with the same name, volumes, ports, networks, env and labels, and waits until it is healthy
   4. if the new version doesn't come up within two minutes, the old container is put back and started again
 
   Open pages notice the new version and offer a reload. Each attempt is listed under **History**.
 - **By hand:** `docker compose pull && docker compose up -d`, or for a source install `git pull && npm ci && npm run build`.
-- **Automatically:** set `updates.auto: true` to install new versions at `updates.window`. There is one attempt per version. If the release's image isn't in the registry yet, the attempt doesn't count, and Page tries again at the next window.
+- **Automatically:** set `updates.auto: true` to install new versions at `updates.window`. There is one attempt per version. If the release's image isn't in the registry yet, the attempt doesn't count, and NanoDash tries again at the next window.
 
 ```yaml
 updates:
@@ -69,7 +69,7 @@ updates:
   image: ghcr.io/owner/page  # optional: defaults to the image the container runs
 ```
 
-The `:ro` flag on the socket mount doesn't limit what the Docker API allows, so the default mount is enough. Without the socket, Page shows the manual steps instead. To publish a release, bump `version` in `package.json`, then push a matching tag (`v0.3.1`). The Docker workflow builds amd64 and arm64 on native runners, pushes the multi-arch image, and only then creates the GitHub release with generated notes. Running Pages never see a version whose image can't be pulled.
+The `:ro` flag on the socket mount doesn't limit what the Docker API allows, so the default mount is enough. Without the socket, NanoDash shows the manual steps instead. To publish a release, bump `version` in `package.json`, then push a matching tag (`v0.3.1`). The Docker workflow builds amd64 and arm64 on native runners, pushes the multi-arch image, and only then creates the GitHub release with generated notes. Running Pages never see a version whose image can't be pulled.
 
 ## Run locally
 
@@ -87,7 +87,7 @@ The end-to-end tests need the browser once: `npx playwright install chromium`.
 
 ## Configuration
 
-Config lives in `./config` (override with `HOMEPAGE_CONFIG_DIR`); history lives in `./data` (`HOMEPAGE_DATA_DIR`). Changes to the files show up in every open dashboard within a second, without a reload (set `liveReload: false` to turn this off). Page watches the folder and also re-checks it every 5 seconds, for bind mounts and network shares that don't report changes. If you have the editor open when a file changes, you're asked before your view is reloaded. A broken file is reported on the page instead of crashing it.
+Config lives in `./config` (override with `HOMEPAGE_CONFIG_DIR`); history lives in `./data` (`HOMEPAGE_DATA_DIR`). Changes to the files show up in every open dashboard within a second, without a reload (set `liveReload: false` to turn this off). NanoDash watches the folder and also re-checks it every 5 seconds, for bind mounts and network shares that don't report changes. If you have the editor open when a file changes, you're asked before your view is reloaded. A broken file is reported on the page instead of crashing it.
 
 ### settings.yaml
 
@@ -116,10 +116,10 @@ pingInterval: 30       # seconds between status checks
 liveReload: true       # refresh open dashboards when a config file changes
 tabs: [Home, Media]    # optional tab order (see "Tabs")
 history:
-  retentionDays: 7     # how long status history is kept
+  retentionDays: 90    # how long hourly summaries and incidents are kept (raw checks: 7 days)
 alerts:
   discord: "{{HOMEPAGE_VAR_DISCORD_WEBHOOK}}"
-  webhook: https://example.com/hook   # receives JSON: service, status, url, since, durationSeconds, message
+  webhook: https://example.com/hook   # receives JSON: title, service, status, url, since, durationSeconds, message
   gotify: https://gotify.example.com  # with gotifyToken (an app token)
   gotifyToken: "{{HOMEPAGE_VAR_GOTIFY_TOKEN}}"
   ntfy: https://ntfy.sh/my-homelab    # a topic URL; ntfyToken for protected topics
@@ -140,7 +140,7 @@ alerts:
   matrixRoom: "!abcdefg:matrix.org"   # room id
   threshold: 2         # failed checks in a row before alerting
   certDays: 14         # warn this many days before an HTTPS certificate expires (0 = off)
-  title: Homelab       # sender name (Discord username, Gotify/ntfy title); default "Page"
+  title: Homelab       # sender name (Discord username, Gotify/ntfy title, `title` in the webhook's JSON); default "NanoDash"
   messages:            # optional templates (see "Alert messages")
     down: "🔴 {{service}} is DOWN ({{reason}})"
     up: "🟢 {{service}} is back after {{duration}}"
@@ -208,7 +208,7 @@ The YAML differs from Homepage's: groups and services use an explicit `name:` ke
   latitude: 48.85
   longitude: 2.35
   units: metric          # metric | imperial
-- type: resources        # the machine running Page
+- type: resources        # the machine running NanoDash
   disks: ["/", "/mnt/data"]
 - type: markets
   symbols: [AAPL, ^GSPC]   # Yahoo Finance symbols (unofficial API, may be delayed or rate-limited)
@@ -279,7 +279,7 @@ When no icon is set or it fails to load, the tile shows the service's initials.
 | `synology` | `url`, `username`, `password` | CPU, RAM, storage, volume status |
 | `calendar` | `sources` (`{type: ical, url}`, `{type: sonarr\|radarr, url, key}`), `days`, `timezone` | Upcoming events; more rows on bigger tiles |
 | `rss` | `urls`, `limit` | Latest headlines (links) |
-| `finance` | `period` (`month` or `year`), `chart` (`donut` or `sankey`) | Page's own finance tracker: totals, category donut or money flow, monthly bars, balance (by tile size) |
+| `finance` | `period` (`month` or `year`), `chart` (`donut` or `sankey`) | NanoDash's own finance tracker: totals, category donut or money flow, monthly bars, balance (by tile size) |
 | `prometheus` | `url`, `queries`, `targets`, `range`, `username`/`password` or `token`, `headers` | Your PromQL queries as values with thresholds and sparklines; scrape targets up/down |
 | `grafana` | `url`, `token` (service account), `panels` | Firing and pending alerts, dashboards, health; panels embedded on the service page |
 | `glances` | `url`, `version` (4 or 3), `disks`, `chart`, `username`, `password` | CPU, RAM, fullest disk, temperature, load, uptime; CPU sparkline; disk list |
@@ -410,18 +410,18 @@ Without `mappings`, the widget shows the first few top-level values of the respo
 A background job checks every service that has `ping` set, every `pingInterval` seconds, even when nobody has the page open. Results go into a SQLite database in the data folder. Each tile shows the last 24 hours as bars; `tall` and `large` tiles add a latency chart.
 
 **Alerts:**
-- After `alerts.threshold` failed checks in a row, Page sends a DOWN alert to Discord and/or your webhook.
+- After `alerts.threshold` failed checks in a row, NanoDash sends a DOWN alert to every alert channel you set up. A channel that can't be reached is tried once more.
 - When the service comes back, it sends a RECOVERED alert with the outage length.
 - Use **Send** under Monitoring & alerts in Settings to check your setup. Pick **Sample: service down** or **back up** to see your templates.
 
 ### Alert messages
 
-`alerts.messages.down`, `.up` and `.notice` replace Page's built-in text on every channel. Empty ones keep the built-in text. `{{name}}` is replaced by a variable, and unknown names become empty:
+`alerts.messages.down`, `.up` and `.notice` replace NanoDash's built-in text on every channel. Empty ones keep the built-in text. `{{name}}` is replaced by a variable, and unknown names become empty:
 - **Service alerts:** `service`, `status` (down, up), `reason` (e.g. HTTP 503), `duration` (outage length, e.g. 12m), `since`, `url`, `error`, `httpStatus`.
 - **Notices:** budgets, updates, certificates and thresholds pass their own fields (`service`, `version`, `category`, `value`…). `kind` is budget, update, cert or threshold.
-- **Everywhere:** `message` (Page's own text), `level` (info, warn, error), `time` and `title`.
+- **Everywhere:** `message` (NanoDash's own text), `level` (info, warn, error), `time` and `title`.
 
-`alerts.webhookBody` sends your own JSON to the generic webhook instead of Page's, e.g. for Slack, Mattermost or Home Assistant. Values are escaped for JSON strings, so keep the quotes around `"{{…}}"`. There, `message` is the text after templating.
+`alerts.webhookBody` sends your own JSON to the generic webhook instead of NanoDash's, e.g. for Slack, Mattermost or Home Assistant. Values are escaped for JSON strings, so keep the quotes around `"{{…}}"`. There, `message` is the text after templating.
 
 Template placeholders don't clash with secrets: only `{{HOMEPAGE_VAR_…}}` and `{{HOMEPAGE_FILE_…}}` are read from the environment.
 
@@ -443,11 +443,14 @@ ping: { type: http, url: https://app/health, expect: [200], keyword: "OK" }     
 ping: { type: http, jsonPath: "$.status", equals: ok }                            # a JSON value (url defaults to the link)
 ping: { type: tcp, host: 10.0.0.5, port: 22 }                                     # a port accepts connections
 ping: { type: udp, host: 10.0.0.5, port: 51820, payload: "0x00", expect: "" }      # something answers on a UDP port
+ping: { type: tcpudp, host: 10.0.0.53, port: 53 }                                 # the port answers over TCP and over UDP (udpPort if they differ)
 ping: { type: minecraft, host: mc.example.com, edition: java }                    # a Minecraft server answers its status ping (bedrock: UDP 19132)
 ping: { type: icmp, host: 10.0.0.1 }                                              # ping (needs ping permission in the container)
 ping: { type: dns, host: nas.home.arpa, server: 10.0.0.53, record: A, expect: 10.0.0.20 }
 ping: { type: snmp, host: 10.0.0.2, community: public, oid: 1.3.6.1.2.1.1.3.0 }   # any value back = up
 ```
+
+**TCP + UDP:** for services that need both (DNS, game servers, VPNs with a TCP fallback). It is up only when the TCP port accepts a connection and the UDP port replies; the failure says which one didn't (`udp: no reply`). `payload` and `expect` work as for a UDP check, and `udpPort` sets a different UDP port.
 
 **UDP:** there is no handshake, so a UDP check sends `payload` (text, or bytes as `0x…` hex; default one zero byte) and is up when anything answers (and the answer contains `expect`, if set). A closed port usually reports `ECONNREFUSED`. Many services only answer their own protocol: WireGuard, for one, stays silent to strangers, so watch it through the `wireguard` widget or a TCP check on its web UI instead.
 
@@ -478,9 +481,13 @@ Vaultwarden and other apps without a stats API can still be watched with an HTTP
 
 ### Prometheus export
 
-Page can be scraped by Prometheus (or Grafana Agent, VictoriaMetrics…) at `/api/export/metrics`:
+NanoDash can be scraped by Prometheus (or Grafana Agent, VictoriaMetrics…) at `/api/export/metrics`:
 - `page_service_up`, `page_service_latency_ms`, `page_service_uptime_ratio` (last 24 hours) and `page_service_last_check_timestamp_seconds` for every service with a status check, labelled `service`, `name` and `group`
+- per service too: `page_service_cert_days_left` (HTTPS checks), `page_service_incident_open`, `page_service_incident_started_timestamp_seconds` and `page_service_incidents_24h`
 - `page_widget_value{service, field}`: the latest value of every recorded widget field (`record: true` or thresholds)
+- `page_device_up` and `page_device_latency_ms` for every inventory device with an address, labelled `device` and `name`
+- `page_backup_last_ok`, `page_backup_last_run_timestamp_seconds` and `page_backup_last_size_bytes`
+- `page_update_available`, `page_users`, `page_sessions_active`, `page_database_size_bytes`, `page_process_uptime_seconds` and `page_process_resident_memory_bytes`
 - `page_build_info{version}`
 
 It needs an API token: create one under **Settings → Monitoring & alerts → API tokens** (admins). The token is shown once, with a ready-made `scrape_configs` block; only its hash is stored, it stops working if its admin is disabled or demoted, and it can be revoked any time.
@@ -528,11 +535,11 @@ Discovered services join a YAML group with the same name, or get a new group. Th
 
 ## Install as an app
 
-Open the page in Chrome, Edge or Safari and choose **Install** / **Add to Home Screen**. Browsers only allow this over **HTTPS** (or on `localhost`), so put Page behind your reverse proxy. Offline, the app shows the last loaded dashboard with an "Offline" badge.
+Open the page in Chrome, Edge or Safari and choose **Install** / **Add to Home Screen**. Browsers only allow this over **HTTPS** (or on `localhost`), so put NanoDash behind your reverse proxy. Offline, the app shows the last loaded dashboard with an "Offline" badge.
 
 ## Language
 
-Page speaks English and French. `language: auto` (the default) follows each visitor's browser and falls back to English; `en` or `fr` sets one language for everyone. It's also under **Settings → General**. Dates, numbers and amounts follow the language too (`1 234,56 €` in French).
+NanoDash speaks English and French. `language: auto` (the default) follows each visitor's browser and falls back to English; `en` or `fr` sets one language for everyone. It's also under **Settings → General**. Dates, numbers and amounts follow the language too (`1 234,56 €` in French).
 
 Your own words stay as you wrote them (service, group and category names), and so do the values integrations report on tiles ("running", "CPU"…): thresholds and history use those labels as keys. To add a language, translate `src/i18n/fr.ts` into a new file; `npm test` checks that every text the UI shows has a translation (`node scripts/i18n-keys.mjs --missing` lists what's left).
 
@@ -563,9 +570,9 @@ Saving keeps the comments in `settings.yaml`, like the editor does.
 
 ## Backups
 
-Every night (03:00 by default) Page writes one zip to `data/backups/` and keeps the newest 7. Each zip holds:
+Every night (03:00 by default) NanoDash writes one zip to `data/backups/` and keeps the newest 7. Each zip holds:
 - the config files, exactly as on disk
-- a consistent copy of the database (history, users, finance), taken safely while Page runs
+- a consistent copy of the database (history, users, finance), taken safely while NanoDash runs
 - uploaded wallpapers, logos and profile pictures
 - `secret.key`, which signs sessions and encrypts two-factor secrets
 
@@ -581,7 +588,7 @@ backup:
   dir: /backups     # optional; default data/backups
 ```
 
-**Restore:** stop Page, unzip the backup, copy `config/` over your config folder and `data/` over your data folder (delete `page.db-wal` and `page.db-shm` there first), and start Page again. The zip holds secrets: keep it somewhere safe.
+**Restore:** stop NanoDash, unzip the backup, copy `config/` over your config folder and `data/` over your data folder (delete `page.db-wal` and `page.db-shm` there first), and start NanoDash again. The zip holds secrets: keep it somewhere safe.
 
 ## Editing in the browser
 
@@ -600,7 +607,7 @@ Each change is validated and written straight to the YAML file; comments on unto
 **Import from Homepage:**
 - In the editor, choose **Import**, pick your gethomepage.dev `services.yaml`, `bookmarks.yaml`, `settings.yaml`, `widgets.yaml` and `docker.yaml`, check the preview, then **Merge** (keep your groups, add new ones) or **Replace**.
 - From a terminal: `npm run import:homepage -- /path/to/homepage/config` previews; add `--write` to save. Existing files are backed up first.
-- Anything that can't be carried over exactly is listed, for example ICMP pings (Page checks over HTTP), unsupported widgets and custom formats.
+- Anything that can't be carried over exactly is listed, for example ICMP pings (kept, but they need ping permission in the container), unsupported widgets and custom formats.
 
 ## Accounts and sign-in
 
@@ -613,7 +620,7 @@ On first start, create the admin account at **Set up**. Add more people under **
 auth:
   publicView: true            # false: everything requires signing in
   baseUrl: https://home.example.com   # public URL, needed for SSO behind a proxy
-  local: { enabled: true }    # username/password accounts stored in Page
+  local: { enabled: true }    # username/password accounts stored in NanoDash
   providers:                  # single sign-on (callback: <baseUrl>/api/auth/oauth/<id>/callback)
     - id: authentik
       type: oidc              # oidc | google | github
@@ -621,7 +628,7 @@ auth:
       issuer: https://auth.example.com/application/o/page/
       clientId: page
       clientSecret: "{{HOMEPAGE_VAR_OIDC_SECRET}}"
-      signup: false           # only people who already have a Page account may sign in
+      signup: false           # only people who already have a NanoDash account may sign in
       adminGroup: admins      # members become admins
     - { id: google, type: google, clientId: "…", clientSecret: "{{HOMEPAGE_VAR_GOOGLE_SECRET}}" }
     - { id: github, type: github, clientId: "…", clientSecret: "{{HOMEPAGE_VAR_GITHUB_SECRET}}" }
@@ -640,11 +647,11 @@ auth:
 
 **Who can sign in through SSO:** with `signup: false` (the default for Google, GitHub and OIDC), a person can sign in only if:
 - they have signed in before, or
-- the provider confirms their email and it matches an existing Page user. Add the user with that email under **Users** first.
+- the provider confirms their email and it matches an existing NanoDash user. Add the user with that email under **Users** first.
 
 Everyone else is refused. Unverified emails are never used to match. LDAP and proxy logins create accounts automatically unless you set `signup: false` on them.
 
-**Proxy sign-in** trusts the `Remote-User`, `Remote-Email`, `Remote-Name` and `Remote-Groups` headers. It only does so when the request also carries the shared secret, so make sure only your proxy can reach Page, and configure the proxy to add the header.
+**Proxy sign-in** trusts the `Remote-User`, `Remote-Email`, `Remote-Name` and `Remote-Groups` headers. It only does so when the request also carries the shared secret, so make sure only your proxy can reach NanoDash, and configure the proxy to add the header.
 
 **Profile:** everyone can open **Profile** from the account menu. There you can set a display name, upload a profile picture (PNG, JPEG, WebP, GIF or AVIF, up to 2 MB) and change your password if you have one. Email, role and SSO links stay with admins, because the email is what links SSO sign-ins to accounts.
 
@@ -688,7 +695,7 @@ Signed-in users get **Finance** in the header (the wallet button) and the accoun
 - **Flow:** a Sankey chart of where the money came from (income by category) and where it went (spending by category), with what was saved, or taken from savings when spending was higher. Categories under 2% are grouped as "Other". Hover a band for its amount and share.
 - **Export:** the **Export** button on the money flow (Overview and Flow) saves just the chart, cropped and on a transparent background, as a PNG image or an SVG you can edit; or a CSV of every band (source, target, amount, share). **Report (PDF)** opens a one-page summary of the period (totals, the flow, spending by category, budgets) and the print dialog: choose **Save as PDF**. The report always prints dark on white, whatever the theme. Open it any time at `/finance/report?period=2026-09` (or a year, `?period=2026`).
 - **Quick entry:** at the top of every tab. **Repeat** makes it a recurring transaction from that date. ☆ saves it as a **shortcut**: a one-tap button above the form that adds it again today, in the currency it was saved in. Remove a shortcut with its ×.
-- **Transactions:** quick entry at the top, search and filter, edit and delete. **Export CSV** downloads the period with the current filters. **All** downloads every transaction, and **JSON** gives the same data as JSON. The CSV opens in Excel and imports back into Page as is. Text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets don't run it as a formula.
+- **Transactions:** quick entry at the top, search and filter, edit and delete. **Export CSV** downloads the period with the current filters. **All** downloads every transaction, and **JSON** gives the same data as JSON. The CSV opens in Excel and imports back into NanoDash as is. Text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets don't run it as a formula.
 - **Accounts:** bank accounts, cash, cards and savings, each with its balance (opening balance plus its transactions) and a 12-month balance line. Accounts named by Firefly III or a CSV import appear by themselves. **Transfer** moves money between two of your accounts (asking for the amount received when their currencies differ): it changes both balances but is never income or spending, and deleting one side deletes both. The **account picker** in the header shows one account's totals, charts and transactions; quick entry adds to the account you're viewing (or the last one used), and a CSV import can go into an account. Renaming an account renames it on its transactions; accounts with transactions can be archived, empty ones deleted.
 - **Currency:** the picker in the header shows everything in another currency, remembered per browser. Transactions in other currencies are converted at the latest ECB reference rates (via Frankfurter, no key, cached 6 hours and kept for offline use). Budgets are converted too. New transactions and imports use the currency being shown. A currency without an ECB rate is listed but left out of the totals, and the page says how many transactions that affects.
 - **Plan:**
@@ -702,7 +709,7 @@ Signed-in users get **Finance** in the header (the wallet button) and the accoun
   - **Put aside** and **Take out**, or the **Savings** button in the header, record moves between your own pots. They are not spending, so they stay out of the totals and charts.
 - **Categories:** pick each category's chart colour. The eight palette colours are checked to stay apart, also for colour-blind people. Beyond that, **Custom** lets a category take any colour and keep its own band in the charts, at the cost of that guarantee. Categories with no colour are grouped as "Other". Renaming to an existing name merges the two. Each category can have a **monthly budget**: the Overview shows how much of it is used (×12 in the year view), and an alert is sent when it runs out.
 - **Import:**
-  - Upload a bank CSV or Excel (.xlsx) export and match its columns. For Excel, the first sheet with data is read, and dates and amounts are taken as Excel stores them. Old .xls and .ods files need saving as .xlsx or .csv first. Page guesses them from English and French headers and handles decimal commas, day-first dates and debit/credit columns.
+  - Upload a bank CSV or Excel (.xlsx) export and match its columns. For Excel, the first sheet with data is read, and dates and amounts are taken as Excel stores them. Old .xls and .ods files need saving as .xlsx or .csv first. NanoDash guesses them from English and French headers and handles decimal commas, day-first dates and debit/credit columns.
   - The mapping is remembered.
   - Importing the same file again adds nothing.
 
@@ -713,7 +720,7 @@ finance:
   budgetAlerts: over            # over: alert when a budget is used up; warn: also at 80%; off
 ```
 
-Budget alerts go to the same Discord/webhook channels as service alerts, at most once per category, threshold and month. The webhook receives `{ kind: "budget", level, message, category, spentCents, budgetCents }`.
+Budget alerts go to the same channels as service alerts, at most once per category, threshold and month. The webhook receives `{ kind: "budget", level, message, category, spentCents, budgetCents }`.
 
 Add a `finance` widget to a tile to see it on the dashboard; bigger tiles show more charts.
 
@@ -722,15 +729,15 @@ Add a `finance` widget to a tile to see it on the dashboard; bigger tiles show m
 **Travel** (in the Apps menu) keeps track of where you've been:
 - **Map:** a dotted globe that slowly turns (drag it, or pick a country) with the countries you've visited in your accent colour, the ones you want to visit outlined, and the cities you've been to glowing. **Flat map** shows the same as a world map. Pick a country to mark it as visited, lived there or want to go, and see your trips there.
 - **Stats:** countries out of 195 (UN members and the two observers) and the share of the world, continents, cities, trips, days away this year, and your longest trip.
-- **Trips:** a name, dates, the stops in order (search a city, or add a whole country), a rating, notes, and who came along. Companions (other Page users) see the trip on their own map and in their stats; only you can change it, and they can remove it from their list.
+- **Trips:** a name, dates, the stops in order (search a city, or add a whole country), a rating, notes, and who came along. Companions (other NanoDash users) see the trip on their own map and in their stats; only you can change it, and they can remove it from their list.
 - **Places:** every country and city you've marked, with search to add more.
 
-Each person has their own log. It needs the `travel` permission, which signed-in users have by default (see `auth.userPermissions`). City search uses Open-Meteo's free place search through Page; everything else (the map included) works offline. Country flags use the Twemoji Country Flags font (Twemoji graphics by Twitter, CC-BY 4.0) so they also show on Windows.
+Each person has their own log. It needs the `travel` permission, which signed-in users have by default (see `auth.userPermissions`). City search uses Open-Meteo's free place search through NanoDash; everything else (the map included) works offline. Country flags use the Twemoji Country Flags font (Twemoji graphics by Twitter, CC-BY 4.0) so they also show on Windows.
 
 ## Watchlist and reading list
 
 **Watchlist** (in the Apps menu) keeps the books, movies, shows and games you want to get to:
-- **Add:** pick the kind and type a title. For books, Page searches Open Library as you type: pick one to get its cover, author, year and page count. Everything else you type yourself.
+- **Add:** pick the kind and type a title. For books, NanoDash searches Open Library as you type: pick one to get its cover, author, year and page count. Everything else you type yourself.
 - **Statuses:** in progress, planned, finished and dropped, each with its own tab, and a filter by kind. Starting something records the date; finishing it records that too and fills in the progress.
 - **Each item:** progress (pages, episodes, minutes or hours, shown on the cover while in progress), a rating out of 5, and notes.
 - **Stats:** what you're on, what's planned, what you finished this year by kind, and the pages read.

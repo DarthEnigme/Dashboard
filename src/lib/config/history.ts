@@ -40,7 +40,7 @@ export function saveVersionBefore(file: ConfigFile, user: string | null) {
       .run(file, file, KEEP);
   } catch (e) {
     // History is a convenience; never block a save because of it.
-    console.warn("[page] could not snapshot config:", e);
+    console.warn("[nanodash] could not snapshot config:", e);
   }
 }
 

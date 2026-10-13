@@ -1,4 +1,4 @@
-// Page self-updater. Runs in a short-lived helper container started by the old Page container
+// NanoDash self-updater. Runs in a short-lived helper container started by the old NanoDash container
 // (from the NEW image, with the Docker socket mounted), because a container can't replace itself:
 //
 //   node scripts/updater.mjs <old-container-id> <new-image>
@@ -102,7 +102,7 @@ const safeJson = (t) => {
   }
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const log = (msg) => console.log(`[page-updater] ${new Date().toISOString()} ${msg}`);
+const log = (msg) => console.log(`[nanodash-updater] ${new Date().toISOString()} ${msg}`);
 const q = (s) => encodeURIComponent(s);
 
 async function waitHealthy(id) {

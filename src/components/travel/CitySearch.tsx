@@ -15,7 +15,7 @@ export interface PlaceHit {
   lon: number;
 }
 
-/** Type a city, pick it from the results (Open-Meteo's place search, through Page). */
+/** Type a city, pick it from the results (Open-Meteo's place search, through NanoDash). */
 export function CitySearch({ onPick, placeholder }: { onPick: (p: PlaceHit) => void; placeholder?: string }) {
   const t = useT();
   const [q, setQ] = useState("");

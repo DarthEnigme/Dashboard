@@ -31,7 +31,7 @@ describe("Homepage import", () => {
       ping: "https://pve.lan:8006",
       widget: { type: "proxmox", url: "https://pve.lan:8006", username: "api@pam!homepage", password: "{{HOMEPAGE_VAR_PROXMOX_SECRET}}", node: "pve" },
     });
-    expect(svc("Infrastructure", "Pi-hole")?.ping).toBe("http://pihole.lan");
+    expect(svc("Infrastructure", "Pi-hole")?.ping).toEqual({ type: "icmp", host: "pihole.lan" });
     expect(svc("Infrastructure / Network", "UniFi")?.icon).toBe("https://cdn.jsdelivr.net/gh/selfhst/icons/png/unifi.png");
   });
 
@@ -101,7 +101,7 @@ describe("Homepage import", () => {
     );
   });
 
-  it("produces YAML that Page's schemas accept", () => {
+  it("produces YAML that NanoDash's schemas accept", () => {
     const y = toYaml(out);
     expect(settingsSchema.safeParse(YAML.parse(y.settings)).success).toBe(true);
     expect(servicesFileSchema.safeParse(YAML.parse(y.services)).success).toBe(true);

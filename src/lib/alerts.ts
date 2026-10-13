@@ -47,7 +47,7 @@ export interface AlertPayload {
 }
 
 export function describeAlert(p: AlertPayload): string {
-  if (p.status === "test") return "Test alert from Page: notifications are working.";
+  if (p.status === "test") return "Test alert from NanoDash: notifications are working.";
   if (p.status === "down") {
     const why = p.httpStatus ? `HTTP ${p.httpStatus}` : p.error ?? "no response";
     return `${p.service} is DOWN (${why}).`;
@@ -122,7 +122,7 @@ export function sendNotice(cfg: Settings["alerts"], n: Notice): Promise<string[]
   return deliver(cfg, text, n.level, color, n.url, { ...n, message: text }, n);
 }
 
-const senderName = (cfg: Settings["alerts"]) => cfg.title?.trim() || "Page";
+const senderName = (cfg: Settings["alerts"]) => cfg.title?.trim() || "NanoDash";
 
 const withCommon = (cfg: Settings["alerts"], vars: Record<string, unknown>) => ({ time: new Date().toISOString(), title: senderName(cfg), ...vars });
 
@@ -154,6 +154,8 @@ async function sendEmail(cfg: NonNullable<Settings["alerts"]["email"]>, title: s
   });
   transport.close();
 }
+/** Wait before the second try; PAGE_ALERT_RETRY_MS shortens it in tests. */
+const RETRY_MS = Number(process.env.PAGE_ALERT_RETRY_MS ?? 2000);
 const TAGS = { info: "information_source", warn: "warning", error: "rotating_light" } as const;
 
 async function deliver(
@@ -168,17 +170,29 @@ async function deliver(
   const errors: string[] = [];
   const title = senderName(cfg);
   const post = async (name: string, target: string, body: unknown, headers: Record<string, string> = { "Content-Type": "application/json" }) => {
-    try {
-      const res = await http(target, {
-        method: "POST",
-        headers,
-        body: typeof body === "string" ? body : JSON.stringify(body),
-        timeoutMs: 8000,
-      });
-      await res.body?.cancel();
-      if (!res.ok) errors.push(`${name}: HTTP ${res.status}`);
-    } catch (e) {
-      errors.push(`${name}: ${(e as Error).message}`);
+    // One more try after a short wait when the channel is unreachable, busy (429) or failing (5xx).
+    for (let attempt = 0; ; attempt++) {
+      let error: string;
+      let retry = true;
+      try {
+        const res = await http(target, {
+          method: "POST",
+          headers,
+          body: typeof body === "string" ? body : JSON.stringify(body),
+          timeoutMs: 8000,
+        });
+        await res.body?.cancel();
+        if (res.ok) return;
+        error = `HTTP ${res.status}`;
+        retry = res.status === 429 || res.status >= 500;
+      } catch (e) {
+        error = (e as Error).message;
+      }
+      if (!retry || attempt >= 1) {
+        errors.push(`${name}: ${error}`);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, RETRY_MS));
     }
   };
 
@@ -194,7 +208,7 @@ async function deliver(
   }
   if (cfg.webhook) {
     const custom = cfg.webhookBody?.trim();
-    jobs.push(post("Webhook", cfg.webhook, custom ? renderTemplate(custom, withCommon(cfg, { ...vars, message: text }), jsonEscape) : webhookBody));
+    jobs.push(post("Webhook", cfg.webhook, custom ? renderTemplate(custom, withCommon(cfg, { ...vars, message: text }), jsonEscape) : { title, ...webhookBody }));
   }
   if (cfg.gotify && cfg.gotifyToken) {
     jobs.push(

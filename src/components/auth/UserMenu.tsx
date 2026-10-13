@@ -2,6 +2,7 @@
 
 import { sectionsFor } from "@/lib/sections";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { KeyRound, LogIn, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
@@ -50,6 +51,11 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
   const label = u.name || u.username;
   const logout = async () => {
     await sendJson("/api/auth", "DELETE");
+    // The offline copies of the pages (see public/sw.js) belong to the account that just left.
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k.endsWith("-shell")).map((k) => caches.delete(k)));
+    } catch {}
     window.location.href = auth.publicView ? "/" : "/login";
   };
 
@@ -113,9 +119,9 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
               </a>
             ))}
             {auth.canEdit && (
-              <a role="menuitem" href="/settings" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover">
+              <Link role="menuitem" href="/settings" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover">
                 <Settings className="h-4 w-4" /> {t("Settings")}
-              </a>
+              </Link>
             )}
             <button role="menuitem" onClick={logout} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover">
               <LogOut className="h-4 w-4" /> {t("Sign out")}

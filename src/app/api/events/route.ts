@@ -12,7 +12,7 @@ const HEARTBEAT_MS = 25_000;
 /**
  * Server-sent events, so open dashboards refresh themselves: "version" on connect (the page compares it
  * with the version it was rendered with) and "config" whenever a config file changes. Also "build" on
- * connect (a different build means Page itself was updated) and "update" while an update installs.
+ * connect (a different build means NanoDash itself was updated) and "update" while an update installs.
  */
 export async function GET(req: Request) {
   const { settings } = loadConfig();

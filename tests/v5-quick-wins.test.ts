@@ -56,13 +56,16 @@ describe("alert templates", () => {
   it("keeps the built-in text without templates, and templates notices", async () => {
     got.length = 0;
     await sendAlert({ threshold: 2, certDays: 14, webhook: `${base}/plain` }, { service: "NAS", status: "up", durationSeconds: 90 });
-    expect(JSON.parse(got[0].body)).toMatchObject({ service: "NAS", status: "up", message: "NAS is back UP after 1m." });
+    expect(JSON.parse(got[0].body)).toMatchObject({ title: "NanoDash", service: "NAS", status: "up", message: "NAS is back UP after 1m." });
+    got.length = 0;
+    await sendAlert({ threshold: 2, certDays: 14, title: "Homelab", webhook: `${base}/plain` }, { service: "NAS", status: "down" });
+    expect(JSON.parse(got[0].body)).toMatchObject({ title: "Homelab", service: "NAS", status: "down" });
     got.length = 0;
     await sendNotice(
       { threshold: 2, certDays: 14, ntfy: `${base}/n`, messages: { notice: "[{{kind}}/{{level}}] {{message}} ({{version}})" } },
-      { kind: "update", level: "info", message: "Page 0.5.0 is available.", version: "0.5.0" },
+      { kind: "update", level: "info", message: "NanoDash 0.5.0 is available.", version: "0.5.0" },
     );
-    expect(got[0].body).toBe("[update/info] Page 0.5.0 is available. (0.5.0)");
+    expect(got[0].body).toBe("[update/info] NanoDash 0.5.0 is available. (0.5.0)");
   });
 });
 

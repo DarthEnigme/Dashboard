@@ -108,7 +108,6 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
     };
     return () => {
       const r = restore.current!;
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       applyTheme(root, r.theme, r.custom);
       root.dataset.style = r.style;
       setGlow(root, r.glow);

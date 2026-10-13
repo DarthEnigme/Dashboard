@@ -18,7 +18,7 @@ interface Props {
   onEdit?: () => void;
   /** Admins: a gear button linking to the settings page. */
   showSettings?: boolean;
-  /** Admins: a newer version of Page is available (dot on the gear). */
+  /** Admins: a newer version of NanoDash is available (dot on the gear). */
   updateAvailable?: string;
   /** Sections this person may open (Finance, Travel…): a button, or an Apps menu for several. */
   sections?: AppSection[];
@@ -114,7 +114,7 @@ export function Header({ title, logo, description, query, onQuery, onSubmit, onE
             href={updateAvailable ? "/settings#updates" : "/settings"}
             className="glass glass-interactive grid h-11 w-11 shrink-0 place-items-center rounded-full"
             aria-label={updateAvailable ? t("Settings (update {version} available)", { version: updateAvailable }) : t("Settings")}
-            title={updateAvailable ? t("Page {version} is available", { version: updateAvailable }) : t("Settings")}
+            title={updateAvailable ? t("NanoDash {version} is available", { version: updateAvailable }) : t("Settings")}
           >
             <Settings className="h-4 w-4" />
             {updateAvailable && <span aria-hidden className="absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-[var(--page)]" />}

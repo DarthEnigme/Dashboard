@@ -4,7 +4,7 @@ import { clientAuth, ensureBootstrap, sameOrigin, viewer } from "@/lib/auth";
 import { ldapAuthenticate } from "@/lib/auth/ldap";
 import { resolveIdentity } from "@/lib/auth/identity";
 import { burnPasswordCheck, verifyPassword } from "@/lib/auth/password";
-import { clearFailures, clientIp, isLimited, recordFailure } from "@/lib/auth/ratelimit";
+import { clearFailures, clientIp, isLimited, MAX_USER_FAILURES, recordFailure } from "@/lib/auth/ratelimit";
 import { SESSION_COOKIE, signToken } from "@/lib/auth/session";
 import { revokeSession, startSession } from "@/lib/auth/sessions";
 import { syncSsoGroups } from "@/lib/auth/groups";
@@ -27,7 +27,9 @@ export async function POST(req: Request) {
 
   await ensureBootstrap();
   const limitKey = `${clientIp(req)}|${name.toLowerCase()}`;
-  if (isLimited(limitKey)) return fail("Too many failed attempts. Try again in 15 minutes.", 429);
+  // Per username too: the address in limitKey is only as good as the X-Forwarded-For header.
+  const userKey = `user|${name.toLowerCase()}`;
+  if (isLimited(limitKey) || isLimited(userKey, MAX_USER_FAILURES)) return fail("Too many failed attempts. Try again in 15 minutes.", 429);
 
   const { auth } = loadConfig().settings;
   let user: users.User | undefined;
@@ -53,7 +55,7 @@ export async function POST(req: Request) {
         else error = r.error;
       }
     } catch (e) {
-      console.error("[page] LDAP login failed:", e);
+      console.error("[nanodash] LDAP login failed:", e);
       return fail("The directory server could not be reached", 502);
     }
   }
@@ -61,6 +63,7 @@ export async function POST(req: Request) {
   if (!local?.hasPassword && !auth.ldap.enabled) await burnPasswordCheck(password);
   if (!user || user.disabled) {
     recordFailure(limitKey);
+    recordFailure(userKey);
     users.audit(name, "login-failed", { method: local?.hasPassword ? "local" : auth.ldap.enabled ? "ldap" : "local" });
     return fail(user?.disabled ? "This account is disabled." : error);
   }

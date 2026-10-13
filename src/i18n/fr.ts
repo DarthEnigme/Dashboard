@@ -123,8 +123,8 @@ export const fr: Record<string, string> = {
   "Budget alerts": "Alertes de budget",
   "Budget used up": "Budget épuisé",
   Budgets: "Budgets",
-  "Budgets, updates, certificates and thresholds. {{message}} is Page's own text, {{kind}} is budget, update, cert or threshold.":
-    "Budgets, mises à jour, certificats et seuils. {{message}} est le texte de Page, {{kind}} vaut budget, update, cert ou threshold.",
+  "Budgets, updates, certificates and thresholds. {{message}} is NanoDash's own text, {{kind}} is budget, update, cert or threshold.":
+    "Budgets, mises à jour, certificats et seuils. {{message}} est le texte de NanoDash, {{kind}} vaut budget, update, cert ou threshold.",
   "Build services from container labels.": "Créer les services à partir des labels des conteneurs.",
   "By {date}": "D’ici le {date}",
 
@@ -190,7 +190,7 @@ export const fr: Record<string, string> = {
   "Confirm password": "Confirmer le mot de passe",
   "Confirm: {label}": "Confirmer : {label}",
   "container with the same settings and volumes. It is unavailable for about a minute. If the new version doesn't start, the current one is put back automatically.":
-    "avec les mêmes réglages et volumes. Page est indisponible environ une minute. Si la nouvelle version ne démarre pas, l’actuelle est remise automatiquement.",
+    "avec les mêmes réglages et volumes. NanoDash est indisponible environ une minute. Si la nouvelle version ne démarre pas, l’actuelle est remise automatiquement.",
   "Continue with": "Continuer avec",
   Copy: "Copier",
   "Couldn’t load config for editing:": "Impossible de charger la config pour la modifier :",
@@ -236,7 +236,7 @@ export const fr: Record<string, string> = {
   "Disable account": "Désactiver le compte",
   disabled: "désactivé",
   Discard: "Annuler les modifications",
-  "Discord username, Gotify and ntfy title.": "Nom d’utilisateur Discord, titre Gotify et ntfy.",
+  "Discord username, Gotify and ntfy title, and `title` in the webhook's JSON.": "Nom d’utilisateur Discord, titre Gotify et ntfy, et `title` dans le JSON du webhook.",
   "Discord webhook URL": "URL du webhook Discord",
   "Discover services from Docker labels": "Découvrir les services via les labels Docker",
   Dismiss: "Ignorer",
@@ -281,9 +281,10 @@ export const fr: Record<string, string> = {
   Email: "E-mail",
   "Email (optional, used to match SSO logins)": "E-mail (facultatif, sert à relier les connexions SSO)",
   "Empty means fluid. Groups can override it.": "Vide = fluide. Les groupes peuvent le remplacer.",
-  "Empty sends Page's own JSON. Values are escaped for JSON strings, so keep the quotes around them.":
-    "Vide : Page envoie son propre JSON. Les valeurs sont échappées pour des chaînes JSON, gardez donc les guillemets autour.",
+  "Empty sends NanoDash's own JSON. Values are escaped for JSON strings, so keep the quotes around them.":
+    "Vide : NanoDash envoie son propre JSON. Les valeurs sont échappées pour des chaînes JSON, gardez donc les guillemets autour.",
   "Empty: anything below 500 is up.": "Vide : tout code sous 500 compte comme en ligne.",
+  "Empty: the same port": "Vide : le même port",
   "Empty: the service link": "Vide : le lien du service",
   "Empty: the system resolver.": "Vide : le résolveur du système.",
   "Enable account": "Activer le compte",
@@ -511,8 +512,8 @@ export const fr: Record<string, string> = {
   "New service group": "Nouveau groupe de services",
   "New service in {group}": "Nouveau service dans {group}",
   "New theme": "Nouveau thème",
-  "New versions of Page: check, read what changed, and install with one click (Docker).":
-    "Nouvelles versions de Page : vérifier, lire les changements et installer en un clic (Docker).",
+  "New versions of NanoDash: check, read what changed, and install with one click (Docker).":
+    "Nouvelles versions de NanoDash : vérifier, lire les changements et installer en un clic (Docker).",
   Next: "Suivant",
   "Next period": "Période suivante",
   "Next to the title, on the sign-in page, and as the browser and app icon (PNG or JPEG for the icon; square works best). Up to 2 MB.":
@@ -600,11 +601,11 @@ export const fr: Record<string, string> = {
 
   // ---------- P ----------
   "PNG, JPEG, WebP, GIF or AVIF up to 2 MB. Square images look best.": "PNG, JPEG, WebP, GIF ou AVIF jusqu’à 2 Mo. Les images carrées rendent mieux.",
-  Page: "Page",
-  "Page downloads": "Page télécharge",
-  "Page is now running": "Page exécute maintenant",
-  "Page was updated to": "Page a été mis à jour vers",
-  "Page {version} is available": "Page {version} est disponible",
+  NanoDash: "NanoDash",
+  "NanoDash downloads": "NanoDash télécharge",
+  "NanoDash is now running": "NanoDash exécute maintenant",
+  "NanoDash was updated to": "NanoDash a été mis à jour vers",
+  "NanoDash {version} is available": "NanoDash {version} est disponible",
   "Partly cloudy": "Partiellement nuageux",
   Password: "Mot de passe",
   "Password (8+ characters)": "Mot de passe (8 caractères ou plus)",
@@ -784,6 +785,7 @@ export const fr: Record<string, string> = {
   System: "Système",
 
   // ---------- T ----------
+  "TCP + UDP port": "Port TCP + UDP",
   "TCP port": "Port TCP",
   "TLS certificate expired": "Certificat TLS expiré",
   "TLS certificate expires in {n} d": "Le certificat TLS expire dans {n} j",
@@ -849,6 +851,8 @@ export const fr: Record<string, string> = {
 
   // ---------- U ----------
   "UDP port": "Port UDP",
+  "UDP port, if different": "Port UDP, s’il est différent",
+  "Up only when both TCP and UDP answer.": "Disponible seulement si TCP et UDP répondent tous les deux.",
   Uncategorised: "Sans catégorie",
   Undo: "Annuler",
   "Unknown device": "Appareil inconnu",
@@ -1171,8 +1175,8 @@ export const fr: Record<string, string> = {
 
   // ---------- 0.6: fonts, travel colours, alert channels, info widgets ----------
   "Alert channels": "Canaux d’alerte",
-  "Bundled with Page, so it works offline. system keeps your device's font; atkinson is designed to be easy to read.":
-    "Fournie avec Page, elle marche hors ligne. system garde la police de l’appareil ; atkinson est conçue pour être facile à lire.",
+  "Bundled with NanoDash, so it works offline. system keeps your device's font; atkinson is designed to be easy to read.":
+    "Fournie avec NanoDash, elle marche hors ligne. system garde la police de l’appareil ; atkinson est conçue pour être facile à lire.",
   Channels: "Canaux",
   "Colours of the travel map.": "Couleurs de la carte des voyages.",
   Font: "Police",

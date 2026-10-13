@@ -70,7 +70,7 @@ async function recordMetrics(state: MonitorState, services: { id: string; servic
         value: v,
         state: event,
       });
-      if (errors.length) console.warn(`[page] threshold alert for ${service.name} failed: ${errors.join("; ")}`);
+      if (errors.length) console.warn(`[nanodash] threshold alert for ${service.name} failed: ${errors.join("; ")}`);
     }
   });
 }
@@ -122,7 +122,22 @@ export function rollup(now = Date.now()) {
   }
 }
 
+/**
+ * Forget services that are gone from the config (deleted, renamed, or no longer checked): their
+ * open outage is closed, since nothing would ever see them come back.
+ */
+export function dropStale(state: Pick<MonitorState, "outages" | "certs" | "breaches">, checked: Set<string>, all: Set<string>, now = Date.now()) {
+  for (const [id, outage] of state.outages) {
+    if (checked.has(id)) continue;
+    if (outage.down) closeIncident(id, now);
+    state.outages.delete(id);
+  }
+  for (const id of state.certs.keys()) if (!checked.has(id)) state.certs.delete(id);
+  for (const key of state.breaches.keys()) if (!all.has(key.slice(0, key.indexOf("|")))) state.breaches.delete(key);
+}
+
 async function tick(state: MonitorState): Promise<number> {
+  const started = Date.now();
   const cfg = await getConfig();
   const { settings } = cfg;
   const ids = serviceIds(cfg.services);
@@ -132,11 +147,14 @@ async function tick(state: MonitorState): Promise<number> {
       .filter((t): t is typeof t & { check: NonNullable<typeof t.check> } => !!t.check),
   );
   const alertsOn = hasAlertChannel(settings.alerts);
+  dropStale(state, new Set(targets.map((t) => t.id)), new Set(ids.flat()));
 
+  // Alongside the checks, so a slow widget doesn't hold them up.
+  let metrics: Promise<void> | undefined;
   if (Date.now() - state.lastMetrics >= settings.metricsInterval * 1000 - 1000) {
     state.lastMetrics = Date.now();
     const widgets = cfg.services.flatMap((grp, gi) => grp.services.map((s, si) => ({ id: ids[gi][si], service: s }))).filter((t) => t.service.widget);
-    await recordMetrics(state, widgets, settings).catch((e) => console.error("[page] recording metrics failed:", e));
+    metrics = recordMetrics(state, widgets, settings).catch((e) => console.error("[nanodash] recording metrics failed:", e));
   }
 
   await mapLimit(targets, CONCURRENCY, async ({ id, service, check }) => {
@@ -145,7 +163,7 @@ async function tick(state: MonitorState): Promise<number> {
     insertPing({ service_id: id, ts: now, up: r.up ? 1 : 0, status: r.status ?? null, latency_ms: r.latencyMs ?? null });
     if (r.cert) {
       state.certs.set(id, r.cert);
-      await certNotice(settings, id, service, r.cert).catch((e) => console.warn(`[page] certificate notice for ${service.name} failed:`, e));
+      await certNotice(settings, id, service, r.cert).catch((e) => console.warn(`[nanodash] certificate notice for ${service.name} failed:`, e));
     }
 
     // Outages are always recorded as incidents; alerts are only sent when a channel is configured.
@@ -165,8 +183,9 @@ async function tick(state: MonitorState): Promise<number> {
       error: r.error,
       httpStatus: r.error ? undefined : r.status,
     });
-    if (errors.length) console.warn(`[page] alert for ${service.name} failed: ${errors.join("; ")}`);
+    if (errors.length) console.warn(`[nanodash] alert for ${service.name} failed: ${errors.join("; ")}`);
   });
+  await metrics;
 
   if (Date.now() - state.lastMaintenance > HOUR) {
     state.lastMaintenance = Date.now();
@@ -176,11 +195,12 @@ async function tick(state: MonitorState): Promise<number> {
       rollupMetrics();
       pruneMetrics(Date.now() - RAW_RETENTION, Date.now() - settings.history.retentionDays * 24 * HOUR);
     } catch (e) {
-      console.error("[page] metrics maintenance failed:", e);
+      console.error("[nanodash] metrics maintenance failed:", e);
     }
-    for (const job of state.hourly) await job().catch((e) => console.error("[page] hourly job failed:", e));
+    for (const job of state.hourly) await job().catch((e) => console.error("[nanodash] hourly job failed:", e));
   }
-  return settings.pingInterval * 1000;
+  // Checks start every pingInterval, however long this pass took.
+  return Math.max(1000, settings.pingInterval * 1000 - (Date.now() - started));
 }
 
 /** Register a job for the monitor's hourly maintenance pass. */
@@ -198,14 +218,14 @@ export function startMonitor() {
   try {
     for (const i of openIncidents()) state.outages.set(i.service_id, { failures: 1, down: true, since: i.start });
   } catch (e) {
-    console.warn("[page] could not load open incidents:", e);
+    console.warn("[nanodash] could not load open incidents:", e);
   }
   const loop = async () => {
     let delay = 30_000;
     try {
       delay = await tick(state);
     } catch (e) {
-      console.error("[page] monitor tick failed:", e);
+      console.error("[nanodash] monitor tick failed:", e);
     }
     state.timer = setTimeout(loop, delay);
     state.timer.unref?.();

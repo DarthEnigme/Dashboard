@@ -1,9 +1,10 @@
 name: CI
 
+# Pull requests run this directly. Pushes to main and tags run it from the Docker image
+# workflow, which only builds once it has passed.
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_call:
 
 jobs:
   test:
@@ -16,8 +17,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Type-check
-        run: npx tsc --noEmit
+      - name: Lint and type-check
+        run: npm run lint
       - name: Unit tests
         run: npm test
       - name: Build

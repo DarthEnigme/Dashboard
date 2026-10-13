@@ -71,7 +71,7 @@ test("imports a Homepage config from the editor (merge), with warnings, then res
     await dialog.getByRole("button", { name: "Import" }).click();
     await expect(page.getByText("Homepage config imported")).toBeVisible();
     const services = readConfig("services");
-    // Merge: existing groups stay, new ones are added; Page-only settings (auth) survive.
+    // Merge: existing groups stay, new ones are added; NanoDash-only settings (auth) survive.
     expect(services).toContain("name: Infra\n");
     expect(services).toContain("name: Infrastructure / Network");
     expect(readConfig("settings")).toContain("title: My Homelab");

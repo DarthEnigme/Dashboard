@@ -46,6 +46,6 @@ export async function budgetAlertJob() {
       budgetCents: b.budget,
     });
     if (!errors.length) setMeta(key, new Date().toISOString());
-    else console.warn(`[page] budget alert for ${b.name} failed: ${errors.join("; ")}`);
+    else console.warn(`[nanodash] budget alert for ${b.name} failed: ${errors.join("; ")}`);
   }
 }

@@ -32,7 +32,7 @@ export interface PingResult {
 
 /**
  * The check for a service: `ping: true` checks the link, a string checks that URL (both over HTTP),
- * an object is a typed check (http, tcp, icmp, dns, snmp). An http object without url uses the link.
+ * an object is a typed check (see checkTypes in config/schema.ts). An http object without url uses the link.
  */
 export function checkSpec(s: Service | undefined): CheckSpec | undefined {
   const p = s?.ping;
@@ -52,6 +52,8 @@ export function describeCheck(c: CheckSpec): string {
       return `tcp ${c.host}:${c.port}`;
     case "udp":
       return `udp ${c.host}:${c.port}`;
+    case "tcpudp":
+      return `tcp+udp ${c.host}:${c.port}${c.udpPort && c.udpPort !== c.port ? `/${c.udpPort}` : ""}`;
     case "minecraft":
       return `minecraft ${c.edition} ${c.host}${c.port ? `:${c.port}` : ""}`;
     case "icmp":
@@ -207,6 +209,18 @@ function checkUdp(c: Extract<CheckSpec, { type: "udp" }>): Promise<PingResult> {
   });
 }
 
+/** A service that needs both: up when the TCP port accepts a connection and the UDP port replies. */
+async function checkTcpUdp(c: Extract<CheckSpec, { type: "tcpudp" }>): Promise<PingResult> {
+  const at = Date.now();
+  const [tcp, udp] = await Promise.all([
+    checkTcp({ type: "tcp", host: c.host, port: c.port }),
+    checkUdp({ type: "udp", host: c.host, port: c.udpPort ?? c.port, payload: c.payload, expect: c.expect }),
+  ]);
+  if (tcp.up && udp.up) return { up: true, latencyMs: Math.max(tcp.latencyMs ?? 0, udp.latencyMs ?? 0), at };
+  const failed = [!tcp.up && `tcp: ${tcp.error ?? "no reply"}`, !udp.up && `udp: ${udp.error ?? "no reply"}`].filter(Boolean);
+  return { up: false, error: failed.join("; "), at };
+}
+
 async function checkMinecraft(c: Extract<CheckSpec, { type: "minecraft" }>): Promise<PingResult> {
   const at = Date.now();
   try {
@@ -225,7 +239,8 @@ export function parsePingTime(out: string): number | undefined {
 
 function checkIcmp(c: Extract<CheckSpec, { type: "icmp" }>): Promise<PingResult> {
   const at = Date.now();
-  if (!/^[\w.:-]+$/.test(c.host)) return Promise.resolve({ up: false, error: "invalid host", at });
+  // A leading "-" would be read by ping as an option.
+  if (!/^[\w.:-]+$/.test(c.host) || c.host.startsWith("-")) return Promise.resolve({ up: false, error: "invalid host", at });
   const args = process.platform === "win32" ? ["-n", "1", "-w", "3000", c.host] : ["-c", "1", "-W", "3", c.host];
   return new Promise((resolve) => {
     let out = "";
@@ -286,6 +301,8 @@ export function runCheck(c: CheckSpec): Promise<PingResult> {
       return checkTcp(c);
     case "udp":
       return checkUdp(c);
+    case "tcpudp":
+      return checkTcpUdp(c);
     case "minecraft":
       return checkMinecraft(c);
     case "icmp":

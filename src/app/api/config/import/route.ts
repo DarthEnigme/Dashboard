@@ -13,7 +13,7 @@ type Obj = Record<string, unknown>;
 /**
  * Import a gethomepage.dev config.
  * { files } → preview (counts, warnings). { files, mode: "replace" | "merge", commit: true } → write.
- * Settings are always merged (auth, alerts and other Page-only settings stay); "merge" also keeps
+ * Settings are always merged (auth, alerts and other NanoDash-only settings stay); "merge" also keeps
  * existing groups and only adds groups whose names are new.
  */
 export async function POST(req: Request) {

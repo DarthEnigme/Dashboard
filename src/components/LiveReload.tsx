@@ -15,7 +15,7 @@ const REFRESH_DEBOUNCE_MS = 300;
  * `version` is the config version the page was rendered with: the stream sends the current one on
  * every (re)connect, so changes made while disconnected are caught too.
  * While `paused` (e.g. the editor is open with its own copy of the config) it offers a reload instead.
- * It also notices when Page itself was updated (a new build) and offers a full reload for the new code;
+ * It also notices when NanoDash itself was updated (a new build) and offers a full reload for the new code;
  * a tab in the background just reloads.
  */
 export function LiveReload({ paused = false, onReload, version }: { paused?: boolean; onReload?: () => void; version?: string }) {
@@ -85,7 +85,7 @@ export function LiveReload({ paused = false, onReload, version }: { paused?: boo
     return (
       <div role="status" className="glass fixed right-4 bottom-4 z-50 flex items-center gap-3 rounded-2xl px-4 py-3 text-sm">
         <Sparkles className="h-4 w-4 text-accent" />
-        <span>{t("Page was updated to")}{" "}{updated}.</span>
+        <span>{t("NanoDash was updated to")}{" "}{updated}.</span>
         <button type="button" onClick={() => window.location.reload()} className="glass-interactive flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-3 py-1 font-medium text-white">
           <RefreshCw className="h-3.5 w-3.5" /> {t("Reload")}
         </button>

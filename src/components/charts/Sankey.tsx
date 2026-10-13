@@ -20,7 +20,7 @@ const FROM_SAVINGS = FLOW_FROM_SAVINGS;
 export function Sankey({ flow, currency, height = 260, ariaLabel: label }: { flow: Flow; currency: string; height?: number; ariaLabel?: string }) {
   const t = useT();
   const ariaLabel = label ?? t("Where the money came from and where it went");
-  // Names Page adds itself; categories are the user's own words.
+  // Names NanoDash adds itself; categories are the user's own words.
   const flowName = (name: string) => (name === SAVED ? (t.locale === "en" ? SAVED : t("Saved money")) : name === FROM_SAVINGS ? t("From savings") : name === "Other" ? t("Other") : name === "Income" ? t("Income") : name);
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<{ index: number; x: number; y: number }>();

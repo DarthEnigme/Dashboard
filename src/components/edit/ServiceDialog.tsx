@@ -69,6 +69,16 @@ const checkFields: Record<string, { label: string; fields: FieldSpec[] }> = {
       { key: "expect", label: msg("Reply must contain"), placeholder: "optional" },
     ],
   },
+  tcpudp: {
+    label: msg("TCP + UDP port"),
+    fields: [
+      { key: "host", label: msg("Host"), required: true, placeholder: "10.0.0.53" },
+      { key: "port", label: msg("Port"), kind: "number", required: true, placeholder: "53", help: msg("Up only when both TCP and UDP answer.") },
+      { key: "udpPort", label: msg("UDP port, if different"), kind: "number", placeholder: msg("Empty: the same port") },
+      { key: "payload", label: msg("Send"), placeholder: "0x00", help: msg("Text, or bytes as 0x… hex. Up when anything answers; many services only answer their own protocol.") },
+      { key: "expect", label: msg("Reply must contain"), placeholder: "optional" },
+    ],
+  },
   minecraft: {
     label: msg("Minecraft server"),
     fields: [

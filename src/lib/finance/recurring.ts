@@ -119,7 +119,7 @@ export function runRecurring(until = today()): number {
 /** Hourly: add recurring transactions that came due. */
 export async function recurringJob() {
   const n = runRecurring();
-  if (n) console.log(`[page] added ${n} recurring transaction${n === 1 ? "" : "s"}`);
+  if (n) console.log(`[nanodash] added ${n} recurring transaction${n === 1 ? "" : "s"}`);
 }
 
 // --- shortcuts: one-tap transactions ("macros") ---

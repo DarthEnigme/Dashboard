@@ -119,6 +119,10 @@ export const linkIdentity = (userId: number, provider: string, subject: string) 
 export const unlinkIdentity = (userId: number, provider: string, subject: string) =>
   db().prepare("DELETE FROM identities WHERE user_id = ? AND provider = ? AND subject = ?").run(userId, provider, subject);
 
+const AUDIT_DAYS = 365;
+/** The audit log keeps a year. */
+export const pruneAudit = () => db().prepare("DELETE FROM audit WHERE ts < ?").run(Date.now() - AUDIT_DAYS * 86_400_000);
+
 export function audit(user: string | null, action: string, detail?: unknown) {
   db()
     .prepare("INSERT INTO audit (ts, user, action, detail) VALUES (?, ?, ?, ?)")

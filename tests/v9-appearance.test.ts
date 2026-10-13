@@ -113,7 +113,7 @@ describe("themes", () => {
     expect(one[0].id).toBe("mint-paper-2");
     const two = parseThemeImport(JSON.stringify([mint, { ...mint, id: undefined, label: "Dé jà" }]), []);
     expect(two.map((t) => t.id)).toEqual(["mint-paper", "de-ja"]);
-    expect(() => parseThemeImport('{"label":"x"}', [])).toThrow(/Not a Page theme/);
+    expect(() => parseThemeImport('{"label":"x"}', [])).toThrow(/Not a NanoDash theme/);
   });
 
   it("counts custom theme edits as unsaved changes", () => {

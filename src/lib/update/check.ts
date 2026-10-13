@@ -66,7 +66,7 @@ interface GhCommit {
   commit: { message: string; committer?: { date?: string } };
 }
 
-const headers = { Accept: "application/vnd.github+json", "User-Agent": "page-dashboard" };
+const headers = { Accept: "application/vnd.github+json", "User-Agent": "nanodash" };
 
 /** The newest release (stable) or commit on main (edge), and whether it is newer than this build. */
 export async function checkForUpdate(cfg: Settings["updates"], current = buildInfo()): Promise<UpdateStatus> {

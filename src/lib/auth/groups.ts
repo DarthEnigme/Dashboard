@@ -115,7 +115,7 @@ export function setManualGroups(userId: number, names: string[]) {
 }
 
 /**
- * Follow the groups an external sign-in reported: join the Page groups mapped to any of them, leave
+ * Follow the groups an external sign-in reported: join the NanoDash groups mapped to any of them, leave
  * SSO-made memberships that no longer match. Hand-made memberships are never touched. Writes only
  * on change (proxy sign-in calls this on every request).
  */

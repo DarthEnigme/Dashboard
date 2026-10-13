@@ -1,6 +1,6 @@
 // Written to the config directory on first run if a file is missing.
 export const defaultFiles: Record<string, string> = {
-  "settings.yaml": `# Page settings
+  "settings.yaml": `# NanoDash settings
 title: Homelab
 theme: dark          # dark | light | system
 accent: "#8b5cf6"

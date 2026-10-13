@@ -5,6 +5,7 @@ export async function register() {
     const { budgetAlertJob } = await import("./lib/finance/budgets");
     const { recurringJob } = await import("./lib/finance/recurring");
     const { pruneSessions } = await import("./lib/auth/sessions");
+    const { pruneAudit } = await import("./lib/auth/users");
     const { updateJob } = await import("./lib/update/job");
     const { backupJob } = await import("./lib/backup");
     const { warrantyJob } = await import("./lib/inventory/store");
@@ -12,7 +13,7 @@ export async function register() {
     try {
       reconcilePendingUpdate();
     } catch (e) {
-      console.warn("[page] could not record the last update:", e);
+      console.warn("[nanodash] could not record the last update:", e);
     }
     startMonitor();
     onHourly(fireflyDailyJob);
@@ -22,5 +23,6 @@ export async function register() {
     onHourly(backupJob);
     onHourly(warrantyJob);
     onHourly(async () => void pruneSessions());
+    onHourly(async () => void pruneAudit());
   }
 }

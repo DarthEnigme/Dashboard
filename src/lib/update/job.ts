@@ -23,7 +23,7 @@ export async function updateJob(now = new Date()) {
     const errors = await sendNotice(settings.alerts, {
       kind: "update",
       level: "info",
-      message: `Page ${version} is available (running ${status.current.version}).${cfg.auto ? ` It will be installed at ${cfg.window}.` : ""}`,
+      message: `NanoDash ${version} is available (running ${status.current.version}).${cfg.auto ? ` It will be installed at ${cfg.window}.` : ""}`,
       url: status.latest.url,
       version,
       current: status.current.version,

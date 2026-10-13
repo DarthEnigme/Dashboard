@@ -2,7 +2,7 @@ name: Docker image
 
 # main → :latest and :sha-xxxx. A tag like v0.5.1 (matching package.json) → :0.5.1 and :0.5, then
 # a GitHub Release with generated notes. The release comes last, once the image is pullable:
-# running Pages see the release as a new version and may install it right away.
+# running installs see the release as a new version and may install it right away.
 #
 # Each architecture builds on its own native runner (arm64 under QEMU made `next build` crash
 # at random), pushed by digest; the merge job tags the multi-arch image.
@@ -23,7 +23,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # No image (and so no :latest, which edge-channel installs update to) from a commit that fails the tests.
+  test:
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: test
     strategy:
       fail-fast: true
       matrix:
@@ -125,4 +130,4 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "Page $GITHUB_REF_NAME"
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "NanoDash $GITHUB_REF_NAME"

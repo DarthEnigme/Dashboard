@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { base32Decode, base32Encode, newRecoveryCodes, openSecret, sealSecret, totpCode, useRecoveryCode, verifyTotp } from "@/lib/auth/totp";
+import { base32Decode, base32Encode, newRecoveryCodes, openSecret, sealSecret, totpCode, spendRecoveryCode, verifyTotp } from "@/lib/auth/totp";
 import { checkSession, createResetToken, createSession, listSessions, resetTokenUser, revokeSession, revokeUserSessions, SHORT_MS } from "@/lib/auth/sessions";
 import { createGroup, groupsOf, listGroups, setManualGroups, syncSsoGroups, updateGroup } from "@/lib/auth/groups";
 import { createUser, getTwoFactor, getUser, setTwoFactor } from "@/lib/auth/users";
@@ -38,9 +38,9 @@ describe("totp", () => {
   it("recovery codes work once each, in any case or spacing", () => {
     const { codes, hashes } = newRecoveryCodes(3);
     expect(codes[0]).toMatch(/^[A-Z2-7]{5}-[A-Z2-7]{5}$/);
-    const left = useRecoveryCode(hashes, codes[1].toLowerCase().replace("-", " "))!;
+    const left = spendRecoveryCode(hashes, codes[1].toLowerCase().replace("-", " "))!;
     expect(left).toHaveLength(2);
-    expect(useRecoveryCode(left, codes[1])).toBeUndefined();
+    expect(spendRecoveryCode(left, codes[1])).toBeUndefined();
   });
 
   it("stores 2FA on the user", () => {

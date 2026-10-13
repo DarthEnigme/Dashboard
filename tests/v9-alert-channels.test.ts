@@ -115,7 +115,7 @@ describe("email, Pushover and Matrix alerts", () => {
   it("reports a channel that fails, and still sends the others", async () => {
     const errors = await alerts.sendNotice(
       { threshold: 2, certDays: 14, email: { host: "127.0.0.1", port: 1, from: "a@b.c", to: "d@e.f" }, pushoverToken: "t", pushoverUser: "u" },
-      { kind: "update", level: "info", message: "Page 1.0 is out" },
+      { kind: "update", level: "info", message: "NanoDash 1.0 is out" },
     );
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatch(/^Email: /);

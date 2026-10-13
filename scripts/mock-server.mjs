@@ -1,4 +1,4 @@
-// Fake homelab APIs for trying Page without real services: `npm run mock`, then point widgets at
+// Fake homelab APIs for trying NanoDash without real services: `npm run mock`, then point widgets at
 // http://localhost:4010/<service>. Serves the test fixtures and checks each API's auth the same way
 // the real service does. /webhook records alerts; /flaky?up=0|1 toggles a service for alert testing.
 // /oidc is a minimal OpenID provider that signs in whoever GET /oidc/_as?email=… last set.
@@ -69,7 +69,7 @@ const routes = {
       { tag_name: "v0.9.0-rc.1", body: "pre", html_url: "https://example.com/rc", published_at: "2026-10-04T10:00:00Z", draft: false, prerelease: true },
       {
         tag_name: "v0.9.0",
-        name: "Page 0.9.0",
+        name: "NanoDash 0.9.0",
         body: "## What's new\n- **Faster** dashboards\n- Fixed `ping` timeouts, see [the issue](https://example.com/issues/1)\n\nThanks to everyone who tested.",
         html_url: "https://example.com/releases/v0.9.0",
         published_at: "2026-10-03T10:00:00Z",
@@ -388,9 +388,8 @@ const routes = {
   "GET /truenas/api/v2.0/system/info": (_q, res) => json(res, 200, { uptime_seconds: 864000 }),
   "GET /syno/webapi/auth.cgi": (req, res) => {
     const q = new URL(req.url, "http://x").searchParams;
-    q.get("account") === "page" && q.get("passwd") === "syno-pw"
-      ? json(res, 200, { success: true, data: { sid: "SYNOSID" } })
-      : json(res, 200, { success: false, error: { code: 400 } });
+    if (q.get("account") === "page" && q.get("passwd") === "syno-pw") json(res, 200, { success: true, data: { sid: "SYNOSID" } });
+    else json(res, 200, { success: false, error: { code: 400 } });
   },
   "GET /syno/webapi/entry.cgi": (req, res) => {
     const q = new URL(req.url, "http://x").searchParams;

@@ -279,7 +279,7 @@ export const proxmox: Integration<typeof schema> = {
               method: "POST",
               insecure: cfg.insecure,
               headers: { ...auth(cfg), "Content-Type": "application/x-www-form-urlencoded" },
-              body: new URLSearchParams({ snapname, description: "Taken from Page" }).toString(),
+              body: new URLSearchParams({ snapname, description: "Taken from NanoDash" }).toString(),
             })
           : await http(`${base}/status/${action}`, { method: "POST", insecure: cfg.insecure, headers: auth(cfg) });
       const body = await res.text();

@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     .reverse();
   audit(g.user.username, "finance-export", { format, period, count: txns.length });
 
-  const name = `page-finance-${period ?? "all"}.${format}`;
+  const name = `nanodash-finance-${period ?? "all"}.${format}`;
   const headers = { "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "no-store" };
   if (format === "json") {
     const body = txns.map((t) => ({

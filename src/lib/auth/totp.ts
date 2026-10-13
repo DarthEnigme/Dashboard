@@ -99,7 +99,7 @@ export function newRecoveryCodes(n = 10): { codes: string[]; hashes: string[] } 
 }
 
 /** The hashes left after using `code`, or undefined when it isn't one of them. */
-export function useRecoveryCode(hashes: string[], code: string): string[] | undefined {
+export function spendRecoveryCode(hashes: string[], code: string): string[] | undefined {
   const h = hashCode(code);
   return hashes.includes(h) ? hashes.filter((x) => x !== h) : undefined;
 }

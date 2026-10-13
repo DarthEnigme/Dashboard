@@ -1,12 +1,12 @@
 {
-  "name": "page",
+  "name": "nanodash",
   "version": "0.5.7",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit",
+    "lint": "eslint . && tsc --noEmit",
     "test": "vitest run",
     "mock": "node scripts/mock-server.mjs",
     "e2e": "playwright test",
@@ -39,6 +39,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.1.12",
     "@types/d3-geo": "^3.1.1",
@@ -51,12 +52,17 @@
     "@types/react-dom": "^19.1.7",
     "@types/topojson-client": "^3.1.5",
     "d3-geo": "^3.1.1",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.27",
     "tailwindcss": "^4.1.12",
     "topojson-client": "^3.1.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4",
     "world-atlas": "^2.0.2",
     "world-countries": "^5.1.0"
+  },
+  "overrides": {
+    "postcss": "^8.5.23"
   },
   "engines": {
     "node": ">=22.13"

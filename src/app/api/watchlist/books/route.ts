@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     const r = await cached(`openlibrary|${q.toLowerCase()}`, 3_600_000, () =>
       httpJson<{ docs?: [] }>(`${BASE}/search.json?${new URLSearchParams({ q, limit: "10", fields: "key,title,author_name,first_publish_year,number_of_pages_median,cover_i" })}`, {
         timeoutMs: 8000,
-        headers: { "User-Agent": "Page dashboard (https://github.com/DarthEnigme/Dashboard)" },
+        headers: { "User-Agent": "NanoDash (https://github.com/DarthEnigme/Dashboard)" },
       }),
     );
     return NextResponse.json(parseOpenLibrary(r, COVERS));

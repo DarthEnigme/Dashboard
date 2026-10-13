@@ -4,7 +4,7 @@ import { serviceIds } from "@/lib/config/slug";
 import { serviceVisibility } from "@/lib/config/sanitize";
 import { seeFilter } from "@/lib/auth";
 import { checkSpec, describeCheck } from "@/lib/checks";
-import { latestPing, openIncidents, pingsSince } from "@/lib/db";
+import { latestPing, openIncidents, uptimeSince } from "@/lib/db";
 import { certFor } from "@/lib/monitor";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export async function GET() {
   const see = await seeFilter();
   const ids = serviceIds(cfg.services);
   const open = new Map(openIncidents().map((i) => [i.service_id, i]));
-  const since = Date.now() - 86_400_000;
+  const day = uptimeSince(Date.now() - 86_400_000);
   const rows: StatusRow[] = [];
   cfg.services.forEach((g, gi) => {
     g.services.forEach((s, si) => {
@@ -41,7 +41,7 @@ export async function GET() {
       if (!check || !serviceVisibility(g, s).every(see)) return;
       const id = ids[gi][si];
       const last = latestPing(id);
-      const day = pingsSince(id, since);
+      const checks = day.get(id);
       const inc = open.get(id);
       rows.push({
         id,
@@ -53,7 +53,7 @@ export async function GET() {
         up: last ? !!last.up : null,
         latencyMs: last?.latency_ms ?? null,
         at: last?.ts ?? null,
-        uptime: day.length ? day.filter((p) => p.up).length / day.length : null,
+        uptime: checks?.checks ? checks.up / checks.checks : null,
         incident: inc ? { since: inc.start, cause: inc.cause } : null,
         certDaysLeft: certFor(id)?.daysLeft ?? null,
       });

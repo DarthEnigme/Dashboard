@@ -70,3 +70,47 @@ describe("action metadata", () => {
     expect(new Set(withActions)).toEqual(ACTION_TYPES);
   });
 });
+
+describe("services removed from the config", () => {
+  it("closes their open outage and forgets their state", async () => {
+    const { dropStale } = await import("@/lib/monitor");
+    const { incidentsSince, openIncident, openIncidents } = await import("@/lib/db");
+    openIncident("infra.gone", 1000, "no response");
+    openIncident("infra.kept", 1000, "no response");
+    const state = {
+      outages: new Map([
+        ["infra.gone", { failures: 3, down: true, since: 1000 }],
+        ["infra.kept", { failures: 3, down: true, since: 1000 }],
+        ["infra.unchecked", { failures: 1, down: false, since: 1500 }],
+      ]),
+      certs: new Map([["infra.gone", { expires: "2030-01-01T00:00:00.000Z", daysLeft: 900 }]]),
+      breaches: new Map([
+        ["infra.gone|CPU", { firing: true }],
+        ["infra.unchecked|Disk /|x", { firing: false }],
+      ]),
+    };
+    // infra.unchecked is still in the config, but no longer has a status check.
+    dropStale(state, new Set(["infra.kept"]), new Set(["infra.kept", "infra.unchecked"]), 5000);
+    expect([...state.outages.keys()]).toEqual(["infra.kept"]);
+    expect(state.certs.size).toBe(0);
+    expect([...state.breaches.keys()]).toEqual(["infra.unchecked|Disk /|x"]);
+    expect(openIncidents().map((i) => i.service_id)).toEqual(["infra.kept"]);
+    expect(incidentsSince("infra.gone", 0)[0]).toMatchObject({ start: 1000, end: 5000 });
+  });
+});
+
+describe("uptime per service", () => {
+  it("counts checks and successes since a time, in one pass", async () => {
+    const { insertPing, uptimeSince } = await import("@/lib/db");
+    const ping = (service_id: string, ts: number, up: number) => insertPing({ service_id, ts, up, status: 200, latency_ms: 5 });
+    ping("up.a", 50, 0); // before the window
+    ping("up.a", 100, 1);
+    ping("up.a", 200, 0);
+    ping("up.a", 300, 1);
+    ping("up.b", 150, 0);
+    const day = uptimeSince(100);
+    expect(day.get("up.a")).toEqual({ checks: 3, up: 2 });
+    expect(day.get("up.b")).toEqual({ checks: 1, up: 0 });
+    expect(day.get("up.none")).toBeUndefined();
+  });
+});

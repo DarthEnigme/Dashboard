@@ -66,7 +66,7 @@ export function resolveIdentity(id: ExternalIdentity, policy: Policy, repo: Repo
 
   if (!policy.signup) {
     const who = id.email ?? id.username ?? "this account";
-    return { ok: false, error: `No Page account for ${who}. Ask an admin to add you.` };
+    return { ok: false, error: `No NanoDash account for ${who}. Ask an admin to add you.` };
   }
 
   const user = repo.createUser({

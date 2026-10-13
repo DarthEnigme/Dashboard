@@ -63,7 +63,9 @@ export function withBalances(accounts: Account[], ratesFor: (currency: string) =
   const byAccount = new Map<string, Txn[]>();
   for (const r of rows) {
     const k = r.account.toLowerCase();
-    byAccount.set(k, [...(byAccount.get(k) ?? []), r]);
+    const list = byAccount.get(k);
+    if (list) list.push(r);
+    else byAccount.set(k, [r]);
   }
   const now = monthOf(today);
   const [y, m] = now.split("-").map(Number);

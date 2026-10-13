@@ -22,6 +22,6 @@ export async function POST(req: Request) {
   if (version && version !== status.latest.version) return NextResponse.json({ error: `Latest is now ${status.latest.version}; review it first` }, { status: 409 });
   const pf = await preflight(cfg);
   if (!pf.canApply) return NextResponse.json({ error: pf.reason }, { status: 409 });
-  applyUpdate(cfg, status, g.admin.username).catch((e) => console.error("[page] update failed:", e));
+  applyUpdate(cfg, status, g.admin.username).catch((e) => console.error("[nanodash] update failed:", e));
   return NextResponse.json({ ok: true, target: status.latest.version }, { status: 202 });
 }

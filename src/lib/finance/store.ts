@@ -26,13 +26,17 @@ export interface NewTransaction {
 export function listTransactions(filter: { from?: string; to?: string; category?: string; account?: string; q?: string; limit?: number } = {}): Transaction[] {
   const where: string[] = [];
   const args: (string | number)[] = [];
-  if (filter.from) where.push("date >= ?"), args.push(filter.from);
-  if (filter.to) where.push("date <= ?"), args.push(filter.to);
-  if (filter.category === "") where.push("category IS NULL");
-  else if (filter.category) where.push("category = ? COLLATE NOCASE"), args.push(filter.category);
-  if (filter.account === "") where.push("account IS NULL");
-  else if (filter.account) where.push("account = ? COLLATE NOCASE"), args.push(filter.account);
-  if (filter.q) where.push("(description LIKE ? OR category LIKE ?)"), args.push(`%${filter.q}%`, `%${filter.q}%`);
+  const add = (condition: string, ...values: (string | number)[]) => {
+    where.push(condition);
+    args.push(...values);
+  };
+  if (filter.from) add("date >= ?", filter.from);
+  if (filter.to) add("date <= ?", filter.to);
+  if (filter.category === "") add("category IS NULL");
+  else if (filter.category) add("category = ? COLLATE NOCASE", filter.category);
+  if (filter.account === "") add("account IS NULL");
+  else if (filter.account) add("account = ? COLLATE NOCASE", filter.account);
+  if (filter.q) add("(description LIKE ? OR category LIKE ?)", `%${filter.q}%`, `%${filter.q}%`);
   const sql = `SELECT * FROM fin_transactions ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY date DESC, id DESC LIMIT ?`;
   return db().prepare(sql).all(...args, filter.limit ?? 1000) as unknown as Transaction[];
 }

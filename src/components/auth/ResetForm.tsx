@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import { inputClass } from "../edit/FieldInput";
@@ -58,9 +59,9 @@ export function ResetForm({ title, token }: { title: string; token: string }) {
           <p className="flex items-center gap-2 text-sm">
             <CheckCircle2 className="h-5 w-5 text-[var(--ok)]" /> {t("Password set. Sign in with it now.")}
           </p>
-          <a href="/login" className="flex h-10 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-white hover:brightness-110">
+          <Link href="/login" className="flex h-10 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-white hover:brightness-110">
             {t("Sign in")}
-          </a>
+          </Link>
         </div>
       ) : (
         who && (

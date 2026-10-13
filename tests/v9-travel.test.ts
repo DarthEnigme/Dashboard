@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
-import { COUNTRIES, countryIndex, countryName, DOTS, flag } from "@/lib/travel/geo";
+import { COUNTRIES, countryName, DOTS, flag } from "@/lib/travel/geo";
 import { createTrip, deletePlace, deleteTrip, listPlaces, listTrips, savePlace, travelStats, updateTrip, visitedCountries } from "@/lib/travel/store";
 
 const user = (name: string) => Number(db().prepare("INSERT INTO users (username, role, created_at) VALUES (?, 'user', ?)").run(name, Date.now()).lastInsertRowid);
@@ -27,7 +27,10 @@ describe("travel geography", () => {
       let d = Infinity;
       for (let i = 0; i < DOTS.length; i += 3) {
         const dd = (DOTS[i] / 10 - lon) ** 2 + (DOTS[i + 1] / 10 - lat) ** 2;
-        if (dd < d) (d = dd), (best = DOTS[i + 2]);
+        if (dd < d) {
+          d = dd;
+          best = DOTS[i + 2];
+        }
       }
       return COUNTRIES[best].code;
     };

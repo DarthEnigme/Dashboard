@@ -27,7 +27,7 @@ export function translator(locale: Locale): T {
   return t;
 }
 
-/** BCP 47 tag for Intl (numbers, dates, currencies). English keeps the US formats Page always used. */
+/** BCP 47 tag for Intl (numbers, dates, currencies). English keeps the US formats NanoDash always used. */
 export const localeTag = (locale: Locale) => (locale === "fr" ? "fr-FR" : "en-US");
 
 /** "auto": the first supported language the browser asks for (Accept-Language), else English. */

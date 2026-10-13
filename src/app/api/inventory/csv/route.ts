@@ -13,7 +13,7 @@ export async function GET() {
   if ("error" in g) return g.error;
   const stamp = new Date().toISOString().slice(0, 10);
   return new Response(devicesCsv(), {
-    headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="page-inventory-${stamp}.csv"`, "Cache-Control": "no-store" },
+    headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="nanodash-inventory-${stamp}.csv"`, "Cache-Control": "no-store" },
   });
 }
 

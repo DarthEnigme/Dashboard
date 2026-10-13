@@ -1,6 +1,6 @@
 // Builds src/lib/travel/geo.json for the travel globe: every country (code, names, continent,
 // centre) and an even lattice of land dots, each tagged with its country. Run once after changing
-// the sources: node scripts/build-geo.mjs. The output is committed; nothing here runs in Page.
+// the sources: node scripts/build-geo.mjs. The output is committed; nothing here runs in NanoDash.
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -50,6 +50,14 @@ for (let i = 0; i < DOTS; i++) {
   if (hit) dots.push(Math.round(lon * 10), Math.round(lat * 10), hit.index);
 }
 
-const out = { countries: list.map(({ num, ...c }) => c), dots };
+// `num` only matched shapes to countries above.
+const out = {
+  countries: list.map((country) => {
+    const c = { ...country };
+    delete c.num;
+    return c;
+  }),
+  dots,
+};
 fs.writeFileSync(path.join(root, "src", "lib", "travel", "geo.json"), JSON.stringify(out));
 console.log(`${list.length} countries, ${dots.length / 3} land dots, ${shapes.filter((s) => s.index === undefined).length} shapes without a country`);
