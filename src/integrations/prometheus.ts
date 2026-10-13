@@ -23,7 +23,7 @@ export const promConnection = {
   /** Bearer token (e.g. Grafana Cloud / Mimir), instead of basic auth. */
   token: z.string().optional(),
   /** Extra headers, e.g. X-Scope-OrgID for Mimir/Thanos tenants. */
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
   insecure: z.boolean().optional(),
 };
 

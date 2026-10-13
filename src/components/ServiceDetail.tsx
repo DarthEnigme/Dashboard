@@ -14,6 +14,7 @@ import { StatusDot } from "./StatusDot";
 import { WidgetFields } from "./WidgetFields";
 import { MetricsSection } from "./MetricsSection";
 import { ActionMenu } from "./ActionMenu";
+import { MuteButton } from "./MuteButton";
 import { LineChart } from "./charts/LineChart";
 import { Legend, Tooltip, useWidth } from "./charts/common";
 import { msg } from "@/i18n";
@@ -45,9 +46,11 @@ interface Props {
   group: string;
   settings: ClientSettings;
   canAct: boolean;
+  /** Admins can mute this service's alerts. */
+  canMute?: boolean;
 }
 
-export function ServiceDetail({ service: s, group, settings, canAct }: Props) {
+export function ServiceDetail({ service: s, group, settings, canAct, canMute }: Props) {
   const t = useT();
   const [range, setRange] = useState<Range>("24h");
   const { data, isLoading } = useSWR<HistoryData>(
@@ -72,6 +75,7 @@ export function ServiceDetail({ service: s, group, settings, canAct }: Props) {
           {s.description && <p className="text-sm text-muted">{s.description}</p>}
         </div>
         {s.ping && <StatusDot id={s.id} interval={settings.pingInterval} />}
+        {canMute && s.ping && <MuteButton target={s.id} name={s.name} />}
         {canAct && s.actions && <ActionMenu service={s} />}
         {s.href && (
           <a
@@ -156,6 +160,7 @@ export function ServiceDetail({ service: s, group, settings, canAct }: Props) {
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--ok)]" aria-label={t("Resolved")} />
                     )}
                     <span className="font-medium">{i.end === null ? t("Down now") : t("Outage")}</span>
+                    {!!i.planned && <span className="rounded-full bg-track px-2 text-xs text-muted">{t("planned")}</span>}
                     <span className="text-muted">{dateTime(i.start)}</span>
                     <span className="text-muted">
                       {i.end === null ? t("for {time}", { time: duration((Date.now() - i.start) / 1000) }) : t("lasted {time}", { time: duration((i.end - i.start) / 1000) })}

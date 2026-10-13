@@ -137,3 +137,24 @@ describe("groups", () => {
     expect(settingsSchema.parse({}).auth.userPermissions).toEqual(["finance", "travel", "watchlist"]);
   });
 });
+
+describe("a two-factor code works once", () => {
+  it("names the step a code belongs to, and remembers the last one used", async () => {
+    const { matchTotpStep, newTotpSecret, totpCode } = await import("@/lib/auth/totp");
+    const users = await import("@/lib/auth/users");
+    const secret = newTotpSecret();
+    const now = 1_700_000_000_000;
+    const step = Math.floor(now / 30_000);
+    expect(matchTotpStep(secret, totpCode(secret, now), now)).toBe(step);
+    expect(matchTotpStep(secret, totpCode(secret, now - 30_000), now)).toBe(step - 1);
+    expect(matchTotpStep(secret, "000000", now)).not.toBe(step);
+
+    const u = users.createUser({ username: `totp-${Date.now()}`, role: "user" });
+    expect(users.totpStep(u.id)).toBeNull();
+    users.setTotpStep(u.id, step);
+    // The sign-in route accepts only steps after this one: the same code, or the previous one, is a replay.
+    expect(users.totpStep(u.id)).toBe(step);
+    users.setTwoFactor(u.id, null);
+    expect(users.totpStep(u.id)).toBeNull();
+  });
+});

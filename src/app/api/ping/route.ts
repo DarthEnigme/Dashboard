@@ -6,10 +6,11 @@ import { cached } from "@/lib/cache";
 import { latestPing } from "@/lib/db";
 import { checkSpec, describeCheck, runCheck, type PingResult } from "@/lib/checks";
 import { certFor } from "@/lib/monitor";
+import { listMutes, mutedNow } from "@/lib/maintenance";
 
 export const dynamic = "force-dynamic";
 
-/** Latest status of a service, plus `certWarn` when its certificate is within alerts.certDays of expiry. */
+/** Latest status of a service, plus `certWarn` when its certificate is within alerts.certDays of expiry and `muted` during maintenance. */
 export async function GET(req: Request) {
   const id = new URL(req.url).searchParams.get("id") ?? "";
   const check = checkSpec(await findService(id, await seeFilter()));
@@ -18,7 +19,7 @@ export async function GET(req: Request) {
   const withCert = (r: PingResult) => {
     const cert = r.cert ?? certFor(id);
     const days = settings.alerts.certDays;
-    return { ...r, cert, certWarn: !!(cert && days && cert.daysLeft <= days) };
+    return { ...r, cert, certWarn: !!(cert && days && cert.daysLeft <= days), muted: !!mutedNow(settings.maintenance, listMutes(), id) };
   };
 
   // The background monitor stores a result every ping interval; use it while it's fresh.

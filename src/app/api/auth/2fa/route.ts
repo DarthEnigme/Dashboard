@@ -3,7 +3,7 @@ import { sameOrigin } from "@/lib/auth";
 import { clearFailures, isLimited, recordFailure } from "@/lib/auth/ratelimit";
 import { verifyToken } from "@/lib/auth/session";
 import { startSession } from "@/lib/auth/sessions";
-import { openSecret, spendRecoveryCode, verifyTotp } from "@/lib/auth/totp";
+import { matchTotpStep, openSecret, spendRecoveryCode } from "@/lib/auth/totp";
 import * as users from "@/lib/auth/users";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,9 @@ export async function POST(req: Request) {
   const limitKey = `2fa|${user.id}`;
   if (isLimited(limitKey)) return fail("Too many wrong codes. Try again in 15 minutes.", 429);
   const secret = openSecret(tf.secret);
-  let ok = !!secret && verifyTotp(secret, code);
+  const step = secret ? matchTotpStep(secret, code) : undefined;
+  // A code works once: someone who saw it typed can't sign in with it too.
+  let ok = step !== undefined && step > (users.totpStep(user.id) ?? -1);
   let usedRecovery = false;
   if (!ok) {
     const left = spendRecoveryCode(tf.recovery, code);
@@ -38,6 +40,7 @@ export async function POST(req: Request) {
     return fail("Wrong code");
   }
   clearFailures(limitKey);
+  if (!usedRecovery) users.setTotpStep(user.id, step!);
   const method = typeof claims.method === "string" ? claims.method : "password";
   users.audit(user.username, "login", { method, twoFactor: usedRecovery ? "recovery-code" : "totp" });
   const res = NextResponse.json({ ok: true, recoveryCodesLeft: usedRecovery ? users.getTwoFactor(user.id)?.recovery.length : undefined });

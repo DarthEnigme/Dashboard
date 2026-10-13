@@ -17,6 +17,7 @@ import { TripEditor } from "./TripEditor";
 import { CitySearch } from "./CitySearch";
 import { DeleteButton } from "../edit/controls";
 import { inputBase } from "../edit/FieldInput";
+import { localDay } from "@/lib/day";
 
 interface Data {
   places: Place[];
@@ -39,7 +40,7 @@ const CONTINENTS: Record<string, string> = {
   OC: msg("Oceania"),
   SA: msg("South America"),
 };
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDay();
 const nights = (t: Trip) => Math.round((Date.parse(t.end_date) - Date.parse(t.start_date)) / 86_400_000);
 
 /** The travel log: a globe of where you've been, your trips, and every country and city you've marked. */

@@ -212,7 +212,7 @@ describe("registry", () => {
   });
 
   it("accepts the editor's string values in schemas", () => {
-    expect(integrations.glances.schema.parse({ url: "http://x:61208", version: "3" }).version).toBe(3);
-    expect(integrations.arcane.schema.parse({ url: "http://x", key: "k", env: 2 }).env).toBe("2");
+    expect((integrations.glances.schema.parse({ url: "http://x:61208", version: "3" }) as { version: number }).version).toBe(3);
+    expect((integrations.arcane.schema.parse({ url: "http://x", key: "k", env: 2 }) as { env: string }).env).toBe("2");
   });
 });

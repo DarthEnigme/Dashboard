@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { BellOff } from "lucide-react";
 import { fetcher } from "@/lib/fetcher";
 import type { PingResult } from "@/lib/checks";
 import { useT } from "@/i18n/client";
@@ -9,7 +10,7 @@ const SLOW_MS = 1000;
 
 export function StatusDot({ id, interval }: { id: string; interval: number }) {
   const t = useT();
-  const { data, error } = useSWR<PingResult & { certWarn?: boolean }>(`/api/ping?id=${encodeURIComponent(id)}`, fetcher, {
+  const { data, error } = useSWR<PingResult & { certWarn?: boolean; muted?: boolean }>(`/api/ping?id=${encodeURIComponent(id)}`, fetcher, {
     refreshInterval: interval * 1000,
     revalidateOnFocus: false,
   });
@@ -27,6 +28,7 @@ export function StatusDot({ id, interval }: { id: string; interval: number }) {
   const cert = data?.cert;
   const certLabel = data?.certWarn && cert ? (cert.daysLeft < 0 ? t("TLS certificate expired") : t("TLS certificate expires in {n} d", { n: cert.daysLeft })) : undefined;
   if (certLabel) label = `${label} · ${certLabel}`;
+  if (data?.muted) label = `${label} · ${t("alerts muted")}`;
 
   return (
     <span className="flex shrink-0 items-center gap-1.5 self-start pt-1" title={label}>
@@ -35,6 +37,7 @@ export function StatusDot({ id, interval }: { id: string; interval: number }) {
           {cert!.daysLeft < 0 ? t("cert expired") : t("cert {n}d", { n: cert!.daysLeft })}
         </span>
       )}
+      {data?.muted && <BellOff className="h-3 w-3 text-[var(--warn)]" aria-hidden />}
       {data?.up && <span className="text-[11px] tabular-nums text-muted">{data.latencyMs}{t("ms")}</span>}
       <span className="relative flex h-2.5 w-2.5">
         {data?.up && (

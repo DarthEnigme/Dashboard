@@ -58,7 +58,7 @@ test.describe.serial("settings page", () => {
     await page.goto("/settings#refresh");
     const field = page.getByLabel("Widget refresh (seconds)");
     await field.fill("2");
-    await expect(page.getByText(/greater than or equal to 5/)).toBeVisible();
+    await expect(page.getByText(/Must be at least 5/)).toBeVisible();
     await expect(page.getByRole("region", { name: "Unsaved changes" })).toContainText("1 problem to fix");
     await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
     await page.getByRole("button", { name: "Discard" }).click();

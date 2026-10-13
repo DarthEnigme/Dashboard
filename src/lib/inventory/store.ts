@@ -6,6 +6,7 @@ import { runCheck, type PingResult } from "../checks";
 import { parseCsv } from "../finance/csv";
 import { safeText, toCsv } from "../finance/csvText";
 import { normalizeMac } from "../wol";
+import { localDay } from "@/lib/day";
 
 export const DEVICE_KINDS = ["server", "nas", "router", "switch", "ap", "computer", "laptop", "phone", "tablet", "tv", "printer", "camera", "iot", "other"] as const;
 export type DeviceKind = (typeof DEVICE_KINDS)[number];
@@ -184,8 +185,8 @@ export async function warrantyJob(now = new Date()) {
   const { settings } = loadConfig();
   const days = settings.inventory.warrantyDays;
   if (!days || !hasAlertChannel(settings.alerts)) return;
-  const today = now.toISOString().slice(0, 10);
-  const limit = new Date(now.getTime() + days * 86_400_000).toISOString().slice(0, 10);
+  const today = localDay(now);
+  const limit = localDay(new Date(now.getTime() + days * 86_400_000));
   for (const d of listDevices()) {
     if (!d.warranty_until || d.warranty_until < today || d.warranty_until > limit) continue;
     const key = `warranty:${d.id}:${d.warranty_until}`;

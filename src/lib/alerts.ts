@@ -7,6 +7,8 @@ export interface AlertState {
   down: boolean;
   /** First failed check of the current outage. */
   since?: number;
+  /** The outage began while alerts were muted: no DOWN alert has gone out for it (yet). */
+  suppressed?: boolean;
 }
 
 export type AlertEvent = { kind: "down"; since: number } | { kind: "recovered"; since: number; durationMs: number };
@@ -34,6 +36,18 @@ export function evaluate(
     return { state: { failures, down: true, since }, event: { kind: "down", since } };
   }
   return { state: { ...state, failures, since } };
+}
+
+/**
+ * Which alert a check result calls for, given whether the service's alerts are muted right now
+ * (maintenance). An outage that starts while muted is held back; if the service is still down when
+ * the mute ends, DOWN goes out then. UP is only sent for an outage that was announced.
+ */
+export function alertDecision(prev: AlertState, next: AlertState, event: AlertEvent | undefined, muted: boolean): { state: AlertState; send?: "down" | "up" } {
+  if (event?.kind === "down") return muted ? { state: { ...next, suppressed: true } } : { state: next, send: "down" };
+  if (event?.kind === "recovered") return prev.suppressed ? { state: next } : { state: next, send: "up" };
+  if (next.down && next.suppressed && !muted) return { state: { ...next, suppressed: false }, send: "down" };
+  return { state: next };
 }
 
 export interface AlertPayload {

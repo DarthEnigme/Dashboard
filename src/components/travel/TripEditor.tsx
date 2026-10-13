@@ -9,8 +9,9 @@ import { Dialog } from "../edit/Dialog";
 import { inputBase, inputClass } from "../edit/FieldInput";
 import { CitySearch } from "./CitySearch";
 import { useT } from "@/i18n/client";
+import { localDay } from "@/lib/day";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDay();
 
 /** Add or edit a trip: name, dates, the stops in order (cities or whole countries), who came, a rating and notes. */
 export function TripEditor({ trip, people, onClose, onSaved }: { trip?: Trip; people: { id: number; name: string }[]; onClose: () => void; onSaved: (trips: Trip[]) => void }) {

@@ -105,7 +105,7 @@ export function Dashboard({ config, auth, tabs, version }: { config: ClientConfi
         onEdit={auth.canEdit ? () => setMode("edit") : undefined}
         showSettings={auth.canEdit}
         updateAvailable={update?.available ? update.version : undefined}
-        monitor={<MonitorPanel refreshSeconds={settings.pingInterval} />}
+        monitor={<MonitorPanel refreshSeconds={settings.pingInterval} canMute={isAdmin} />}
         sections={sectionsFor(auth.user?.permissions)}
         account={<UserMenu auth={auth} />}
       />

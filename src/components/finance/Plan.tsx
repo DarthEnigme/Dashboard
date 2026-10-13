@@ -12,10 +12,11 @@ import { DeleteButton } from "../edit/controls";
 import { inputBase } from "../edit/FieldInput";
 import { msg, type T } from "@/i18n";
 import { useT } from "@/i18n/client";
+import { localDay } from "@/lib/day";
 
 type Rule = RecurringRule & { next: string | null };
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDay();
 const EVERY = {
   week: [msg("every week"), msg("every {n} weeks")],
   month: [msg("every month"), msg("every {n} months")],

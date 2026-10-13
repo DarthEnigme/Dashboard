@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { guardPermission } from "@/lib/auth";
 import { audit } from "@/lib/auth/users";
 import { devicesCsv, importDevices } from "@/lib/inventory/store";
+import { localDay } from "@/lib/day";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ const guard = (req?: Request) => guardPermission("inventory", req, "the inventor
 export async function GET() {
   const g = await guard();
   if ("error" in g) return g.error;
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = localDay();
   return new Response(devicesCsv(), {
     headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="nanodash-inventory-${stamp}.csv"`, "Cache-Control": "no-store" },
   });

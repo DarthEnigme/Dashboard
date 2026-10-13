@@ -14,6 +14,7 @@ import { useT } from "@/i18n/client";
 import { FieldsDialog } from "../edit/FieldsDialog";
 import { DeleteButton, IconButton } from "../edit/controls";
 import { inputBase } from "../edit/FieldInput";
+import { localDay } from "@/lib/day";
 
 const KEY = "/api/inventory";
 const KINDS = ["server", "nas", "router", "switch", "ap", "computer", "laptop", "phone", "tablet", "tv", "printer", "camera", "iot", "other"];
@@ -56,8 +57,8 @@ export function InventoryPage({ canWake }: { canWake: boolean }) {
   const [editing, setEditing] = useState<Device | "new">();
   const [msgText, setMsg] = useState<{ text: string; error?: boolean }>();
   const file = useRef<HTMLInputElement>(null);
-  const today = new Date().toISOString().slice(0, 10);
-  const soon = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+  const today = localDay();
+  const soon = localDay(new Date(Date.now() + 30 * 86_400_000));
 
   const list = devices ?? [];
   const locations = [...new Set(list.map((d) => d.location).filter(Boolean) as string[])].sort();

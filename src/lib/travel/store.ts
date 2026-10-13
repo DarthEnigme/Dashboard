@@ -1,5 +1,6 @@
 import { db } from "../db";
 import { COUNTRIES, countryIndex, UN_COUNT } from "./geo";
+import { localDay } from "@/lib/day";
 
 export const PLACE_STATUSES = ["visited", "lived", "want"] as const;
 export type PlaceStatus = (typeof PLACE_STATUSES)[number];
@@ -161,7 +162,7 @@ export function deleteTrip(userId: number, id: number): Trip[] {
 // ---------- what this person has seen ----------
 
 /** Country codes visited (or lived in): marked places plus every stop of trips that have started. */
-export function visitedCountries(places: Place[], trips: Trip[], today = new Date().toISOString().slice(0, 10)): Set<string> {
+export function visitedCountries(places: Place[], trips: Trip[], today = localDay()): Set<string> {
   const set = new Set(places.filter((p) => p.status !== "want").map((p) => p.country));
   for (const t of trips) if (t.start_date <= today) for (const s of t.stops) set.add(s.country);
   return set;
@@ -169,7 +170,7 @@ export function visitedCountries(places: Place[], trips: Trip[], today = new Dat
 
 const dayMs = 86_400_000;
 
-export function travelStats(places: Place[], trips: Trip[], today = new Date().toISOString().slice(0, 10)): TravelStats {
+export function travelStats(places: Place[], trips: Trip[], today = localDay()): TravelStats {
   const visited = visitedCountries(places, trips, today);
   const past = trips.filter((t) => t.start_date <= today);
   const cities = new Set([

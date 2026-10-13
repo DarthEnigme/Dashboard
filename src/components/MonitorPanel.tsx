@@ -5,11 +5,12 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import useSWR from "swr";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, CheckCircle2, CircleDashed, Search, X, XCircle } from "lucide-react";
+import { Activity, BellOff, CheckCircle2, CircleDashed, Search, X, XCircle } from "lucide-react";
 import { fetcher } from "@/lib/fetcher";
 import type { StatusRow } from "@/app/api/status/route";
 import { duration } from "@/integrations/format";
 import { Icon } from "./Icon";
+import { MuteButton } from "./MuteButton";
 import { useT } from "@/i18n/client";
 
 type Filter = "all" | "down" | "up";
@@ -19,9 +20,9 @@ const since = (t: number) => duration(Math.max(1, Math.round((Date.now() - t) / 
 /**
  * Header button with the number of services down, opening a panel from the right edge with every
  * monitored service: status, latency, 24-hour uptime and open outages. Also opens with "m" or the
- * page:monitor event (command palette).
+ * page:monitor event (command palette). Admins (`canMute`) can hold back alerts from here.
  */
-export function MonitorPanel({ refreshSeconds }: { refreshSeconds: number }) {
+export function MonitorPanel({ refreshSeconds, canMute }: { refreshSeconds: number; canMute?: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
@@ -102,9 +103,12 @@ export function MonitorPanel({ refreshSeconds }: { refreshSeconds: number }) {
                     <h2 className="flex items-center gap-2 text-lg font-semibold">
                       <Activity className="h-5 w-5 text-accent" /> {t("Monitoring")}
                     </h2>
-                    <button ref={closeRef} onClick={() => setOpen(false)} aria-label={t("Close")} className="rounded-full p-1.5 text-muted hover:bg-hover hover:text-fg">
-                      <X className="h-5 w-5" />
-                    </button>
+                    <span className="flex items-center gap-1">
+                      {canMute && <MuteButton target="*" name={t("all services")} compact />}
+                      <button ref={closeRef} onClick={() => setOpen(false)} aria-label={t("Close")} className="rounded-full p-1.5 text-muted hover:bg-hover hover:text-fg">
+                        <X className="h-5 w-5" />
+                      </button>
+                    </span>
                   </header>
                   <p className="text-sm text-muted">
                     {up} {t("up ·")}{" "}<span className={down ? "font-medium text-[var(--err)]" : ""}>{down} {t("down")}</span>
@@ -130,12 +134,15 @@ export function MonitorPanel({ refreshSeconds }: { refreshSeconds: number }) {
                   </div>
                   <ul className="-mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto">
                     {rows.map((r) => (
-                      <li key={r.id}>
-                        <Link href={`/service/${r.id}`} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-hover">
+                      <li key={r.id} className="flex items-center">
+                        <Link href={`/service/${r.id}`} onClick={() => setOpen(false)} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2 hover:bg-hover">
                           <Status up={r.up} />
                           <Icon icon={r.icon} name={r.name} size={24} />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium">{r.name}</span>
+                            <span className="flex items-center gap-1.5 text-sm font-medium">
+                              <span className="truncate">{r.name}</span>
+                              {r.muted && <BellOff className="h-3.5 w-3.5 shrink-0 text-[var(--warn)]" aria-label={t("alerts muted")} />}
+                            </span>
                             <span className="block truncate text-xs text-muted">
                               {r.incident ? <span className="text-[var(--err)]">{t("down for")}{" "}{since(r.incident.since)}{r.incident.cause ? ` · ${r.incident.cause}` : ""}</span> : `${r.group} · ${r.check}`}
                             </span>
@@ -146,6 +153,7 @@ export function MonitorPanel({ refreshSeconds }: { refreshSeconds: number }) {
                             {r.certDaysLeft !== null && r.certDaysLeft < 15 && <span className="block text-[var(--warn)]">{t("cert")}{" "}{r.certDaysLeft} d</span>}
                           </span>
                         </Link>
+                        {canMute && <MuteButton target={r.id} name={r.name} compact />}
                       </li>
                     ))}
                     {!rows.length && <li className="py-10 text-center text-sm text-muted">{filter === "down" ? t("Nothing is down. 🎉") : t("No service matches.")}</li>}

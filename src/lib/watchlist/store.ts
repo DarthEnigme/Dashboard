@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { localDay } from "@/lib/day";
 
 export const WATCH_KINDS = ["book", "movie", "show", "game", "other"] as const;
 export const WATCH_STATUSES = ["planned", "active", "done", "dropped"] as const;
@@ -33,7 +34,7 @@ export interface WatchStats {
   planned: number;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDay();
 const text = (s: unknown, max: number) => (typeof s === "string" && s.trim() ? s.trim().slice(0, max) : null);
 const int = (n: unknown, min: number, max: number) => {
   const v = typeof n === "string" && n.trim() !== "" ? Number(n) : n;

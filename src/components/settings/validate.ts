@@ -23,7 +23,9 @@ export function validateSettings(draft: Obj): { errors: Record<string, string>; 
   const r = settingsSchema.safeParse(draft);
   if (r.success) return { errors: {}, parsed: r.data };
   const errors: Record<string, string> = {};
-  for (const issue of r.error.issues) {
+  for (const { path: where, message } of r.error.issues) {
+    // Settings are plain YAML: keys are text or list positions, never symbols.
+    const issue = { path: where as (string | number)[], message };
     const value = getPath(draft, issue.path.join("."));
     if (typeof value === "string" && placeholder.test(value.trim())) continue;
     const key = fieldFor(issue.path);

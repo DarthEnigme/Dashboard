@@ -4,6 +4,7 @@ import { filePath } from "@/lib/config/load";
 import { configFiles, type ConfigFile } from "@/lib/config/schema";
 import { canEdit } from "@/lib/auth";
 import { zip } from "@/lib/zip";
+import { localDay } from "@/lib/day";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function GET() {
   const files = (Object.keys(configFiles) as ConfigFile[])
     .filter((f) => fs.existsSync(filePath(f)))
     .map((f) => ({ name: `${f}.yaml`, data: fs.readFileSync(filePath(f)) }));
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = localDay();
   return new Response(new Uint8Array(zip(files)), {
     headers: {
       "Content-Type": "application/zip",

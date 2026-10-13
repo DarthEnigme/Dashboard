@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-export const DATA_DIR = process.env.HOMEPAGE_DATA_DIR ?? path.join(process.cwd(), "data");
+export const DATA_DIR = process.env.HOMEPAGE_DATA_DIR ?? path.join(/* turbopackIgnore: true */ process.cwd(), "data");
 
 export interface PingRow {
   service_id: string;
@@ -259,6 +259,8 @@ export function db(): DatabaseSync {
     // Encrypted TOTP secret, and SHA-256 hashes of unused recovery codes (JSON).
     addColumn(d, "users", "totp_secret TEXT");
     addColumn(d, "users", "totp_recovery TEXT");
+    addColumn(d, "users", "totp_last_step INTEGER");
+    addColumn(d, "incidents", "planned INTEGER NOT NULL DEFAULT 0");
     // Both halves of a transfer between own accounts share this id (left out of income and spending).
     addColumn(d, "fin_transactions", "transfer_id TEXT");
     d.exec("PRAGMA foreign_keys = ON;");
@@ -368,10 +370,12 @@ export interface IncidentRow {
   start: number;
   end: number | null;
   cause: string | null;
+  /** 1 when it began while the service's alerts were muted (maintenance). */
+  planned: number;
 }
 
-export function openIncident(serviceId: string, start: number, cause: string | null) {
-  db().prepare("INSERT INTO incidents (service_id, start, cause) VALUES (?, ?, ?)").run(serviceId, start, cause);
+export function openIncident(serviceId: string, start: number, cause: string | null, planned = false) {
+  db().prepare("INSERT INTO incidents (service_id, start, cause, planned) VALUES (?, ?, ?, ?)").run(serviceId, start, cause, planned ? 1 : 0);
 }
 
 export function closeIncident(serviceId: string, end: number) {
@@ -386,6 +390,32 @@ export function openIncidents(): IncidentRow[] {
 export function incidentCountsSince(since: number): Map<string, number> {
   const rows = db().prepare("SELECT service_id, COUNT(*) AS n FROM incidents WHERE start >= ? GROUP BY service_id").all(since) as unknown as { service_id: string; n: number }[];
   return new Map(rows.map((r) => [r.service_id, r.n]));
+}
+
+/** Every outage that was still going on at `since` or began after it, newest first. */
+export function incidentsOverlapping(since: number): IncidentRow[] {
+  return db().prepare("SELECT * FROM incidents WHERE end IS NULL OR end >= ? ORDER BY start DESC LIMIT 200").all(since) as unknown as IncidentRow[];
+}
+
+/**
+ * Checks made and passed per service and hour since `since`: finished hours from the rollups, and
+ * from `rawFrom` on (hours that may not be rolled up yet) counted from the raw checks.
+ */
+export function hourlyChecksSince(since: number, rawFrom: number): Map<string, { hour: number; checks: number; up: number }[]> {
+  const rows = db()
+    .prepare(
+      `SELECT service_id, hour, checks, up FROM pings_hourly WHERE hour >= ? AND hour < ?
+       UNION ALL
+       SELECT service_id, (ts / 3600000) * 3600000 AS hour, COUNT(*) AS checks, SUM(up) AS up FROM pings WHERE ts >= ? GROUP BY service_id, hour`,
+    )
+    .all(since, rawFrom, Math.max(since, rawFrom)) as unknown as { service_id: string; hour: number; checks: number; up: number }[];
+  const out = new Map<string, { hour: number; checks: number; up: number }[]>();
+  for (const { service_id, ...r } of rows) {
+    const list = out.get(service_id);
+    if (list) list.push(r);
+    else out.set(service_id, [r]);
+  }
+  return out;
 }
 
 export function incidentsSince(serviceId: string, since: number): IncidentRow[] {

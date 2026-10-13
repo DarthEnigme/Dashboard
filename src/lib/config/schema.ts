@@ -1,4 +1,14 @@
 import { z } from "zod";
+
+// These messages are shown next to settings fields: say what to do, not "Too small: expected number to be >=5".
+z.config({
+  customError: (issue) => {
+    if (issue.origin !== "number" && issue.origin !== "int") return undefined;
+    if (issue.code === "too_small") return `Must be at least ${issue.minimum}`;
+    if (issue.code === "too_big") return `Must be at most ${issue.maximum}`;
+    return undefined;
+  },
+});
 import { paletteThemes } from "@/lib/theme";
 import { fontIds } from "@/lib/fonts";
 
@@ -34,6 +44,8 @@ const customThemeSchema = z.object({
   gradient: z.object({ base: hex, blobs: z.tuple([hex, hex, hex]) }).optional(),
 });
 export const tileSizes = ["small", "wide", "tall", "large"] as const;
+/** In Date#getDay() order. */
+export const weekdays = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 export const visibilities = ["public", "users", "admins"] as const;
 /** public, users or admins; or a list of group names: their members (and admins). */
 export type Visibility = (typeof visibilities)[number] | string[];
@@ -70,7 +82,7 @@ export const authSchema = z
     defaultRole: z.enum(["user", "admin"]).default("user"),
     /** What every signed-in user may do; groups add more (Settings → Accounts → Groups). */
     userPermissions: z.array(z.enum(PERMISSIONS)).default(["finance", "travel", "watchlist"]),
-    local: z.object({ enabled: z.boolean().default(true) }).default({}),
+    local: z.object({ enabled: z.boolean().default(true) }).prefault({}),
     proxy: z
       .object({
         enabled: z.boolean().default(false),
@@ -84,7 +96,7 @@ export const authSchema = z
         adminGroup: z.string().optional(),
         signup: z.boolean().default(true),
       })
-      .default({}),
+      .prefault({}),
     ldap: z
       .object({
         enabled: z.boolean().default(false),
@@ -100,10 +112,10 @@ export const authSchema = z
         insecure: z.boolean().optional(),
         signup: z.boolean().default(true),
       })
-      .default({}),
+      .prefault({}),
     providers: z.array(providerSchema).default([]),
   })
-  .default({});
+  .prefault({});
 export type AuthConfig = z.infer<typeof authSchema>;
 
 export const settingsSchema = z
@@ -129,7 +141,7 @@ export const settingsSchema = z
         blur: z.number().min(0).max(40).default(0),
         brightness: z.number().min(0).max(1).default(0.7),
       })
-      .default({}),
+      .prefault({}),
     /** Font of the whole page (lib/fonts.ts); system keeps the platform font. */
     font: z.enum(fontIds).default("system"),
     /** Travel map colours: a colour, or "accent" to follow the accent colour. */
@@ -139,7 +151,7 @@ export const settingsSchema = z
         livedColor: z.string().default("accent"),
         wantColor: z.string().default("#f59e0b"),
       })
-      .default({}),
+      .prefault({}),
     target: z.enum(["_blank", "_self"]).default("_blank"),
     columns: z.number().int().min(1).max(8).optional(),
     editing: z.boolean().default(true),
@@ -150,9 +162,9 @@ export const settingsSchema = z
     /** Refresh open dashboards when a config file changes on disk. */
     liveReload: z.boolean().default(true),
     tabs: z.array(z.string()).optional(),
-    history: z.object({ retentionDays: z.number().min(1).max(400).default(90) }).default({}),
+    history: z.object({ retentionDays: z.number().min(1).max(400).default(90) }).prefault({}),
     /** Device inventory: remind the alert channels this many days before a warranty ends (0 = off). */
-    inventory: z.object({ warrantyDays: z.number().int().min(0).max(365).default(30) }).default({}),
+    inventory: z.object({ warrantyDays: z.number().int().min(0).max(365).default(30) }).prefault({}),
     /** Nightly zip of the config, the database, uploads and the secret key. */
     backup: z
       .object({
@@ -167,7 +179,7 @@ export const settingsSchema = z
         /** Folder for the zips (another disk or a network share); default data/backups. */
         dir: z.string().optional(),
       })
-      .default({}),
+      .prefault({}),
     alerts: z
       .object({
         discord: z.string().optional(),
@@ -214,7 +226,7 @@ export const settingsSchema = z
         /** JSON body for the generic webhook, with {{variables}}; empty sends NanoDash's own JSON. */
         webhookBody: z.string().optional(),
       })
-      .default({}),
+      .prefault({}),
     auth: authSchema,
     finance: z
       .object({
@@ -225,7 +237,33 @@ export const settingsSchema = z
         /** Alert when a category's monthly budget is used up ("over"), also at 80% ("warn"), or never. */
         budgetAlerts: z.enum(["off", "over", "warn"]).default("over"),
       })
-      .default({}),
+      .prefault({}),
+    /**
+     * Recurring times (server local time) when alerts are held back: checks still run. `days` name the
+     * day a window starts on (none = every day); `services` are ids (none = all of them).
+     */
+    maintenance: z
+      .array(
+        z.object({
+          name: z.string().optional(),
+          days: z.array(z.enum(weekdays)).optional(),
+          from: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM"),
+          to: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM"),
+          services: z.array(z.string()).optional(),
+        }),
+      )
+      .default([]),
+    /** A read-only /status page anyone can open, also when the dashboard itself needs a sign-in. */
+    statusPage: z
+      .object({
+        enabled: z.boolean().default(false),
+        title: z.string().optional(),
+        /** Service ids to show; default: every checked service that is visible to everyone. */
+        services: z.array(z.string()).optional(),
+        /** Days of uptime bars (hourly history is kept history.retentionDays). */
+        days: z.number().int().min(7).max(90).default(90),
+      })
+      .prefault({}),
     updates: z
       .object({
         /** Look for a new version every 6 hours. */
@@ -249,20 +287,20 @@ export const settingsSchema = z
         /** Image repository to pull (without tag); defaults to the one this container runs. */
         image: z.string().optional(),
       })
-      .default({}),
+      .prefault({}),
     docker: z
       .object({
         discovery: z.boolean().default(false),
         hosts: z.array(z.object({ name: z.string(), host: z.string().optional() })).default([{ name: "local" }]),
       })
-      .default({}),
+      .prefault({}),
     /** Colour themes made in Settings → Appearance; picked with theme: custom:<id>. */
     customThemes: z
       .array(customThemeSchema)
       .default([])
       .refine((list) => new Set(list.map((t) => t.id)).size === list.length, "two themes have the same id"),
   })
-  .default({});
+  .prefault({});
 
 export const widgetSchema = z.object({ type: z.string().min(1) }).passthrough();
 

@@ -9,8 +9,9 @@ import { money } from "@/lib/finance/format";
 import { inputBase } from "../edit/FieldInput";
 import type { Account } from "@/lib/finance/accounts";
 import { useT } from "@/i18n/client";
+import { localDay } from "@/lib/day";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDay();
 const ACCOUNT_KEY = "page.finance.account";
 
 /**

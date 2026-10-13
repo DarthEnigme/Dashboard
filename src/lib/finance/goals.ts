@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { localDay } from "@/lib/day";
 
 /**
  * Savings goals: a target and what has been put aside for it. Money set aside is a move between
@@ -27,7 +28,7 @@ export function listGoals(): Goal[] {
   const moves = db().prepare("SELECT id, goal_id, date, amount_cents AS amount, note FROM fin_goal_moves ORDER BY date DESC, id DESC").all() as unknown as (Goal["moves"][number] & {
     goal_id: number;
   })[];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDay();
   return goals.map((g) => ({ ...g, perMonth: monthlyNeeded(g, today), moves: moves.filter((m) => m.goal_id === g.id).slice(0, 10).map((m) => ({ id: m.id, date: m.date, amount: m.amount, note: m.note })) }));
 }
 

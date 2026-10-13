@@ -13,6 +13,7 @@ import { Dialog } from "../edit/Dialog";
 import { FieldInput, type FormValue } from "../edit/FieldInput";
 import { useT } from "@/i18n/client";
 import { msg } from "@/i18n";
+import { localDay } from "@/lib/day";
 
 export const ACCOUNTS_KEY = "/api/finance/accounts";
 const KINDS = ["bank", "cash", "card", "savings", "other"];
@@ -177,7 +178,7 @@ function BalanceLine({ history, label }: { history: { month: string; cents: numb
 
 function TransferDialog({ accounts, onClose, onDone }: { accounts: AccountWithBalance[]; onClose: () => void; onDone: () => Promise<void> }) {
   const t = useT();
-  const [value, setValue] = useState<Record<string, unknown>>({ from: accounts[0].name, to: accounts[1].name, date: new Date().toISOString().slice(0, 10) });
+  const [value, setValue] = useState<Record<string, unknown>>({ from: accounts[0].name, to: accounts[1].name, date: localDay() });
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const from = accounts.find((a) => a.name === value.from) ?? accounts[0];

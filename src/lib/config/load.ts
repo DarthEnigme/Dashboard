@@ -5,7 +5,7 @@ import { configFiles, type ConfigFile, type Settings, type ServiceGroup, type Bo
 import { defaultFiles } from "./defaults";
 import { substituteEnv } from "./env";
 
-export const CONFIG_DIR = process.env.HOMEPAGE_CONFIG_DIR ?? path.join(process.cwd(), "config");
+export const CONFIG_DIR = process.env.HOMEPAGE_CONFIG_DIR ?? path.join(/* turbopackIgnore: true */ process.cwd(), "config");
 
 export const filePath = (file: ConfigFile) => path.join(CONFIG_DIR, `${file}.yaml`);
 
@@ -22,8 +22,9 @@ function ensureDefaults() {
   if (ensured) return;
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
   for (const [name, content] of Object.entries(defaultFiles)) {
-    const p = path.join(CONFIG_DIR, name);
-    if (!fs.existsSync(p)) fs.writeFileSync(p, content, "utf8");
+    // The config folder is chosen at run time: nothing for the bundler to trace from here.
+    const p = path.join(/* turbopackIgnore: true */ CONFIG_DIR, name);
+    if (!fs.existsSync(/* turbopackIgnore: true */ p)) fs.writeFileSync(p, content, "utf8");
   }
   ensured = true;
 }

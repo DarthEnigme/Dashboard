@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { db } from "../db";
 import { convertTxns, type Txn } from "./aggregate";
 import { addTransaction } from "./store";
+import { localDay } from "@/lib/day";
 
 export const ACCOUNT_KINDS = ["bank", "cash", "card", "savings", "other"] as const;
 export type AccountKind = (typeof ACCOUNT_KINDS)[number];
@@ -58,7 +59,7 @@ export function getAccount(id: number): Account | undefined {
 const monthOf = (d: string) => d.slice(0, 7);
 
 /** Balances per account. `rates` (units per one unit of each account's currency) convert other currencies. */
-export function withBalances(accounts: Account[], ratesFor: (currency: string) => Record<string, number> | undefined, today = new Date().toISOString().slice(0, 10)): AccountWithBalance[] {
+export function withBalances(accounts: Account[], ratesFor: (currency: string) => Record<string, number> | undefined, today = localDay()): AccountWithBalance[] {
   const rows = db().prepare("SELECT account, date, amount_cents, currency, category FROM fin_transactions WHERE account IS NOT NULL").all() as unknown as (Txn & { account: string })[];
   const byAccount = new Map<string, Txn[]>();
   for (const r of rows) {

@@ -116,7 +116,7 @@ async function checkHttp(c: Extract<CheckSpec, { type: "http" }>): Promise<PingR
   const at = Date.now();
   const needBody = !!(c.keyword || c.jsonPath);
   try {
-    let res = await http(url, { method: needBody ? "GET" : (c.method ?? "HEAD"), insecure: c.insecure, timeoutMs: 5000, redirect: "manual" });
+    let res = await http(url, { method: needBody ? "GET" : (c.method ?? "HEAD"), insecure: c.insecure, timeoutMs: 5000, redirect: "manual", maxBytes: 1_000_000, truncate: true });
     if (!needBody && (res.status === 405 || res.status === 501)) {
       await res.body?.cancel();
       res = await http(url, { method: "GET", insecure: c.insecure, timeoutMs: 5000, redirect: "manual" });
@@ -125,7 +125,7 @@ async function checkHttp(c: Extract<CheckSpec, { type: "http" }>): Promise<PingR
     let up = c.expect?.length ? c.expect.includes(res.status) : res.status < 500;
     let error: string | undefined;
     if (needBody && up) {
-      const text = (await res.text()).slice(0, 1_000_000);
+      const text = await res.text(); // at most 1 MB (see maxBytes above)
       if (c.keyword && !text.includes(c.keyword)) {
         up = false;
         error = `"${c.keyword}" not found`;

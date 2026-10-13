@@ -434,6 +434,34 @@ History is stored per service id (group name + service name), so renaming a serv
 
 Raw checks are kept 7 days; hourly summaries are kept `history.retentionDays` (default 90). Outages are recorded whether or not alerts are configured.
 
+### Maintenance
+
+Hold back alerts while you work on something. Checks keep running and history is kept; an outage that starts meanwhile is recorded as **planned**.
+
+- **One-off:** admins get a bell on each service's page and on each row of the monitoring panel (the bell in the panel's header mutes everything): 30 minutes, 2 hours, 8 hours, or until you turn alerts back on.
+- **Recurring:** windows in `settings.yaml`, in server local time. `days` name the day a window starts on (leave it out for every day), so `sat 23:00`–`02:00` runs into Sunday. Leave `services` out to cover all of them.
+
+```yaml
+maintenance:
+  - { name: Backups, days: [sun], from: "03:00", to: "05:00", services: [infra.nas] }
+```
+
+While a service is muted, there are no down/up alerts, threshold alerts or certificate notices for it, and its tile shows a crossed-out bell. If it is still down when the mute ends, the DOWN alert goes out then. Recovery is only announced for an outage that was.
+
+### Public status page
+
+`statusPage.enabled: true` adds a read-only page at `/status` that anyone can open without signing in, also when the dashboard itself is private (`auth.publicView: false`).
+
+```yaml
+statusPage:
+  enabled: true
+  title: Homelab status     # default: "<title> status"
+  services: [infra.nas]     # ids; default: every checked service that is visible to everyone
+  days: 90                  # uptime bars, 7–90
+```
+
+It shows whether everything is up, each service's state with one bar per day of uptime, and the outages of the last 14 days ("planned" for maintenance). It never shows links, addresses, check targets, failure reasons or widget data. Services marked `visible: users`, `admins` or a group stay off it unless you list their ids.
+
 ### Check types
 
 `ping: true` (the link) and `ping: <url>` check over HTTP: up when the answer is below 500. For anything else, give `ping` a type. The editor has a form for each.
@@ -483,7 +511,7 @@ Vaultwarden and other apps without a stats API can still be watched with an HTTP
 
 NanoDash can be scraped by Prometheus (or Grafana Agent, VictoriaMetrics…) at `/api/export/metrics`:
 - `page_service_up`, `page_service_latency_ms`, `page_service_uptime_ratio` (last 24 hours) and `page_service_last_check_timestamp_seconds` for every service with a status check, labelled `service`, `name` and `group`
-- per service too: `page_service_cert_days_left` (HTTPS checks), `page_service_incident_open`, `page_service_incident_started_timestamp_seconds` and `page_service_incidents_24h`
+- per service too: `page_service_cert_days_left` (HTTPS checks), `page_service_incident_open`, `page_service_incident_started_timestamp_seconds`, `page_service_incidents_24h` and `page_service_maintenance` (alerts held back)
 - `page_widget_value{service, field}`: the latest value of every recorded widget field (`record: true` or thresholds)
 - `page_device_up` and `page_device_latency_ms` for every inventory device with an address, labelled `device` and `name`
 - `page_backup_last_ok`, `page_backup_last_run_timestamp_seconds` and `page_backup_last_size_bytes`
@@ -501,6 +529,8 @@ scrape_configs:
     static_configs:
       - targets: ["page.example.com"]
 ```
+
+**Grafana dashboard:** import [`grafana/nanodash.json`](grafana/nanodash.json) (Dashboards → New → Import) and pick your Prometheus data source. It shows service status over time, response times, 24-hour uptime, certificates, outages (also as annotations), inventory devices, recorded widget values, and NanoDash's own backups, updates, memory and database size. It needs Grafana 10 or newer.
 
 ## Actions
 

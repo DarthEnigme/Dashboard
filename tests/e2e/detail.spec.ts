@@ -86,3 +86,18 @@ test.describe.serial("service detail and actions", () => {
     await anon.close();
   });
 });
+
+test("an admin mutes a service's alerts and turns them back on", async ({ page }) => {
+  await page.goto("/service/infra.portainer");
+  await page.getByRole("button", { name: "Mute alerts for Portainer" }).click();
+  await page.getByRole("menuitem", { name: "30 minutes" }).click();
+  const muted = page.getByRole("button", { name: /Alerts for Portainer are muted until .+\. Turn them back on/ });
+  await expect(muted).toBeVisible();
+  // The check itself keeps running and reports the mute.
+  await expect.poll(async () => (await (await page.request.get("/api/ping?id=infra.portainer")).json()).muted).toBe(true);
+  expect((await (await page.request.get("/api/ping?id=infra.kuma")).json()).muted).toBe(false);
+  await shot(page, "96-muted-service", { fullPage: false });
+  await muted.click();
+  await expect(page.getByRole("button", { name: "Mute alerts for Portainer" })).toBeVisible();
+  await expect.poll(async () => (await (await page.request.get("/api/ping?id=infra.portainer")).json()).muted).toBe(false);
+});

@@ -117,3 +117,31 @@ test.describe.serial("authentication", () => {
     }
   });
 });
+
+test.describe.serial("public status page", () => {
+  test("is not there unless turned on", async ({ page }) => {
+    expect((await page.request.get("/status")).status()).toBe(404);
+  });
+
+  test("shows state and uptime without signing in, also in private mode, and nothing else", async ({ page }) => {
+    const original = readConfig("settings");
+    writeConfig("settings", `${original.replace("auth:\n", "auth:\n  publicView: false\n").trimEnd()}\nstatusPage:\n  enabled: true\n  title: Lab status\n`);
+    try {
+      await page.goto("/");
+      await expect(page).toHaveURL(/\/login$/);
+      await page.goto("/status");
+      await expect(page.getByRole("heading", { name: "Lab status" })).toBeVisible();
+      await expect(page.getByRole("status")).toContainText(/up|down|Waiting/);
+      await expect(page.getByText("Portainer", { exact: true })).toBeVisible();
+      // Proxmox has no status check: it is not listed.
+      // Signed-in-only services stay off it, and no address of any service is in the page.
+      await expect(page.getByText("Firefly", { exact: true })).toBeHidden();
+      const html = await page.content();
+      expect(html).not.toContain("localhost:4010");
+      expect(html).not.toMatch(/href="https?:\/\//);
+      await shot(page, "95-status-page");
+    } finally {
+      writeConfig("settings", original);
+    }
+  });
+});

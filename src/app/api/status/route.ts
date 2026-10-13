@@ -6,6 +6,7 @@ import { seeFilter } from "@/lib/auth";
 import { checkSpec, describeCheck } from "@/lib/checks";
 import { latestPing, openIncidents, uptimeSince } from "@/lib/db";
 import { certFor } from "@/lib/monitor";
+import { listMutes, mutedNow } from "@/lib/maintenance";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,8 @@ export interface StatusRow {
   /** Down for at least alerts.threshold checks: an open incident. */
   incident: { since: number; cause: string | null } | null;
   certDaysLeft: number | null;
+  /** Alerts are held back right now (maintenance window or a one-off mute). */
+  muted: boolean;
 }
 
 /** Every monitored service this viewer can see, for the monitoring panel. */
@@ -35,6 +38,8 @@ export async function GET() {
   const open = new Map(openIncidents().map((i) => [i.service_id, i]));
   const day = uptimeSince(Date.now() - 86_400_000);
   const rows: StatusRow[] = [];
+  const mutes = listMutes();
+  const now = new Date();
   cfg.services.forEach((g, gi) => {
     g.services.forEach((s, si) => {
       const check = checkSpec(s);
@@ -56,6 +61,7 @@ export async function GET() {
         uptime: checks?.checks ? checks.up / checks.checks : null,
         incident: inc ? { since: inc.start, cause: inc.cause } : null,
         certDaysLeft: certFor(id)?.daysLeft ?? null,
+        muted: !!mutedNow(cfg.settings.maintenance, mutes, id, now),
       });
     });
   });

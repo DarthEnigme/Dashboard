@@ -16,7 +16,7 @@ export type ThresholdRule = z.infer<typeof thresholdRuleSchema>;
 export const widgetExtrasSchema = z.object({
   /** Store this widget's numbers over time (charts on the service page, threshold alerts). */
   record: z.boolean().optional(),
-  thresholds: z.record(thresholdRuleSchema).optional(),
+  thresholds: z.record(z.string(), thresholdRuleSchema).optional(),
 });
 export type WidgetExtras = z.infer<typeof widgetExtrasSchema>;
 

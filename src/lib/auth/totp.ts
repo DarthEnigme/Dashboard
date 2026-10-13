@@ -51,12 +51,15 @@ export function totpCode(secret: string, at = Date.now(), step = 30): string {
   return String(n).padStart(6, "0");
 }
 
-/** Accepts the current code and one step either side (clock drift). */
-export function verifyTotp(secret: string, code: string, at = Date.now()): boolean {
+/** The time step this code belongs to: the current one or one either side (clock drift). Undefined for a wrong code. */
+export function matchTotpStep(secret: string, code: string, at = Date.now()): number | undefined {
   const c = code.replace(/\s/g, "");
-  if (!/^\d{6}$/.test(c)) return false;
-  return [-1, 0, 1].some((d) => crypto.timingSafeEqual(Buffer.from(totpCode(secret, at + d * 30_000)), Buffer.from(c)));
+  if (!/^\d{6}$/.test(c)) return undefined;
+  const now = Math.floor(at / 30_000);
+  return [now, now - 1, now + 1].find((step) => crypto.timingSafeEqual(Buffer.from(totpCode(secret, step * 30_000)), Buffer.from(c)));
 }
+
+export const verifyTotp = (secret: string, code: string, at = Date.now()) => matchTotpStep(secret, code, at) !== undefined;
 
 export function otpauthUrl(secret: string, account: string, issuer: string): string {
   const label = encodeURIComponent(`${issuer}:${account}`);

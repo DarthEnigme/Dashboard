@@ -30,7 +30,7 @@ describe("zip", () => {
 
 describe("settings page", () => {
   it("covers every setting in the schema", () => {
-    const top = Object.keys(settingsSchema.removeDefault().shape);
+    const top = Object.keys(settingsSchema.unwrap().shape);
     const covered = new Set(fieldKeys.map((k) => k.split(".")[0]));
     expect(top.filter((k) => !covered.has(k))).toEqual([]);
     expect(new Set(sections.map((s) => s.id)).size).toBe(sections.length);
@@ -39,7 +39,7 @@ describe("settings page", () => {
   it("maps schema issues to the fields they belong to", () => {
     const { errors, parsed } = validateSettings({ refreshInterval: 2, auth: { providers: [{ id: "Bad Id", type: "oidc", clientId: "x", clientSecret: "y" }] } });
     expect(parsed).toBeUndefined();
-    expect(errors.refreshInterval).toMatch(/greater than or equal to 5/);
+    expect(errors.refreshInterval).toMatch(/Must be at least 5/);
     expect(errors["auth.providers"]).toMatch(/^0\.id: /);
   });
 

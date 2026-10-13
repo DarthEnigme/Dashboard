@@ -1,5 +1,6 @@
 import { db } from "../db";
 import { addTransaction } from "./store";
+import { localDay } from "@/lib/day";
 
 export const EVERY = ["week", "month", "year"] as const;
 export type Every = (typeof EVERY)[number];
@@ -22,7 +23,7 @@ export interface RecurringRule {
 }
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
-export const today = () => iso(new Date());
+export const today = () => localDay();
 
 /**
  * The k-th step from `start`. Months keep the start's day, clamped to short months (Jan 31 →

@@ -219,3 +219,31 @@ describe("icmp hosts", () => {
     expect(await runCheck({ type: "icmp", host: "a;b" })).toMatchObject({ up: false, error: "invalid host" });
   });
 });
+
+describe("response size", () => {
+  let big: http.Server;
+  let base = "";
+  beforeAll(async () => {
+    // 3 MB of "a", then the word the keyword check looks for.
+    big = http.createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      for (let i = 0; i < 3; i++) res.write("a".repeat(1024 * 1024));
+      res.end("NEEDLE");
+    });
+    await new Promise<void>((r) => big.listen(0, "127.0.0.1", r));
+    base = `http://127.0.0.1:${(big.address() as AddressInfo).port}`;
+  });
+  afterAll(() => big.close());
+
+  it("refuses a body past the limit, or cuts it there when asked", async () => {
+    const { http: get } = await import("@/lib/http");
+    await expect((await get(base, { maxBytes: 1024 * 1024 })).text()).rejects.toThrow(/larger than 1 MB/);
+    expect((await (await get(base, { maxBytes: 1024 * 1024, truncate: true })).text()).length).toBe(1024 * 1024);
+    expect((await (await get(base)).text()).endsWith("NEEDLE")).toBe(true);
+  });
+
+  it("keyword checks only read the first megabyte", async () => {
+    expect(await runCheck({ type: "http", url: base, insecure: true, keyword: "NEEDLE" })).toMatchObject({ up: false, error: '"NEEDLE" not found' });
+    expect(await runCheck({ type: "http", url: base, insecure: true, keyword: "aaa" })).toMatchObject({ up: true });
+  });
+});

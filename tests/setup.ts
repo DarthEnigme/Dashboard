@@ -2,6 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+// Dates in tests are fixed instants: the same calendar day on every machine.
+process.env.TZ = "UTC";
+
 // Every test file gets its own config and data directories, so no test can touch the real
 // ./config or ./data (modules read these paths when first imported).
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "page-test-"));

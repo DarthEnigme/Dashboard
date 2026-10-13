@@ -29,6 +29,7 @@ interface Row {
   avatar: string | null;
   totp_secret: string | null;
   totp_recovery: string | null;
+  totp_last_step: number | null;
 }
 
 const toUser = (r: Row | undefined): User | undefined =>
@@ -109,7 +110,12 @@ export function getTwoFactor(id: number): { secret: string; recovery: string[] }
 
 export function setTwoFactor(id: number, v: { secret: string; recovery: string[] } | null) {
   db().prepare("UPDATE users SET totp_secret = ?, totp_recovery = ? WHERE id = ?").run(v?.secret ?? null, v ? JSON.stringify(v.recovery) : null, id);
+  if (!v) db().prepare("UPDATE users SET totp_last_step = NULL WHERE id = ?").run(id);
 }
+
+/** The time step of the last code this user signed in with: that code and older ones are refused (no replays). */
+export const totpStep = (id: number) => one("SELECT * FROM users WHERE id = ?", id)?.totp_last_step ?? null;
+export const setTotpStep = (id: number, step: number) => db().prepare("UPDATE users SET totp_last_step = ? WHERE id = ?").run(step, id);
 
 export const deleteUser = (id: number) => db().prepare("DELETE FROM users WHERE id = ?").run(id);
 

@@ -20,6 +20,8 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: settings.title,
     description: settings.description,
+    // A private dashboard: nothing here belongs in a search engine.
+    robots: { index: false, follow: false },
     appleWebApp: { capable: true, title: settings.title, statusBarStyle: "black-translucent" },
     icons: { icon: `/pwa-icon/192?v=${iconVersion(settings)}`, apple: `/pwa-icon/180?v=${iconVersion(settings)}` },
   };

@@ -22,7 +22,7 @@ type Metric = z.infer<typeof metricSchema>;
 const schema = z.object({
   source: z.enum(["json", "influxdb"]).default("json"),
   url: z.string().url(),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
   /** influxdb: API token and organisation. */
   token: z.string().optional(),
   org: z.string().optional(),

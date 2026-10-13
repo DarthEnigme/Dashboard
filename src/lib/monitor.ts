@@ -2,12 +2,14 @@ import { getConfig } from "./config";
 import { serviceIds } from "./config/slug";
 import { closeIncident, getAppMeta, insertPing, openIncident, openIncidents, pingsBetween, pruneHistory, setAppMeta, unrolledHours, upsertHour } from "./db";
 import { checkSpec, runCheck, type CertInfo, type PingResult } from "./checks";
-import { evaluate, hasAlertChannel, sendAlert, sendNotice, type AlertState } from "./alerts";
+import { alertDecision, evaluate, hasAlertChannel, sendAlert, sendNotice, type AlertState } from "./alerts";
+import { listMutes, mutedNow, type Mutes } from "./maintenance";
 import type { Service, Settings } from "./config/schema";
 import { fetchWidget } from "./widgets";
 import { describeRule, evaluateThreshold, numericValue, widgetExtras, type BreachState } from "./thresholds";
 import { insertMetrics, pruneMetrics, rollupMetrics } from "./metrics";
 import { RAW_RETENTION, rollupHour } from "./history";
+import { localDay } from "@/lib/day";
 
 const CONCURRENCY = 8;
 const HOUR = 3_600_000;
@@ -30,7 +32,7 @@ interface MonitorState {
  * Read widgets that record history or have thresholds: store their numbers and alert when a
  * value stays past its limit (and again when it is back).
  */
-async function recordMetrics(state: MonitorState, services: { id: string; service: Service }[], settings: Settings) {
+async function recordMetrics(state: MonitorState, services: { id: string; service: Service }[], settings: Settings, mutes: Mutes) {
   const now = Date.now();
   const alertsOn = hasAlertChannel(settings.alerts);
   await mapLimit(services, CONCURRENCY, async ({ id, service }) => {
@@ -54,6 +56,11 @@ async function recordMetrics(state: MonitorState, services: { id: string; servic
       const v = field ? numericValue(field) : undefined;
       if (v === undefined) continue;
       const key = `${id}|${label}`;
+      // Muted (maintenance): no alert, and no memory of the breach, so one that outlasts the mute is reported then.
+      if (mutedNow(settings.maintenance, mutes, id, new Date(now))) {
+        state.breaches.delete(key);
+        continue;
+      }
       const { state: next, event } = evaluateThreshold(state.breaches.get(key) ?? { firing: false }, v, rule, now);
       state.breaches.set(key, next);
       if (!event || !alertsOn || service.alert === false) continue;
@@ -85,7 +92,7 @@ export const failureCause = (r: PingResult) => r.error ?? (r.status ? `HTTP ${r.
 async function certNotice(settings: Settings, id: string, service: Service, cert: CertInfo) {
   const days = settings.alerts.certDays;
   if (!days || cert.daysLeft > days || !hasAlertChannel(settings.alerts) || service.alert === false) return;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDay();
   const key = `cert.${id}`;
   if (getAppMeta<string>(key) === today) return;
   const when = cert.expires.slice(0, 10);
@@ -148,38 +155,43 @@ async function tick(state: MonitorState): Promise<number> {
   );
   const alertsOn = hasAlertChannel(settings.alerts);
   dropStale(state, new Set(targets.map((t) => t.id)), new Set(ids.flat()));
+  const mutes = listMutes();
 
   // Alongside the checks, so a slow widget doesn't hold them up.
   let metrics: Promise<void> | undefined;
   if (Date.now() - state.lastMetrics >= settings.metricsInterval * 1000 - 1000) {
     state.lastMetrics = Date.now();
     const widgets = cfg.services.flatMap((grp, gi) => grp.services.map((s, si) => ({ id: ids[gi][si], service: s }))).filter((t) => t.service.widget);
-    metrics = recordMetrics(state, widgets, settings).catch((e) => console.error("[nanodash] recording metrics failed:", e));
+    metrics = recordMetrics(state, widgets, settings, mutes).catch((e) => console.error("[nanodash] recording metrics failed:", e));
   }
 
   await mapLimit(targets, CONCURRENCY, async ({ id, service, check }) => {
     const r = await runCheck(check);
     const now = r.at ?? Date.now();
     insertPing({ service_id: id, ts: now, up: r.up ? 1 : 0, status: r.status ?? null, latency_ms: r.latencyMs ?? null });
+    const muted = !!mutedNow(settings.maintenance, mutes, id, new Date(now));
     if (r.cert) {
       state.certs.set(id, r.cert);
-      await certNotice(settings, id, service, r.cert).catch((e) => console.warn(`[nanodash] certificate notice for ${service.name} failed:`, e));
+      if (!muted) await certNotice(settings, id, service, r.cert).catch((e) => console.warn(`[nanodash] certificate notice for ${service.name} failed:`, e));
     }
 
     // Outages are always recorded as incidents; alerts are only sent when a channel is configured.
-    const { state: next, event } = evaluate(state.outages.get(id) ?? { failures: 0, down: false }, r.up, settings.alerts.threshold, now);
+    const prev = state.outages.get(id) ?? { failures: 0, down: false };
+    const { state: evaluated, event } = evaluate(prev, r.up, settings.alerts.threshold, now);
+    // While muted (maintenance) an outage is recorded as planned and its alert held back.
+    const { state: next, send } = alertDecision(prev, evaluated, event, muted);
     state.outages.set(id, next);
-    if (!event) return;
-    if (event.kind === "down") openIncident(id, event.since, failureCause(r));
-    else closeIncident(id, now);
+    if (event?.kind === "down") openIncident(id, event.since, failureCause(r), muted);
+    else if (event?.kind === "recovered") closeIncident(id, now);
 
-    if (!alertsOn || service.alert === false) return;
+    if (!send || !alertsOn || service.alert === false) return;
+    const since = (send === "up" ? prev.since : next.since) ?? now;
     const errors = await sendAlert(settings.alerts, {
       service: service.name,
-      status: event.kind === "down" ? "down" : "up",
+      status: send,
       url: service.href,
-      since: new Date(event.since).toISOString(),
-      durationSeconds: event.kind === "recovered" ? Math.round(event.durationMs / 1000) : undefined,
+      since: new Date(since).toISOString(),
+      durationSeconds: send === "up" ? Math.round((now - since) / 1000) : undefined,
       error: r.error,
       httpStatus: r.error ? undefined : r.status,
     });
@@ -216,7 +228,7 @@ export function startMonitor() {
   g.__pageMonitor = state;
   // Outages that were open when the server stopped stay open until the service is seen up again.
   try {
-    for (const i of openIncidents()) state.outages.set(i.service_id, { failures: 1, down: true, since: i.start });
+    for (const i of openIncidents()) state.outages.set(i.service_id, { failures: 1, down: true, since: i.start, suppressed: !!i.planned });
   } catch (e) {
     console.warn("[nanodash] could not load open incidents:", e);
   }

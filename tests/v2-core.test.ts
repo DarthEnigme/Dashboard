@@ -202,3 +202,13 @@ describe("info widgets", () => {
     ]);
   });
 });
+
+describe("localDay", () => {
+  it("is the calendar date where this runs, not the UTC one", async () => {
+    const { localDay } = await import("@/lib/day");
+    // Built from local parts, so this holds in any time zone (toISOString would say the day before, east of UTC).
+    expect(localDay(new Date(2026, 0, 1, 0, 30))).toBe("2026-01-01");
+    expect(localDay(new Date(2026, 11, 31, 23, 30))).toBe("2026-12-31");
+    expect(localDay()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});

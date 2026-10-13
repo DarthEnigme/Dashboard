@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { listGoals, moveToGoal } from "@/lib/finance/goals";
 import { bad, guard, isDate } from "../../_shared";
+import { localDay } from "@/lib/day";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
     moveToGoal(
       Number(b.id),
       Math.round(amount * 100),
-      isDate(b.date) ? b.date : new Date().toISOString().slice(0, 10),
+      isDate(b.date) ? b.date : localDay(),
       typeof b.note === "string" && b.note.trim() ? b.note.trim().slice(0, 200) : null,
     );
   } catch (e) {

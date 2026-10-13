@@ -114,3 +114,87 @@ describe("uptime per service", () => {
     expect(day.get("up.none")).toBeUndefined();
   });
 });
+
+describe("maintenance", () => {
+  // Local time, like the settings: 2026-10-11 is a Sunday.
+  const at = (day: number, h: number, m = 0) => new Date(2026, 9, day, h, m);
+
+  it("matches windows by time and by the day they start on", async () => {
+    const { inWindow } = await import("@/lib/maintenance");
+    const night = { from: "03:00", to: "05:00" };
+    expect(inWindow(night, at(12, 3))).toBe(true);
+    expect(inWindow(night, at(12, 4, 59))).toBe(true);
+    expect(inWindow(night, at(12, 5))).toBe(false);
+    expect(inWindow(night, at(12, 2, 59))).toBe(false);
+    expect(inWindow({ ...night, days: ["sun" as const] }, at(11, 4))).toBe(true);
+    expect(inWindow({ ...night, days: ["sun" as const] }, at(12, 4))).toBe(false);
+
+    // Past midnight: Saturday's window covers the first hours of Sunday, Sunday evening is not in it.
+    const late = { from: "23:00", to: "02:00", days: ["sat" as const] };
+    expect(inWindow(late, at(10, 23, 30))).toBe(true);
+    expect(inWindow(late, at(11, 1, 30))).toBe(true);
+    expect(inWindow(late, at(11, 2))).toBe(false);
+    expect(inWindow(late, at(11, 23, 30))).toBe(false);
+    expect(inWindow({ from: "00:00", to: "00:00" }, at(13, 15))).toBe(true);
+  });
+
+  it("applies windows and one-off mutes to the right services", async () => {
+    const { ALL, listMutes, mute, mutedNow, unmute } = await import("@/lib/maintenance");
+    const windows = [{ name: "Backups", from: "03:00", to: "05:00", services: ["infra.nas"] }];
+    expect(mutedNow(windows, {}, "infra.nas", at(12, 4))).toEqual({ window: "Backups" });
+    expect(mutedNow(windows, {}, "infra.router", at(12, 4))).toBeUndefined();
+    expect(mutedNow(windows, {}, "infra.nas", at(12, 6))).toBeUndefined();
+
+    const now = at(12, 12).getTime();
+    mute("infra.router", 30, "root", now);
+    expect(mutedNow([], listMutes(now), "infra.router", new Date(now))).toEqual({ until: now + 30 * 60_000 });
+    expect(mutedNow([], listMutes(now), "infra.nas", new Date(now))).toBeUndefined();
+    // It runs out on its own.
+    expect(listMutes(now + 31 * 60_000)).toEqual({});
+    mute(ALL, null, "root", now);
+    expect(mutedNow([], listMutes(now), "anything", new Date(now + 86_400_000 * 30))).toEqual({});
+    unmute(ALL, now);
+    unmute("infra.router", now);
+    expect(listMutes(now)).toEqual({});
+  });
+
+  it("holds back alerts while muted, and sends DOWN afterwards if still down", async () => {
+    const { alertDecision, evaluate } = await import("@/lib/alerts");
+    type S = Parameters<typeof evaluate>[0];
+    const sent: string[] = [];
+    let state: S = { failures: 0, down: false };
+    const check = (up: boolean, muted: boolean, now: number) => {
+      const e = evaluate(state, up, 2, now);
+      const d = alertDecision(state, e.state, e.event, muted);
+      state = d.state;
+      if (d.send) sent.push(d.send);
+    };
+    // Goes down during the window: nothing sent, also not for the recovery inside it.
+    check(false, true, 1);
+    check(false, true, 2);
+    expect(state).toMatchObject({ down: true, suppressed: true });
+    check(true, true, 3);
+    expect(sent).toEqual([]);
+    // Down again in the window, still down when it ends: DOWN then, UP on recovery.
+    check(false, true, 4);
+    check(false, true, 5);
+    check(false, false, 6);
+    expect(sent).toEqual(["down"]);
+    check(false, false, 7);
+    check(true, false, 8);
+    expect(sent).toEqual(["down", "up"]);
+    // Outside a window nothing changes: DOWN after the threshold, UP after.
+    check(false, false, 9);
+    check(false, false, 10);
+    check(true, false, 11);
+    expect(sent).toEqual(["down", "up", "down", "up"]);
+  });
+
+  it("records an outage that starts while muted as planned", async () => {
+    const { incidentsSince, openIncident } = await import("@/lib/db");
+    openIncident("infra.planned", 2000, "no response", true);
+    openIncident("infra.unplanned", 2000, "no response");
+    expect(incidentsSince("infra.planned", 0)[0].planned).toBe(1);
+    expect(incidentsSince("infra.unplanned", 0)[0].planned).toBe(0);
+  });
+});

@@ -8,7 +8,7 @@ const formats = ["text", "number", "percent", "bytes", "duration"] as const;
 const schema = z.object({
   url: z.string().url(),
   method: z.enum(["GET", "POST"]).default("GET"),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
   body: z.string().optional(),
   insecure: z.boolean().optional(),
   mappings: z
