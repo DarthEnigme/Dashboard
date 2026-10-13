@@ -56,7 +56,7 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
       const keys = await caches.keys();
       await Promise.all(keys.filter((k) => k.endsWith("-shell")).map((k) => caches.delete(k)));
     } catch {}
-    window.location.href = auth.publicView ? "/" : "/login";
+    window.location.href = auth.publicView ? "/" : "/login?local=1";
   };
 
   return (

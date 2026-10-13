@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { Readable } from "node:stream";
 import { NextResponse } from "next/server";
 import { requireAdmin, sameOrigin } from "@/lib/auth";
 import { audit } from "@/lib/auth/users";
@@ -17,8 +18,9 @@ export async function GET(_req: Request, { params }: Ctx) {
   const p = backupPath(name);
   if (!p) return NextResponse.json({ error: "No such backup" }, { status: 404 });
   audit(admin.username, "backup-download", { name });
-  return new Response(new Uint8Array(fs.readFileSync(p)), {
-    headers: { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "no-store" },
+  // Streamed from disk: a backup can be as large as the database.
+  return new Response(Readable.toWeb(fs.createReadStream(p)) as ReadableStream, {
+    headers: { "Content-Type": "application/zip", "Content-Length": String(fs.statSync(p).size), "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "no-store" },
   });
 }
 

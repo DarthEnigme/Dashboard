@@ -25,6 +25,8 @@ export interface StatusService {
   up: boolean | null;
   /** Alerts are held back (maintenance). */
   maintenance: boolean;
+  /** The public message of that maintenance, when one was written. */
+  note?: string;
   /** Over the whole period; null without checks. */
   uptime: number | null;
   days: StatusDay[];
@@ -35,6 +37,8 @@ export interface StatusIncident {
   start: number;
   end: number | null;
   planned: boolean;
+  /** The public message of the maintenance it began in. */
+  note?: string;
 }
 
 export interface StatusPageData {
@@ -46,14 +50,12 @@ export interface StatusPageData {
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
-/** Outages listed on the page. */
-const INCIDENT_DAYS = 14;
 
 /**
  * Which services the page shows: only ones with a status check. With `listed`, exactly those ids
  * (so a hidden service can be put on it on purpose); otherwise the ones anyone may see.
  */
-export function pickServices(groups: ServiceGroup[], listed?: string[]): { id: string; name: string; group: string }[] {
+export function pickServices(groups: ServiceGroup[], listed?: string[], names: Record<string, string> = {}): { id: string; name: string; group: string }[] {
   const ids = serviceIds(groups);
   const out: { id: string; name: string; group: string }[] = [];
   groups.forEach((g, gi) =>
@@ -61,7 +63,7 @@ export function pickServices(groups: ServiceGroup[], listed?: string[]): { id: s
       if (!checkSpec(s)) return;
       const id = ids[gi][si];
       const shown = listed?.length ? listed.includes(id) : serviceVisibility(g, s).every((v) => v === "public");
-      if (shown) out.push({ id, name: s.name, group: g.name });
+      if (shown) out.push({ id, name: names[id]?.trim() || s.name, group: g.name });
     }),
   );
   return out;
@@ -96,7 +98,7 @@ export function dailyUptime(rows: { hour: number; checks: number; up: number }[]
 
 export async function statusPageData(cfg: Settings["statusPage"], now = new Date()): Promise<StatusPageData> {
   const { services: groups, settings } = await getConfig();
-  const picked = pickServices(groups, cfg.services);
+  const picked = pickServices(groups, cfg.services, cfg.names);
   const days = lastDays(cfg.days, now);
   const since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (cfg.days - 1)).getTime();
   const hours = hourlyChecksSince(since, Math.floor(now.getTime() / HOUR) * HOUR - 3 * HOUR);
@@ -105,16 +107,19 @@ export async function statusPageData(cfg: Settings["statusPage"], now = new Date
 
   const services = picked.map((p): StatusService => {
     const last = latestPing(p.id);
+    const muted = mutedNow(settings.maintenance, mutes, p.id, now);
     return {
       name: p.name,
       group: p.group,
       up: last ? !!last.up : null,
-      maintenance: !!mutedNow(settings.maintenance, mutes, p.id, now),
+      maintenance: !!muted,
+      // Only the public message: the note for admins never leaves the dashboard.
+      note: muted?.publicNote,
       ...dailyUptime(hours.get(p.id) ?? [], days),
     };
   });
-  const incidents = incidentsOverlapping(now.getTime() - INCIDENT_DAYS * DAY)
+  const incidents = incidentsOverlapping(now.getTime() - cfg.incidentDays * DAY)
     .filter((i) => names.has(i.service_id))
-    .map((i) => ({ service: names.get(i.service_id)!, start: i.start, end: i.end, planned: !!i.planned }));
+    .map((i) => ({ service: names.get(i.service_id)!, start: i.start, end: i.end, planned: !!i.planned, note: i.public_note ?? undefined }));
   return { services, incidents, down: services.filter((s) => s.up === false).length, at: now.getTime() };
 }

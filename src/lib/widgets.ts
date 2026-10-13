@@ -4,6 +4,7 @@ import { toResult, type WidgetResult, type WidgetSpark } from "@/integrations/ty
 import type { Service } from "./config/schema";
 import { applyThresholds, widgetExtras } from "./thresholds";
 import { metricSeries, thin } from "./metrics";
+import { count, gauge } from "./stats";
 
 export class WidgetError extends Error {
   constructor(
@@ -32,7 +33,21 @@ export async function fetchWidget(id: string, service: Service): Promise<WidgetR
   }
   // Keyed on the config too, so edits take effect immediately.
   const key = `widget|${id}|${JSON.stringify(parsed.data)}`;
-  const result = await cached(key, TTL, async () => toResult(await integration.fetch(parsed.data, { serviceName: service.name })));
+  const result = await cached(key, TTL, async () => {
+    // Counted per real fetch (not per cached answer), for the Prometheus export.
+    const started = performance.now();
+    try {
+      const r = toResult(await integration.fetch(parsed.data, { serviceName: service.name }));
+      gauge("page_widget_fetch_ok", { service: id }, 1);
+      return r;
+    } catch (e) {
+      gauge("page_widget_fetch_ok", { service: id }, 0);
+      count("page_widget_fetch_errors_total", { service: id });
+      throw e;
+    } finally {
+      gauge("page_widget_fetch_duration_ms", { service: id }, Math.round(performance.now() - started));
+    }
+  });
   const extras = widgetExtras(service.widget);
   let out = applyThresholds(result, extras.thresholds);
   if (extras.record && !out.sparks?.length) out = { ...out, sparks: historySparks(id) };

@@ -9,6 +9,7 @@ import { fetchWidget } from "./widgets";
 import { describeRule, evaluateThreshold, numericValue, widgetExtras, type BreachState } from "./thresholds";
 import { insertMetrics, pruneMetrics, rollupMetrics } from "./metrics";
 import { RAW_RETENTION, rollupHour } from "./history";
+import { count, dropLabel, gauge } from "./stats";
 import { localDay } from "@/lib/day";
 
 const CONCURRENCY = 8;
@@ -169,7 +170,9 @@ async function tick(state: MonitorState): Promise<number> {
     const r = await runCheck(check);
     const now = r.at ?? Date.now();
     insertPing({ service_id: id, ts: now, up: r.up ? 1 : 0, status: r.status ?? null, latency_ms: r.latencyMs ?? null });
-    const muted = !!mutedNow(settings.maintenance, mutes, id, new Date(now));
+    count("page_checks_total", { result: r.up ? "up" : "down" });
+    const maintenance = mutedNow(settings.maintenance, mutes, id, new Date(now));
+    const muted = !!maintenance;
     if (r.cert) {
       state.certs.set(id, r.cert);
       if (!muted) await certNotice(settings, id, service, r.cert).catch((e) => console.warn(`[nanodash] certificate notice for ${service.name} failed:`, e));
@@ -181,7 +184,7 @@ async function tick(state: MonitorState): Promise<number> {
     // While muted (maintenance) an outage is recorded as planned and its alert held back.
     const { state: next, send } = alertDecision(prev, evaluated, event, muted);
     state.outages.set(id, next);
-    if (event?.kind === "down") openIncident(id, event.since, failureCause(r), muted);
+    if (event?.kind === "down") openIncident(id, event.since, failureCause(r), muted, maintenance);
     else if (event?.kind === "recovered") closeIncident(id, now);
 
     if (!send || !alertsOn || service.alert === false) return;
@@ -211,6 +214,9 @@ async function tick(state: MonitorState): Promise<number> {
     }
     for (const job of state.hourly) await job().catch((e) => console.error("[nanodash] hourly job failed:", e));
   }
+  gauge("page_monitor_pass_duration_ms", {}, Date.now() - started);
+  gauge("page_monitor_last_pass_timestamp_seconds", {}, Math.round(Date.now() / 1000));
+  dropLabel("service", new Set(ids.flat()));
   // Checks start every pingInterval, however long this pass took.
   return Math.max(1000, settings.pingInterval * 1000 - (Date.now() - started));
 }

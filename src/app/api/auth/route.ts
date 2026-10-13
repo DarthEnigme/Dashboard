@@ -9,6 +9,7 @@ import { SESSION_COOKIE, signToken } from "@/lib/auth/session";
 import { revokeSession, startSession } from "@/lib/auth/sessions";
 import { syncSsoGroups } from "@/lib/auth/groups";
 import * as users from "@/lib/auth/users";
+import { count } from "@/lib/stats";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export async function POST(req: Request) {
   if (!local?.hasPassword && !auth.ldap.enabled) await burnPasswordCheck(password);
   if (!user || user.disabled) {
     recordFailure(limitKey);
+    count("page_login_failures_total");
     recordFailure(userKey);
     users.audit(name, "login-failed", { method: local?.hasPassword ? "local" : auth.ldap.enabled ? "ldap" : "local" });
     return fail(user?.disabled ? "This account is disabled." : error);
@@ -76,6 +78,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ twoFactor: true, ticket });
   }
   users.audit(user.username, "login", { method });
+  count("page_logins_total");
   const res = NextResponse.json({ ok: true });
   await startSession(res, req, user.id, method, !!remember);
   return res;

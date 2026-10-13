@@ -54,7 +54,7 @@ export function ServiceCard({ service: s, settings, canAct }: Props) {
         </div>
         {s.ping && (
           <Link href={detail} className="relative z-10 rounded-full" title={t("Status details")}>
-            <StatusDot id={s.id} interval={settings.pingInterval} />
+            <StatusDot id={s.id} interval={settings.pingInterval} shared />
           </Link>
         )}
         {canAct && s.actions && <ActionMenu service={s} />}
@@ -64,7 +64,7 @@ export function ServiceCard({ service: s, settings, canAct }: Props) {
       )}
       {s.ping && (
         <Link href={detail} className="relative z-10 mt-auto block rounded-lg" aria-label={t("{name}: uptime details", { name: s.name })}>
-          <History id={s.id} detailed={big} />
+          <History id={s.id} detailed={big} interval={settings.pingInterval} />
         </Link>
       )}
     </div>

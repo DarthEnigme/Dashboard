@@ -446,6 +446,8 @@ maintenance:
   - { name: Backups, days: [sun], from: "03:00", to: "05:00", services: [infra.nas] }
 ```
 
+**Notes:** a mute can carry a note for admins ("replacing the PSU") and a separate message for the public status page; recurring windows take `note:` and `publicNote:`. The admin note shows on the bell, in the monitoring panel, on planned outages and in the audit log. Only the public message ever appears on `/status`.
+
 While a service is muted, there are no down/up alerts, threshold alerts or certificate notices for it, and its tile shows a crossed-out bell. If it is still down when the mute ends, the DOWN alert goes out then. Recovery is only announced for an outage that was.
 
 ### Public status page
@@ -458,9 +460,23 @@ statusPage:
   title: Homelab status     # default: "<title> status"
   services: [infra.nas]     # ids; default: every checked service that is visible to everyone
   days: 90                  # uptime bars, 7–90
+  logo: true                # settings.logo above the title
+  intro: "Services of the home lab."
+  announcement: "Network work tonight, 22:00–23:00."   # a notice at the top
+  announcementLevel: info   # info | warn
+  names: { infra.nas: "File storage" }   # another name for a service on this page
+  showGroups: true          # group headings
+  showUptime: true          # percentages
+  showBars: true            # one bar per day
+  showIncidents: true       # the list of outages…
+  incidentDays: 14          # …of this many days (1–90)
+  footer: "Questions: me@example.com"
+  dashboardLink: false      # a link to the dashboard
 ```
 
-It shows whether everything is up, each service's state with one bar per day of uptime, and the outages of the last 14 days ("planned" for maintenance). It never shows links, addresses, check targets, failure reasons or widget data. Services marked `visible: users`, `admins` or a group stay off it unless you list their ids.
+`intro`, `announcement` and `footer` take basic Markdown (bold, code, links, lists). All of this is also under **Settings → Pages**.
+
+It shows whether everything is up, each service's state with one bar per day of uptime, and recent outages ("planned" for maintenance, with the public message of that maintenance if you wrote one). It never shows links, addresses, check targets, failure reasons or widget data. Services marked `visible: users`, `admins` or a group stay off it unless you list their ids.
 
 ### Check types
 
@@ -516,6 +532,17 @@ NanoDash can be scraped by Prometheus (or Grafana Agent, VictoriaMetrics…) at 
 - `page_device_up` and `page_device_latency_ms` for every inventory device with an address, labelled `device` and `name`
 - `page_backup_last_ok`, `page_backup_last_run_timestamp_seconds` and `page_backup_last_size_bytes`
 - `page_update_available`, `page_users`, `page_sessions_active`, `page_database_size_bytes`, `page_process_uptime_seconds` and `page_process_resident_memory_bytes`
+- NanoDash's own work:
+  - widgets: `page_widget_fetch_ok`, `page_widget_fetch_duration_ms` and `page_widget_fetch_errors_total`, per `service`
+  - alerts: `page_alerts_sent_total` and `page_alerts_failed_total`, per `channel`
+  - checks: `page_checks_total{result}`, `page_monitor_pass_duration_ms`, `page_monitor_last_pass_timestamp_seconds`
+  - sign-ins: `page_logins_total`, `page_login_failures_total`
+  - `page_config_errors` (config files that failed to load)
+  - process: `page_process_cpu_seconds_total`, `page_nodejs_heap_used_bytes`, `page_nodejs_heap_total_bytes`, `page_nodejs_eventloop_lag_seconds`
+  - storage: `page_table_rows{table}`, `page_backups`, `page_backups_size_bytes`, `page_update_last_check_timestamp_seconds`
+- finance, only with `finance.exportMetrics: true` (personal data, readable by anyone with an API token or access to your Prometheus): `page_finance_account_balance{account, currency}`, `page_finance_month_income`, `page_finance_month_spending`, `page_finance_budget_used_ratio{category}`, `page_finance_goal_saved{goal}` and `page_finance_goal_target{goal}`
+
+The `_total` metrics are counters: they start again from zero when NanoDash restarts, so graph them with `rate()` or `increase()`.
 - `page_build_info{version}`
 
 It needs an API token: create one under **Settings → Monitoring & alerts → API tokens** (admins). The token is shown once, with a ready-made `scrape_configs` block; only its hash is stored, it stops working if its admin is disabled or demoted, and it can be revoked any time.
@@ -530,7 +557,7 @@ scrape_configs:
       - targets: ["page.example.com"]
 ```
 
-**Grafana dashboard:** import [`grafana/nanodash.json`](grafana/nanodash.json) (Dashboards → New → Import) and pick your Prometheus data source. It shows service status over time, response times, 24-hour uptime, certificates, outages (also as annotations), inventory devices, recorded widget values, and NanoDash's own backups, updates, memory and database size. It needs Grafana 10 or newer.
+**Grafana dashboard:** import [`grafana/nanodash.json`](grafana/nanodash.json) (Dashboards → New → Import) and pick your Prometheus data source. It shows service status over time, response times, 24-hour uptime, certificates, outages (also as annotations), inventory devices, recorded widget values, NanoDash's own backups, updates, memory and database size, its internals (widget fetches, alerts sent, checks, sign-ins, CPU) and, in a collapsed row, finance. It needs Grafana 10 or newer.
 
 ## Actions
 
@@ -573,6 +600,31 @@ NanoDash speaks English and French. `language: auto` (the default) follows each 
 
 Your own words stay as you wrote them (service, group and category names), and so do the values integrations report on tiles ("running", "CPU"…): thresholds and history use those labels as keys. To add a language, translate `src/i18n/fr.ts` into a new file; `npm test` checks that every text the UI shows has a translation (`node scripts/i18n-keys.mjs --missing` lists what's left).
 
+## Sign-in and error pages
+
+Under **Settings → Pages**, or in `settings.yaml`:
+
+```yaml
+login:
+  heading: "Welcome back"           # instead of "Sign in"
+  message: "Family and friends only."
+  footer: "Lost access? Ask Lucas."
+  background: https://…/wallpaper.jpg   # its own background (or upload one in the settings)
+  backLink: true                    # "Back to dashboard" (only when the dashboard is public)
+  passwordForm: true                # false: single sign-on buttons only
+  autoRedirect: authentik           # go straight to this provider
+errorPages:
+  logo: true
+  notFoundHeading: "Lost?"
+  notFoundMessage: "This corner of the lab is empty."
+  errorHeading: "Something went wrong"
+  errorMessage: "Try again in a minute."
+```
+
+- `autoRedirect` is skipped when the provider sends you back with an error, and `/login?local=1` always shows the sign-in page, so a broken provider can't lock you out. Signing out lands there too.
+- `passwordForm: false` is ignored while no single sign-on provider is set up.
+- Messages take basic Markdown.
+
 ## Settings page
 
 Admins open `/settings` from the gear next to the search box, or from the account menu. The page has:
@@ -614,7 +666,8 @@ A backup on the same disk as the data doesn't survive that disk: point `backup.d
 backup:
   enabled: true
   time: "03:00"     # server time
-  keep: 7
+  keep: 7            # the newest 7 stay; older ones are deleted
+  maxAgeDays: 30     # optional: also delete backups older than this (the newest always stays)
   dir: /backups     # optional; default data/backups
 ```
 
@@ -748,6 +801,7 @@ finance:
   currency: EUR                 # default currency for totals, charts and budgets (others are converted)
   fireflyService: money.firefly # optional: sync daily from this Firefly III widget's service
   budgetAlerts: over            # over: alert when a budget is used up; warn: also at 80%; off
+  exportMetrics: false          # true: balances, budgets and goals in the Prometheus export
 ```
 
 Budget alerts go to the same channels as service alerts, at most once per category, threshold and month. The webhook receives `{ kind: "budget", level, message, category, spentCents, budgetCents }`.

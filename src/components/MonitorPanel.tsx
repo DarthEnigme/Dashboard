@@ -144,6 +144,7 @@ export function MonitorPanel({ refreshSeconds, canMute }: { refreshSeconds: numb
                               {r.muted && <BellOff className="h-3.5 w-3.5 shrink-0 text-[var(--warn)]" aria-label={t("alerts muted")} />}
                             </span>
                             <span className="block truncate text-xs text-muted">
+                              {r.mutedNote ? <span className="text-[var(--warn)]">{r.mutedNote} · </span> : null}
                               {r.incident ? <span className="text-[var(--err)]">{t("down for")}{" "}{since(r.incident.since)}{r.incident.cause ? ` · ${r.incident.cause}` : ""}</span> : `${r.group} · ${r.check}`}
                             </span>
                           </span>

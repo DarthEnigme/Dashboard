@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { monitorEventLoopDelay, type IntervalHistogram } from "node:perf_hooks";
 import path from "node:path";
 import { getConfig } from "../config";
 import { serviceIds } from "../config/slug";
@@ -7,7 +8,16 @@ import { DATA_DIR, db, incidentCountsSince, latestPing, openIncidents, uptimeSin
 import { latestMetrics } from "../metrics";
 import { certFor } from "../monitor";
 import { listMutes, mutedNow } from "../maintenance";
-import { backupStatus } from "../backup";
+import { backupStatus, listBackups } from "../backup";
+import { cached } from "../cache";
+import { loadConfig } from "../config/load";
+import { localDay } from "../day";
+import { listAccounts, withBalances } from "../finance/accounts";
+import { summarize } from "../finance/aggregate";
+import { listGoals } from "../finance/goals";
+import { ratesForSummary } from "../finance/rates";
+import { allForSummary, listCategories } from "../finance/store";
+import { counters, gauges } from "../stats";
 import { deviceStatuses, listDevices } from "../inventory/store";
 import { savedStatus } from "../update/check";
 import { buildInfo } from "../version";
@@ -19,7 +29,7 @@ const labels = (l: Record<string, string>) => (Object.keys(l).length ? `{${Objec
 interface Family {
   name: string;
   help: string;
-  type: "gauge";
+  type: "gauge" | "counter";
   samples: { labels: Record<string, string>; value: number }[];
 }
 
@@ -35,6 +45,10 @@ export function renderMetrics(families: Family[]): string {
       .join("\n") + "\n"
   );
 }
+
+/** A family from what lib/stats.ts has counted or last seen under the same name. */
+const counted = (name: string, help: string): Family => ({ name, help, type: "counter", samples: counters(name) });
+const seen = (name: string, help: string): Family => ({ name, help, type: "gauge", samples: gauges(name) });
 
 /** One part of the export failing (no Docker socket, a missing table) must not empty the scrape. */
 async function part(what: string, fn: () => Family[] | Promise<Family[]>): Promise<Family[]> {
@@ -127,6 +141,90 @@ function instanceFamilies(now: number): Family[] {
   return out;
 }
 
+// Event-loop delay since the previous scrape; started with the first one.
+const g = globalThis as typeof globalThis & { __pageLoopDelay?: IntervalHistogram };
+function loopLagSeconds(): number {
+  if (!g.__pageLoopDelay) {
+    g.__pageLoopDelay = monitorEventLoopDelay({ resolution: 20 });
+    g.__pageLoopDelay.enable();
+    return 0;
+  }
+  const mean = g.__pageLoopDelay.mean / 1e9;
+  g.__pageLoopDelay.reset();
+  return Number.isFinite(mean) ? Math.round(mean * 1e6) / 1e6 : 0;
+}
+
+const TABLES = ["pings", "pings_hourly", "metrics", "metrics_hourly", "incidents", "audit", "sessions", "users", "config_versions", "fin_transactions", "devices"];
+
+/** How NanoDash itself is doing: its own work, its process, what it stores. */
+async function internalFamilies(): Promise<Family[]> {
+  const mem = process.memoryUsage();
+  const cpu = process.cpuUsage();
+  const backups = listBackups();
+  // Counting rows walks an index: fine every few minutes, wasteful on every scrape.
+  const rows = await cached("export|table-rows", 300_000, async () =>
+    TABLES.flatMap((table) => {
+      try {
+        return [{ labels: { table }, value: (db().prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n }];
+      } catch {
+        return []; // a table that isn't created until its feature is used
+      }
+    }),
+  );
+  const checked = savedStatus(loadConfig().settings.updates).checkedAt;
+  return [
+    seen("page_widget_fetch_ok", "1 when the widget's last fetch from its service worked, 0 when it failed."),
+    seen("page_widget_fetch_duration_ms", "How long the widget's last fetch took, in milliseconds."),
+    counted("page_widget_fetch_errors_total", "Widget fetches that failed."),
+    counted("page_alerts_sent_total", "Alerts and notices delivered, per channel."),
+    counted("page_alerts_failed_total", "Alerts and notices a channel did not accept (after one retry), per channel."),
+    counted("page_checks_total", "Status checks run, by result."),
+    seen("page_monitor_pass_duration_ms", "How long the last round of status checks took, in milliseconds."),
+    seen("page_monitor_last_pass_timestamp_seconds", "When the last round of status checks finished (Unix time)."),
+    counted("page_logins_total", "Successful sign-ins."),
+    counted("page_login_failures_total", "Failed sign-ins (wrong password or code)."),
+    single("page_config_errors", "Config files that could not be read or are not valid.", loadConfig().errors.length),
+    { name: "page_process_cpu_seconds_total", help: "CPU time this process has used, user and system.", type: "counter", samples: [{ labels: {}, value: Math.round((cpu.user + cpu.system) / 1e4) / 100 }] },
+    single("page_nodejs_heap_used_bytes", "JavaScript heap in use.", mem.heapUsed),
+    single("page_nodejs_heap_total_bytes", "JavaScript heap reserved.", mem.heapTotal),
+    single("page_nodejs_eventloop_lag_seconds", "Mean event-loop delay since the previous scrape.", loopLagSeconds()),
+    { name: "page_table_rows", help: "Rows per database table (refreshed every 5 minutes).", type: "gauge", samples: rows },
+    single("page_backups", "Backups on disk.", backups.length),
+    single("page_backups_size_bytes", "Total size of the backups on disk.", backups.reduce((n, b) => n + b.size, 0)),
+    ...(checked ? [single("page_update_last_check_timestamp_seconds", "When NanoDash last looked for a new version (Unix time).", Math.round(Date.parse(checked) / 1000))] : []),
+  ];
+}
+
+/** Personal finance, only when finance.exportMetrics is on. Amounts are in units of the currency, not cents. */
+async function financeFamilies(now: number): Promise<Family[]> {
+  const { finance } = loadConfig().settings;
+  if (!finance.exportMetrics) return [];
+  const currency = finance.currency.toUpperCase();
+  const today = localDay(new Date(now));
+  const accounts = listAccounts().filter((a) => !a.archived);
+  const rates = new Map<string, Record<string, number> | undefined>();
+  for (const c of new Set(accounts.map((a) => a.currency))) rates.set(c, (await ratesForSummary(c))?.rates);
+  const s = summarize(allForSummary(), listCategories(), today.slice(0, 7), currency, (await ratesForSummary(currency))?.rates);
+  const balance = family("page_finance_account_balance", "Balance of each account, in its own currency.");
+  for (const a of withBalances(accounts, (c) => rates.get(c), today)) balance.samples.push({ labels: { account: a.name, currency: a.currency }, value: a.balance / 100 });
+  const budget = family("page_finance_budget_used_ratio", "Share of each category's monthly budget spent so far this month (1 = used up).");
+  for (const b of s.budgets) budget.samples.push({ labels: { category: b.name }, value: b.budget ? Math.round((b.spent / b.budget) * 1000) / 1000 : 0 });
+  const saved = family("page_finance_goal_saved", "Put aside for each savings goal.");
+  const target = family("page_finance_goal_target", "Target of each savings goal.");
+  for (const goal of listGoals()) {
+    saved.samples.push({ labels: { goal: goal.name, currency: goal.currency }, value: goal.saved / 100 });
+    target.samples.push({ labels: { goal: goal.name, currency: goal.currency }, value: goal.target / 100 });
+  }
+  return [
+    balance,
+    { name: "page_finance_month_income", help: "Income so far this month, in the finance currency.", type: "gauge", samples: [{ labels: { currency }, value: s.income / 100 }] },
+    { name: "page_finance_month_spending", help: "Spending so far this month, in the finance currency.", type: "gauge", samples: [{ labels: { currency }, value: Math.abs(s.expense) / 100 }] },
+    budget,
+    saved,
+    target,
+  ];
+}
+
 /**
  * NanoDash's numbers for Prometheus: every checked service's state, latency, 24-hour uptime, certificate
  * and outages; inventory devices; the latest recorded widget values; backups, updates and the instance itself.
@@ -143,6 +241,8 @@ export async function collectMetrics(now = Date.now()): Promise<string> {
     ...(await part("backup", backupFamilies)),
     ...(await part("update", () => [single("page_update_available", "1 when a newer version than the running one is known.", savedStatus(settings.updates).available ? 1 : 0)])),
     ...(await part("instance", () => instanceFamilies(now))),
+    ...(await part("internals", internalFamilies)),
+    ...(await part("finance", () => financeFamilies(now))),
     info,
   ]);
 }

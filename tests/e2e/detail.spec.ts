@@ -90,9 +90,15 @@ test.describe.serial("service detail and actions", () => {
 test("an admin mutes a service's alerts and turns them back on", async ({ page }) => {
   await page.goto("/service/infra.portainer");
   await page.getByRole("button", { name: "Mute alerts for Portainer" }).click();
+  await page.getByLabel("Note for admins (optional)").fill("replacing the PSU");
+  await page.getByLabel("Message on the status page (optional)").fill("Hardware work");
   await page.getByRole("menuitem", { name: "30 minutes" }).click();
   const muted = page.getByRole("button", { name: /Alerts for Portainer are muted until .+\. Turn them back on/ });
   await expect(muted).toBeVisible();
+  // The note is in the bell's label, and in the monitoring panel's data for admins.
+  await expect(muted).toHaveAccessibleName(/replacing the PSU/);
+  const rows = (await (await page.request.get("/api/status")).json()) as { id: string; mutedNote?: string }[];
+  expect(rows.find((r) => r.id === "infra.portainer")?.mutedNote).toBe("replacing the PSU");
   // The check itself keeps running and reports the mute.
   await expect.poll(async () => (await (await page.request.get("/api/ping?id=infra.portainer")).json()).muted).toBe(true);
   expect((await (await page.request.get("/api/ping?id=infra.kuma")).json()).muted).toBe(false);

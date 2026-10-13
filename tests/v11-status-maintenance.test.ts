@@ -19,7 +19,7 @@ describe("public status page", () => {
   ]);
 
   it("is off by default", () => {
-    expect(settingsSchema.parse({}).statusPage).toEqual({ enabled: false, days: 90 });
+    expect(settingsSchema.parse({}).statusPage).toMatchObject({ enabled: false, days: 90, incidentDays: 14, logo: true, showUptime: true, showBars: true, showIncidents: true, showGroups: true, dashboardLink: false });
   });
 
   it("shows only checked services anyone may see, unless ids are listed", () => {
@@ -96,5 +96,60 @@ describe("maintenance API", () => {
     expect(settingsSchema.parse({}).maintenance).toEqual([]);
     expect(() => settingsSchema.parse({ maintenance: [{ from: "3am", to: "05:00" }] })).toThrow();
     expect(() => settingsSchema.parse({ maintenance: [{ from: "03:00", to: "05:00", days: ["sunday"] }] })).toThrow();
+  });
+});
+
+describe("tiles", () => {
+  it("finds each service's newest check and its half-hour slots in one pass", async () => {
+    const { bucketsSince, latestPings } = await import("@/lib/db");
+    db().exec("DELETE FROM pings;");
+    const from = 1_000_000_000;
+    const slot = 1_800_000;
+    const ping = (service_id: string, ts: number, up: number, latency_ms: number | null) => insertPing({ service_id, ts, up, status: up ? 200 : 500, latency_ms });
+    ping("t.a", from - 10, 1, 5); // before the window
+    ping("t.a", from + 10, 1, 10);
+    ping("t.a", from + 20, 1, 30);
+    ping("t.a", from + 30, 0, null);
+    ping("t.a", from + slot * 3 + 5, 1, 7);
+    ping("t.b", from + slot + 5, 0, null);
+
+    const rows = bucketsSince(from, slot);
+    expect(rows.get("t.a")!.get(0)).toEqual({ checks: 3, up: 2, avgMs: 20 });
+    expect(rows.get("t.a")!.get(3)).toEqual({ checks: 1, up: 1, avgMs: 7 });
+    expect(rows.get("t.a")!.has(1)).toBe(false);
+    expect(rows.get("t.b")!.get(1)).toEqual({ checks: 1, up: 0, avgMs: null });
+
+    const latest = latestPings(from);
+    expect(latest.get("t.a")).toMatchObject({ ts: from + slot * 3 + 5, up: 1 });
+    expect(latest.get("t.b")).toMatchObject({ up: 0 });
+    // Nothing recent enough: the tile checks for itself instead of showing a stale result.
+    expect(latestPings(from + slot * 10).size).toBe(0);
+  });
+
+  it("compiles a statement once and gives the same service ids for the same config", async () => {
+    const { serviceIds } = await import("@/lib/config/slug");
+    expect(db().prepare("SELECT 1 AS one")).toBe(db().prepare("SELECT 1 AS one"));
+    const groups = [{ name: "Infra", services: [{ name: "NAS" }, { name: "NAS" }] }];
+    expect(serviceIds(groups)).toEqual([["infra.nas", "infra.nas-2"]]);
+    expect(serviceIds(groups)).toBe(serviceIds(groups));
+  });
+});
+
+describe("zip written to disk", () => {
+  it("is byte for byte what the in-memory writer makes, for data and for files", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const { zip, zipToFile } = await import("@/lib/zip");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "page-zip-"));
+    // Larger than one read chunk, so the checksum is carried across chunks.
+    const big = Buffer.alloc(2_500_000, 7);
+    big.write("start", 0);
+    big.write("end", big.length - 3);
+    fs.writeFileSync(path.join(dir, "big.bin"), big);
+    const at = new Date(2026, 9, 9, 3, 0, 0);
+    zipToFile(path.join(dir, "out.zip"), [{ name: "a.txt", data: "héllo" }, { name: "data/big.bin", file: path.join(dir, "big.bin") }, { name: "empty", data: "" }], at);
+    const expected = zip([{ name: "a.txt", data: "héllo" }, { name: "data/big.bin", data: big }, { name: "empty", data: "" }], at);
+    expect(fs.readFileSync(path.join(dir, "out.zip")).equals(expected)).toBe(true);
   });
 });

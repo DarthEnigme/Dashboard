@@ -145,3 +145,70 @@ test.describe.serial("public status page", () => {
     }
   });
 });
+
+test.describe.serial("page customization", () => {
+  const withSettings = async (extra: string, run: () => Promise<void>) => {
+    const original = readConfig("settings");
+    writeConfig("settings", `${original.trimEnd()}\n${extra}`);
+    try {
+      await run();
+    } finally {
+      writeConfig("settings", original);
+    }
+  };
+
+  test("the sign-in page takes its own heading, texts and form choice", async ({ page }) => {
+    await withSettings('login:\n  heading: Welcome back\n  message: "Family and **friends** only."\n  footer: "Lost access? Ask Lucas."\n  passwordForm: false\n  backLink: false\n', async () => {
+      await page.goto("/login");
+      await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+      await expect(page.getByText("Family and friends only.")).toBeVisible();
+      await expect(page.getByText("Lost access? Ask Lucas.")).toBeVisible();
+      await expect(page.getByLabel("Username")).toBeHidden();
+      await expect(page.getByRole("link", { name: /Continue with Mock SSO/ })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Back to dashboard" })).toBeHidden();
+      await shot(page, "97-login-custom", { fullPage: false });
+    });
+  });
+
+  test("auto-redirect goes to the provider, and both ways around it still show the page", async ({ page }) => {
+    await withSettings("login:\n  autoRedirect: mock\n", async () => {
+      // Asked for on purpose: no redirect.
+      await page.goto("/login?local=1");
+      await expect(page.getByLabel("Username")).toBeVisible();
+      await expect(page).toHaveURL(/\/login\?local=1$/);
+      // Otherwise straight to the provider, which refuses this stranger: the page comes back with the reason instead of looping.
+      await ssoAs(page, "stranger@example.com");
+      await page.goto("/login");
+      await expect(page).toHaveURL(/\/login\?error=/);
+      await expect(page.getByRole("main").getByRole("alert")).toContainText("No NanoDash account");
+    });
+  });
+
+  test("the status page shows what it is told to", async ({ page }) => {
+    await withSettings(
+      'statusPage:\n  enabled: true\n  intro: "Services of the home lab."\n  announcement: "Network work tonight."\n  announcementLevel: warn\n  names: { infra.portainer: "Containers" }\n  showBars: false\n  showGroups: false\n  showIncidents: false\n  footer: "Questions: me@example.com"\n  dashboardLink: true\n',
+      async () => {
+        await page.goto("/status");
+        await expect(page.getByText("Services of the home lab.")).toBeVisible();
+        await expect(page.getByRole("region", { name: "Announcement" })).toContainText("Network work tonight.");
+        await expect(page.getByText("Containers", { exact: true })).toBeVisible();
+        await expect(page.getByText("Portainer", { exact: true })).toBeHidden();
+        await expect(page.getByRole("img", { name: /Uptime over the last/ })).toHaveCount(0);
+        await expect(page.getByRole("heading", { name: "Infra" })).toBeHidden();
+        await expect(page.getByText(/Outages in the last/)).toBeHidden();
+        await expect(page.getByText("Questions: me@example.com")).toBeVisible();
+        await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible();
+        await shot(page, "98-status-custom");
+      },
+    );
+  });
+
+  test("the not-found page takes its own words", async ({ page }) => {
+    await withSettings('errorPages:\n  notFoundHeading: Lost?\n  notFoundMessage: "This corner of the lab is empty."\n', async () => {
+      const res = await page.goto("/nope/nowhere");
+      expect(res?.status()).toBe(404);
+      await expect(page.getByRole("heading", { name: "Lost?" })).toBeVisible();
+      await expect(page.getByText("This corner of the lab is empty.")).toBeVisible();
+    });
+  });
+});

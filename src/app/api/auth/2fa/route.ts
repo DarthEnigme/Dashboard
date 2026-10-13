@@ -5,6 +5,7 @@ import { verifyToken } from "@/lib/auth/session";
 import { startSession } from "@/lib/auth/sessions";
 import { matchTotpStep, openSecret, spendRecoveryCode } from "@/lib/auth/totp";
 import * as users from "@/lib/auth/users";
+import { count } from "@/lib/stats";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +37,12 @@ export async function POST(req: Request) {
   }
   if (!ok) {
     recordFailure(limitKey);
+    count("page_login_failures_total");
     users.audit(user.username, "login-failed", { method: "2fa" });
     return fail("Wrong code");
   }
   clearFailures(limitKey);
+  count("page_logins_total");
   if (!usedRecovery) users.setTotpStep(user.id, step!);
   const method = typeof claims.method === "string" ? claims.method : "password";
   users.audit(user.username, "login", { method, twoFactor: usedRecovery ? "recovery-code" : "totp" });

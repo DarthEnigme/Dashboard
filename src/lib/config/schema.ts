@@ -176,6 +176,8 @@ export const settingsSchema = z
           .default("03:00"),
         /** How many backups to keep. */
         keep: z.number().int().min(1).max(365).default(7),
+        /** Also delete backups older than this many days (the newest one always stays). */
+        maxAgeDays: z.number().int().min(1).max(3650).optional(),
         /** Folder for the zips (another disk or a network share); default data/backups. */
         dir: z.string().optional(),
       })
@@ -236,6 +238,8 @@ export const settingsSchema = z
         fireflyService: z.string().optional(),
         /** Alert when a category's monthly budget is used up ("over"), also at 80% ("warn"), or never. */
         budgetAlerts: z.enum(["off", "over", "warn"]).default("over"),
+        /** Put balances, budgets and goals in the Prometheus export (personal data: off unless asked for). */
+        exportMetrics: z.boolean().default(false),
       })
       .prefault({}),
     /**
@@ -250,6 +254,9 @@ export const settingsSchema = z
           from: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM"),
           to: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM"),
           services: z.array(z.string()).optional(),
+          /** Why, for admins; and what visitors of the status page may read. */
+          note: z.string().max(200).optional(),
+          publicNote: z.string().max(200).optional(),
         }),
       )
       .default([]),
@@ -262,6 +269,54 @@ export const settingsSchema = z
         services: z.array(z.string()).optional(),
         /** Days of uptime bars (hourly history is kept history.retentionDays). */
         days: z.number().int().min(7).max(90).default(90),
+        /** Show settings.logo above the title. */
+        logo: z.boolean().default(true),
+        /** A few words under the title (basic Markdown). */
+        intro: z.string().optional(),
+        /** A notice at the top, e.g. planned work tonight; `announcementLevel` picks its colour. */
+        announcement: z.string().optional(),
+        announcementLevel: z.enum(["info", "warn"]).default("info"),
+        /** What each service shows. */
+        showUptime: z.boolean().default(true),
+        showBars: z.boolean().default(true),
+        showIncidents: z.boolean().default(true),
+        showGroups: z.boolean().default(true),
+        /** How far back the outage list goes. */
+        incidentDays: z.number().int().min(1).max(90).default(14),
+        /** Another name for a service on this page, by service id. */
+        names: z.record(z.string(), z.string()).optional(),
+        /** A line at the bottom (basic Markdown). */
+        footer: z.string().optional(),
+        /** A link to the dashboard in the corner. */
+        dashboardLink: z.boolean().default(false),
+      })
+      .prefault({}),
+    /** The sign-in page. */
+    login: z
+      .object({
+        /** Instead of "Sign in". */
+        heading: z.string().optional(),
+        /** Under the heading, and at the bottom of the card (basic Markdown). */
+        message: z.string().optional(),
+        footer: z.string().optional(),
+        /** Its own wallpaper (a URL or an uploaded image); default: the dashboard's background. */
+        background: z.string().optional(),
+        /** The "Back to dashboard" link (only shown when the dashboard is public anyway). */
+        backLink: z.boolean().default(true),
+        /** false: only the single sign-on buttons (ignored while no provider is set up). */
+        passwordForm: z.boolean().default(true),
+        /** Go straight to this provider (its id). /login?local=1 still shows the page. */
+        autoRedirect: z.string().optional(),
+      })
+      .prefault({}),
+    /** Texts of the not-found and error pages; empty keeps the built-in ones. */
+    errorPages: z
+      .object({
+        logo: z.boolean().default(true),
+        notFoundHeading: z.string().optional(),
+        notFoundMessage: z.string().optional(),
+        errorHeading: z.string().optional(),
+        errorMessage: z.string().optional(),
       })
       .prefault({}),
     updates: z

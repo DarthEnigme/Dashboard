@@ -1,6 +1,7 @@
 import { http } from "./http";
 import type { Settings } from "./config/schema";
 import { duration } from "@/integrations/format";
+import { count } from "./stats";
 
 export interface AlertState {
   failures: number;
@@ -183,6 +184,12 @@ async function deliver(
 ): Promise<string[]> {
   const errors: string[] = [];
   const title = senderName(cfg);
+  // Counted per channel for the Prometheus export.
+  const sent = (channel: string) => count("page_alerts_sent_total", { channel });
+  const failed = (channel: string, why: string) => {
+    count("page_alerts_failed_total", { channel });
+    errors.push(`${channel}: ${why}`);
+  };
   const post = async (name: string, target: string, body: unknown, headers: Record<string, string> = { "Content-Type": "application/json" }) => {
     // One more try after a short wait when the channel is unreachable, busy (429) or failing (5xx).
     for (let attempt = 0; ; attempt++) {
@@ -196,14 +203,14 @@ async function deliver(
           timeoutMs: 8000,
         });
         await res.body?.cancel();
-        if (res.ok) return;
+        if (res.ok) return sent(name);
         error = `HTTP ${res.status}`;
         retry = res.status === 429 || res.status >= 500;
       } catch (e) {
         error = (e as Error).message;
       }
       if (!retry || attempt >= 1) {
-        errors.push(`${name}: ${error}`);
+        failed(name, error);
         return;
       }
       await new Promise((r) => setTimeout(r, RETRY_MS));
@@ -254,7 +261,7 @@ async function deliver(
     }
   }
   if (cfg.email?.host) {
-    jobs.push(sendEmail(cfg.email, title, text, url, level).catch((e) => void errors.push(`Email: ${(e as Error).message}`)));
+    jobs.push(sendEmail(cfg.email, title, text, url, level).then(() => sent("Email"), (e) => failed("Email", (e as Error).message)));
   }
   if (cfg.pushoverToken && cfg.pushoverUser) {
     const form = new URLSearchParams({ token: cfg.pushoverToken, user: cfg.pushoverUser, title, message: text, priority: String(PRIORITY.pushover[level]) });
@@ -275,9 +282,10 @@ async function deliver(
             timeoutMs: 8000,
           });
           await res.body?.cancel();
-          if (!res.ok) errors.push(`Matrix: HTTP ${res.status}`);
+          if (res.ok) sent("Matrix");
+          else failed("Matrix", `HTTP ${res.status}`);
         } catch (e) {
-          errors.push(`Matrix: ${(e as Error).message}`);
+          failed("Matrix", (e as Error).message);
         }
       })(),
     );

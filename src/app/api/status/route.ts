@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getConfig } from "@/lib/config";
 import { serviceIds } from "@/lib/config/slug";
 import { serviceVisibility } from "@/lib/config/sanitize";
-import { seeFilter } from "@/lib/auth";
+import { seeFilter, viewer } from "@/lib/auth";
 import { checkSpec, describeCheck } from "@/lib/checks";
 import { latestPing, openIncidents, uptimeSince } from "@/lib/db";
 import { certFor } from "@/lib/monitor";
@@ -28,6 +28,8 @@ export interface StatusRow {
   certDaysLeft: number | null;
   /** Alerts are held back right now (maintenance window or a one-off mute). */
   muted: boolean;
+  /** Admins only: why (the note on the mute or window). */
+  mutedNote?: string;
 }
 
 /** Every monitored service this viewer can see, for the monitoring panel. */
@@ -40,6 +42,7 @@ export async function GET() {
   const rows: StatusRow[] = [];
   const mutes = listMutes();
   const now = new Date();
+  const admin = (await viewer()).role === "admin";
   cfg.services.forEach((g, gi) => {
     g.services.forEach((s, si) => {
       const check = checkSpec(s);
@@ -48,6 +51,7 @@ export async function GET() {
       const last = latestPing(id);
       const checks = day.get(id);
       const inc = open.get(id);
+      const muted = mutedNow(cfg.settings.maintenance, mutes, id, now);
       rows.push({
         id,
         name: s.name,
@@ -61,7 +65,8 @@ export async function GET() {
         uptime: checks?.checks ? checks.up / checks.checks : null,
         incident: inc ? { since: inc.start, cause: inc.cause } : null,
         certDaysLeft: certFor(id)?.daysLeft ?? null,
-        muted: !!mutedNow(cfg.settings.maintenance, mutes, id, now),
+        muted: !!muted,
+        mutedNote: admin ? muted?.note : undefined,
       });
     });
   });

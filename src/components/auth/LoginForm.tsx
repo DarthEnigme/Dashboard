@@ -7,6 +7,7 @@ import { sendJson } from "@/lib/fetcher";
 import type { ClientAuth } from "@/lib/auth";
 import { Icon } from "../Icon";
 import { inputClass } from "../edit/FieldInput";
+import { Markdown } from "../settings/Markdown";
 import { useT } from "@/i18n/client";
 
 const providerIcon = (type: string) => (type === "google" ? "si-google" : type === "github" ? "si-github" : undefined);
@@ -17,9 +18,14 @@ interface Props {
   methods: ClientAuth["methods"];
   error?: string;
   canGoBack: boolean;
+  /** From settings.login: own heading, texts under it and at the bottom, and whether to show the password form. */
+  heading?: string;
+  message?: string;
+  footer?: string;
+  passwordForm?: boolean;
 }
 
-export function LoginForm({ title, logo, methods, error: initialError, canGoBack }: Props) {
+export function LoginForm({ title, logo, methods, error: initialError, canGoBack, heading, message, footer, passwordForm = true }: Props) {
   const t = useT();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -29,7 +35,8 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
   const [code, setCode] = useState("");
   const [error, setError] = useState(initialError);
   const [busy, setBusy] = useState(false);
-  const passwordLogin = methods.local || methods.ldap;
+  // Hidden on request, but never when it is the only way in.
+  const passwordLogin = (methods.local || methods.ldap) && (passwordForm || !methods.providers.length);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -60,8 +67,15 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
         // eslint-disable-next-line @next/next/no-img-element
         <img src={logo} alt="" className="mb-4 h-14 w-14 rounded-2xl object-contain" />
       )}
-      <h1 className="text-2xl font-bold tracking-tight">{t("Sign in")}</h1>
-      <p className="mb-6 text-sm text-muted">{t("to")}{" "}{title}</p>
+      <h1 className="text-2xl font-bold tracking-tight">{heading?.trim() || t("Sign in")}</h1>
+      {!heading?.trim() && !message?.trim() && <p className="mb-6 text-sm text-muted">{t("to")}{" "}{title}</p>}
+      {message?.trim() ? (
+        <div className="mt-1 mb-6 flex flex-col gap-1 text-sm text-muted">
+          <Markdown text={message} />
+        </div>
+      ) : (
+        heading?.trim() && <div className="mb-6" />
+      )}
 
       {error && (
         <p role="alert" className="mb-4 rounded-xl bg-[var(--err)]/15 px-3 py-2 text-sm text-[var(--err)]">
@@ -162,6 +176,12 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
 
       {!passwordLogin && !methods.providers.length && (
         <p className="text-sm text-muted">{t("No login method is enabled. Configure one under auth: in settings.yaml.")}</p>
+      )}
+
+      {footer?.trim() && (
+        <div className="mt-6 flex flex-col gap-1 border-t border-line pt-4 text-xs text-muted">
+          <Markdown text={footer} />
+        </div>
       )}
 
       {canGoBack && (

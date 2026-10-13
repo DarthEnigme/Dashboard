@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { hoursSince, incidentsSince, pingsSince } from "@/lib/db";
 import { findService } from "@/lib/config/lookup";
-import { seeFilter } from "@/lib/auth";
+import { seeFilter, viewer } from "@/lib/auth";
 import { bucketize, bucketizeHourly, overallUptime, percentile, ranges, usesRollups, type Range } from "@/lib/history";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       p95Latency: p95 === null ? null : Math.round(p95),
       buckets,
     };
-    if (q.get("incidents") === "1") body.incidents = incidentsSince(id, from);
+    if (q.get("incidents") === "1") {
+      // Maintenance notes are written for admins.
+      const admin = (await viewer()).role === "admin";
+      body.incidents = incidentsSince(id, from).map((i) => (admin ? i : { ...i, note: null }));
+    }
     return NextResponse.json(body);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

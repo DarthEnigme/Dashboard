@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 export const DATA_DIR = process.env.HOMEPAGE_DATA_DIR ?? path.join(/* turbopackIgnore: true */ process.cwd(), "data");
 
@@ -261,9 +261,25 @@ export function db(): DatabaseSync {
     addColumn(d, "users", "totp_recovery TEXT");
     addColumn(d, "users", "totp_last_step INTEGER");
     addColumn(d, "incidents", "planned INTEGER NOT NULL DEFAULT 0");
+    addColumn(d, "incidents", "note TEXT");
+    addColumn(d, "incidents", "public_note TEXT");
     // Both halves of a transfer between own accounts share this id (left out of income and spending).
     addColumn(d, "fin_transactions", "transfer_id TEXT");
     d.exec("PRAGMA foreign_keys = ON;");
+    // Compile each SQL text once: most statements run on every check or every request.
+    // (After the schema is in place: a statement compiled earlier would not see new columns.)
+    const compile = d.prepare.bind(d);
+    const statements = new Map<string, StatementSync>();
+    d.prepare = (sql: string) => {
+      let s = statements.get(sql);
+      if (!s) {
+        // Texts built from variable parts (column lists) are few; a runaway would still be bounded.
+        if (statements.size >= 500) statements.clear();
+        s = compile(sql);
+        statements.set(sql, s);
+      }
+      return s;
+    };
     g.__pageDb = d;
   }
   return g.__pageDb;
@@ -312,6 +328,31 @@ export function uptimeSince(since: number): Map<string, { checks: number; up: nu
     up: number;
   }[];
   return new Map(rows.map((r) => [r.service_id, { checks: r.checks, up: r.up }]));
+}
+
+/** The newest check of every service, among those made since `since`. */
+export function latestPings(since: number): Map<string, PingRow> {
+  const rows = db()
+    .prepare("SELECT p.* FROM pings p JOIN (SELECT service_id, MAX(ts) AS ts FROM pings WHERE ts >= ? GROUP BY service_id) m ON m.service_id = p.service_id AND m.ts = p.ts")
+    .all(since) as unknown as PingRow[];
+  return new Map(rows.map((r) => [r.service_id, r]));
+}
+
+/** Checks since `since` in slots of `sizeMs`, per service and slot number: counts, and the average latency of the ones that passed. */
+export function bucketsSince(since: number, sizeMs: number): Map<string, Map<number, { checks: number; up: number; avgMs: number | null }>> {
+  const rows = db()
+    .prepare(
+      `SELECT service_id, CAST((ts - ?) / ? AS INTEGER) AS slot, COUNT(*) AS checks, SUM(up) AS up, AVG(CASE WHEN up = 1 THEN latency_ms END) AS avgMs
+       FROM pings WHERE ts >= ? GROUP BY service_id, slot`,
+    )
+    .all(since, sizeMs, since) as unknown as { service_id: string; slot: number; checks: number; up: number; avgMs: number | null }[];
+  const out = new Map<string, Map<number, { checks: number; up: number; avgMs: number | null }>>();
+  for (const { service_id, slot, ...r } of rows) {
+    let m = out.get(service_id);
+    if (!m) out.set(service_id, (m = new Map()));
+    m.set(slot, r);
+  }
+  return out;
 }
 
 export function pingsSince(serviceId: string, since: number): PingRow[] {
@@ -372,10 +413,15 @@ export interface IncidentRow {
   cause: string | null;
   /** 1 when it began while the service's alerts were muted (maintenance). */
   planned: number;
+  /** Planned outages: the maintenance note for admins, and the one for the status page. */
+  note: string | null;
+  public_note: string | null;
 }
 
-export function openIncident(serviceId: string, start: number, cause: string | null, planned = false) {
-  db().prepare("INSERT INTO incidents (service_id, start, cause, planned) VALUES (?, ?, ?, ?)").run(serviceId, start, cause, planned ? 1 : 0);
+export function openIncident(serviceId: string, start: number, cause: string | null, planned = false, notes: { note?: string; publicNote?: string } = {}) {
+  db()
+    .prepare("INSERT INTO incidents (service_id, start, cause, planned, note, public_note) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(serviceId, start, cause, planned ? 1 : 0, notes.note ?? null, notes.publicNote ?? null);
 }
 
 export function closeIncident(serviceId: string, end: number) {

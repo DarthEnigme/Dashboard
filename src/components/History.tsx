@@ -6,9 +6,10 @@ import { fetcher } from "@/lib/fetcher";
 import type { Bucket } from "@/lib/history";
 import { formatLocale } from "@/i18n/format";
 import { useT } from "@/i18n/client";
+import { TILES } from "./StatusDot";
 
 interface HistoryResponse {
-  range: string;
+  range?: string;
   uptime: number | null;
   buckets: Bucket[];
 }
@@ -18,13 +19,17 @@ const barColor = (u: number | null) =>
 
 const time = (ts: number) => new Date(ts).toLocaleTimeString(formatLocale(), { hour: "2-digit", minute: "2-digit" });
 
-/** Uptime bars for the last 24h; `detailed` adds a latency line and the overall uptime. */
-export function History({ id, detailed }: { id: string; detailed?: boolean }) {
+/**
+ * Uptime bars for the last 24h; `detailed` adds a latency line and the overall uptime. With `interval`
+ * (dashboard tiles) the bars come from the /api/tiles answer the status lights already fetch.
+ */
+export function History({ id, detailed, interval }: { id: string; detailed?: boolean; interval?: number }) {
   const t = useT();
-  const { data } = useSWR<HistoryResponse>(`/api/history/${encodeURIComponent(id)}?range=24h`, fetcher, {
-    refreshInterval: 60_000,
+  const { data: answer } = useSWR<HistoryResponse | Record<string, { history: HistoryResponse }>>(interval ? TILES : `/api/history/${encodeURIComponent(id)}?range=24h`, fetcher, {
+    refreshInterval: interval ? interval * 1000 : 60_000,
     revalidateOnFocus: false,
   });
+  const data = interval ? (answer as Record<string, { history: HistoryResponse }> | undefined)?.[id]?.history : (answer as HistoryResponse | undefined);
   const buckets = data?.buckets ?? [];
   if (!buckets.length) return <div className="h-5" />;
 

@@ -4,7 +4,7 @@ import { CONFIG_DIR, loadConfig } from "./config/load";
 import { configFiles, type Settings } from "./config/schema";
 import { DATA_DIR, db, getAppMeta, setAppMeta } from "./db";
 import { hasAlertChannel, sendNotice } from "./alerts";
-import { zip } from "./zip";
+import { zipToFile } from "./zip";
 
 /** page-backup-2026-10-09-0300.zip */
 const NAME = /^page-backup-\d{4}-\d{2}-\d{2}-\d{4}(-\d+)?\.zip$/;
@@ -55,15 +55,16 @@ export function createBackup(by: string, now = new Date()): BackupInfo {
   const snapshot = path.join(dir, `.snapshot-${process.pid}-${now.getTime()}.db`);
   try {
     db().exec(`VACUUM INTO '${snapshot.replace(/'/g, "''")}'`);
-    const files: { name: string; data: Uint8Array }[] = [];
+    // Files are copied into the zip in chunks: the database can be large, memory use stays flat.
+    const files: Parameters<typeof zipToFile>[1] = [];
     for (const f of Object.keys(configFiles)) {
       const p = path.join(CONFIG_DIR, `${f}.yaml`);
-      if (fs.existsSync(p)) files.push({ name: `config/${f}.yaml`, data: fs.readFileSync(p) });
+      if (fs.existsSync(p)) files.push({ name: `config/${f}.yaml`, file: p });
     }
-    files.push({ name: "data/page.db", data: fs.readFileSync(snapshot) });
+    files.push({ name: "data/page.db", file: snapshot });
     const key = path.join(DATA_DIR, "secret.key");
-    if (fs.existsSync(key)) files.push({ name: "data/secret.key", data: fs.readFileSync(key) });
-    for (const rel of walk(path.join(DATA_DIR, "uploads"))) files.push({ name: `data/uploads/${rel}`, data: fs.readFileSync(path.join(DATA_DIR, "uploads", rel)) });
+    if (fs.existsSync(key)) files.push({ name: "data/secret.key", file: key });
+    for (const rel of walk(path.join(DATA_DIR, "uploads"))) files.push({ name: `data/uploads/${rel}`, file: path.join(DATA_DIR, "uploads", rel) });
     files.push({
       name: "README.txt",
       data: Buffer.from(
@@ -72,9 +73,9 @@ export function createBackup(by: string, now = new Date()): BackupInfo {
     });
     const out = path.join(dir, name);
     // Write then rename, so a half-written zip never looks like a backup.
-    fs.writeFileSync(`${out}.part`, zip(files, now));
+    zipToFile(`${out}.part`, files, now);
     fs.renameSync(`${out}.part`, out);
-    prune(dir, cfg.keep);
+    prune(dir, cfg.keep, cfg.maxAgeDays, now.getTime());
     return { name, size: fs.statSync(out).size, at: now.getTime() };
   } finally {
     fs.rmSync(snapshot, { force: true });
@@ -94,9 +95,11 @@ export function listBackups(dir = backupDir()): BackupInfo[] {
     .sort((a, b) => b.at - a.at || b.name.localeCompare(a.name));
 }
 
-/** Keep the newest `keep` backups. */
-export function prune(dir: string, keep: number) {
-  for (const b of listBackups(dir).slice(keep)) fs.rmSync(path.join(dir, b.name), { force: true });
+/** Keep the newest `keep` backups; with `maxAgeDays`, also drop older ones than that (never the newest). */
+export function prune(dir: string, keep: number, maxAgeDays?: number, now = Date.now()) {
+  const all = listBackups(dir);
+  const tooOld = (b: BackupInfo) => maxAgeDays !== undefined && now - b.at > maxAgeDays * 86_400_000;
+  for (const b of all.filter((b, i) => i >= keep || (i > 0 && tooOld(b)))) fs.rmSync(path.join(dir, b.name), { force: true });
 }
 
 /** The file for a backup name, or undefined when the name isn't one of ours (no path tricks). */

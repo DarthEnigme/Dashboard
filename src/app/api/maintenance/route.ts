@@ -24,18 +24,20 @@ export async function GET() {
   return NextResponse.json(state());
 }
 
-/** { service: an id or "*" for everything, minutes: 1–10080 or null (until turned back on) } */
+/** { service: an id or "*" for everything, minutes: 1–10080 or null (until turned back on), note?, publicNote? (200 characters each) } */
 export async function POST(req: Request) {
   const admin = await requireAdmin();
   if (!admin) return forbidden();
   if (!sameOrigin(req)) return bad("Cross-site request refused", 403);
-  const b = ((await req.json().catch(() => ({}))) ?? {}) as { service?: unknown; minutes?: unknown };
+  const b = ((await req.json().catch(() => ({}))) ?? {}) as { service?: unknown; minutes?: unknown; note?: unknown; publicNote?: unknown };
   if (typeof b.service !== "string" || !b.service) return bad("service required");
   if (b.service !== ALL && !(await findService(b.service))) return bad("No such service", 404);
   const forMinutes = b.minutes === null || b.minutes === undefined ? null : Number(b.minutes);
   if (forMinutes !== null && !(Number.isInteger(forMinutes) && forMinutes >= 1 && forMinutes <= MAX_MINUTES)) return bad("minutes must be 1–10080, or null");
-  mute(b.service, forMinutes, admin.username);
-  audit(admin.username, "alerts-mute", { service: b.service, minutes: forMinutes });
+  const note = typeof b.note === "string" ? b.note : undefined;
+  const publicNote = typeof b.publicNote === "string" ? b.publicNote : undefined;
+  mute(b.service, forMinutes, admin.username, Date.now(), { note, publicNote });
+  audit(admin.username, "alerts-mute", { service: b.service, minutes: forMinutes, note: note?.trim() || undefined, publicNote: publicNote?.trim() || undefined });
   return NextResponse.json(state(), { status: 201 });
 }
 

@@ -7,13 +7,22 @@ import type { PingResult } from "@/lib/checks";
 import { useT } from "@/i18n/client";
 
 const SLOW_MS = 1000;
+/** Shared by every tile's status light and uptime bars. */
+export const TILES = "/api/tiles";
 
-export function StatusDot({ id, interval }: { id: string; interval: number }) {
+type Ping = PingResult & { certWarn?: boolean; muted?: boolean };
+
+/**
+ * A service's status light. On the dashboard (`shared`) every tile reads the same /api/tiles answer,
+ * one request for all of them; alone on a service page it asks /api/ping for itself.
+ */
+export function StatusDot({ id, interval, shared }: { id: string; interval: number; shared?: boolean }) {
   const t = useT();
-  const { data, error } = useSWR<PingResult & { certWarn?: boolean; muted?: boolean }>(`/api/ping?id=${encodeURIComponent(id)}`, fetcher, {
+  const { data: answer, error } = useSWR<Ping | Record<string, { ping: Ping }>>(shared ? TILES : `/api/ping?id=${encodeURIComponent(id)}`, fetcher, {
     refreshInterval: interval * 1000,
     revalidateOnFocus: false,
   });
+  const data = shared ? (answer as Record<string, { ping: Ping }> | undefined)?.[id]?.ping : (answer as Ping | undefined);
 
   let color = "bg-muted/50";
   let label = t("Checking…");

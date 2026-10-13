@@ -166,6 +166,7 @@ export function ServiceDetail({ service: s, group, settings, canAct, canMute }: 
                       {i.end === null ? t("for {time}", { time: duration((Date.now() - i.start) / 1000) }) : t("lasted {time}", { time: duration((i.end - i.start) / 1000) })}
                     </span>
                     {i.cause && <span className="ml-auto text-xs text-muted">{i.cause}</span>}
+                    {(i.note || i.public_note) && <span className="w-full text-xs text-muted">{[i.note, i.public_note].filter(Boolean).join(" · ")}</span>}
                   </li>
                 ))}
               </ol>

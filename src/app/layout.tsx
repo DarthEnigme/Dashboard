@@ -6,6 +6,7 @@ import { buildInfo } from "@/lib/version";
 import { fontFamily } from "@/lib/fonts";
 import { getLocale } from "@/i18n/server";
 import { I18nProvider } from "@/i18n/client";
+import { BrandingProvider } from "@/components/Branding";
 import { iconVersion } from "@/lib/logo";
 import { PwaRegister } from "@/components/PwaRegister";
 import { PointerLight } from "@/components/PointerLight";
@@ -50,7 +51,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <style id="page-palette">{paletteCss(look.palette)}</style>
         <I18nProvider locale={locale}>
           <PointerLight />
-          {children}
+          <BrandingProvider value={{ logo: settings.errorPages.logo ? settings.logo : undefined, errorHeading: settings.errorPages.errorHeading, errorMessage: settings.errorPages.errorMessage }}>
+            {children}
+          </BrandingProvider>
           <PaletteLauncher />
           <PwaRegister />
         </I18nProvider>

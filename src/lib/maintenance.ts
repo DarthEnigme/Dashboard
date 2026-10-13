@@ -13,12 +13,23 @@ export interface Mute {
   until: number | null;
   by: string | null;
   at: number;
+  /** Why, for admins. */
+  note?: string;
+  /** What visitors of the status page may read. */
+  publicNote?: string;
 }
 /** Keyed by service id; ALL mutes every service. */
 export type Mutes = Record<string, Mute>;
 export const ALL = "*";
 
 const KEY = "maintenance.mutes";
+// Read on every tile refresh, written a few times a year: kept in memory (one process owns the database).
+const g = globalThis as typeof globalThis & { __pageMutes?: Mutes };
+const stored = () => (g.__pageMutes ??= getAppMeta<Mutes>(KEY) ?? {});
+const store = (m: Mutes) => {
+  g.__pageMutes = m;
+  setAppMeta(KEY, m);
+};
 const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
 /**
@@ -39,21 +50,22 @@ const covers = (w: MaintenanceWindow, id: string) => !w.services?.length || w.se
 
 /** The mutes still in force. */
 export function listMutes(now = Date.now()): Mutes {
-  const all = getAppMeta<Mutes>(KEY) ?? {};
+  const all = stored();
   return Object.fromEntries(Object.entries(all).filter(([, m]) => m.until === null || m.until > now));
 }
 
 /** Mute a service (or ALL) for `minutesFor` minutes, or until turned back on (null). */
-export function mute(target: string, minutesFor: number | null, by: string | null, now = Date.now()): Mutes {
-  const next = { ...listMutes(now), [target]: { until: minutesFor === null ? null : now + minutesFor * 60_000, by, at: now } };
-  setAppMeta(KEY, next);
+export function mute(target: string, minutesFor: number | null, by: string | null, now = Date.now(), notes: { note?: string; publicNote?: string } = {}): Mutes {
+  const text = (s: string | undefined) => s?.trim().slice(0, 200) || undefined;
+  const next = { ...listMutes(now), [target]: { until: minutesFor === null ? null : now + minutesFor * 60_000, by, at: now, note: text(notes.note), publicNote: text(notes.publicNote) } };
+  store(next);
   return next;
 }
 
 export function unmute(target: string, now = Date.now()): Mutes {
   const next = listMutes(now);
   delete next[target];
-  setAppMeta(KEY, next);
+  store(next);
   return next;
 }
 
@@ -62,12 +74,15 @@ export interface Muted {
   until?: number;
   /** The window's name, for recurring ones. */
   window?: string;
+  note?: string;
+  publicNote?: string;
 }
 
 /** Why this service's alerts are held back right now, or undefined when they are not. */
 export function mutedNow(windows: MaintenanceWindow[], mutes: Mutes, id: string, now = new Date()): Muted | undefined {
   const m = mutes[id] ?? mutes[ALL];
-  if (m && (m.until === null || m.until > now.getTime())) return m.until === null ? {} : { until: m.until };
+  const notes = (x: { note?: string; publicNote?: string }) => ({ ...(x.note ? { note: x.note } : {}), ...(x.publicNote ? { publicNote: x.publicNote } : {}) });
+  if (m && (m.until === null || m.until > now.getTime())) return { ...(m.until === null ? {} : { until: m.until }), ...notes(m) };
   const w = windows.find((x) => covers(x, id) && inWindow(x, now));
-  return w ? { window: w.name ?? `${w.from}–${w.to}` } : undefined;
+  return w ? { window: w.name ?? `${w.from}–${w.to}`, ...notes(w) } : undefined;
 }
