@@ -9,8 +9,17 @@ import { FieldsDialog } from "../edit/FieldsDialog";
 import { DeleteButton, IconButton } from "../edit/controls";
 import { useT } from "@/i18n/client";
 import { msg } from "@/i18n";
+import { RulesPanel } from "./Rules";
 
-type Cat = { name: string; slot: number | null; color: string | null; budget: number | null; count: number };
+type Cat = { name: string; slot: number | null; color: string | null; budget: number | null; count: number; parent: string | null };
+
+/** Parents in their own order, each followed by its subcategories. */
+function nested(list: Cat[]): Cat[] {
+  const key = (n: string) => n.toLowerCase();
+  const names = new Set(list.map((c) => key(c.name)));
+  const top = list.filter((c) => !c.parent || !names.has(key(c.parent)));
+  return top.flatMap((p) => [p, ...list.filter((c) => c.parent && key(c.parent) === key(p.name))]);
+}
 
 const renameFields: FieldSpec[] = [
   { key: "rename", label: msg("New name"), required: true, help: msg("Use an existing category's name to merge into it.") },
@@ -38,16 +47,38 @@ export function CategoryManager({ onChanged, currency }: { onChanged: () => void
     }
   };
 
+  const parents = (c: Cat) => (data ?? []).filter((p) => !p.parent && p.name !== c.name);
+  const hasChildren = (c: Cat) => (data ?? []).some((x) => x.parent?.toLowerCase() === c.name.toLowerCase());
+
   return (
+    <>
     <section className="glass flex flex-col gap-2 rounded-3xl p-4">
       <p className="text-sm text-muted">
-        {t("Pick a chart colour per category. The eight palette colours are easy to tell apart, also for colour-blind people. For more categories, pick your own colour with")}{" "}<em>{t("Custom")}</em>{t(". A category without a colour is shown as")}{" "}<em>{t("Other")}</em>{t(". A monthly budget adds the category to the Budgets card and alerts you when it is used up.")}
+        {t("Pick a chart colour per category. The eight palette colours are easy to tell apart, also for colour-blind people. For more categories, pick your own colour with")}{" "}<em>{t("Custom")}</em>{t(". A category without a colour is shown as")}{" "}<em>{t("Other")}</em>{t(". A monthly budget adds the category to the Budgets card and alerts you when it is used up.")}{" "}{t("A subcategory without a colour of its own is shown as its parent, and counts towards the parent's budget.")}
       </p>
       {error && <p role="alert" className="text-sm text-[var(--err)]">{error}</p>}
       {data?.length === 0 && <p className="py-6 text-center text-sm text-muted">{t("Categories appear as you add transactions.")}</p>}
-      {data?.map((c) => (
-        <div key={c.name} className="flex flex-wrap items-center gap-3 rounded-xl bg-chip px-3 py-2">
-          <span className="min-w-32 flex-1 font-medium">{c.name}</span>
+      {data && nested(data).map((c) => (
+        <div key={c.name} data-category={c.name} className={`flex flex-wrap items-center gap-3 rounded-xl bg-chip px-3 py-2 ${c.parent ? "ml-6" : ""}`}>
+          <span className="min-w-32 flex-1 font-medium">
+            {c.parent && <span className="text-muted">{c.parent} › </span>}
+            {c.name}
+          </span>
+          {!hasChildren(c) && (
+            <select
+              value={c.parent ?? ""}
+              onChange={(e) => post({ name: c.name, parent: e.target.value || null })}
+              aria-label={t("Parent category of {name}", { name: c.name })}
+              className="rounded-lg bg-track px-2 py-1 text-xs text-fg outline-none focus:ring-2 focus:ring-accent/60"
+            >
+              <option value="">{t("Top level")}</option>
+              {parents(c).map((p) => (
+                <option key={p.name} value={p.name}>
+                  {t("Under {name}", { name: p.name })}
+                </option>
+              ))}
+            </select>
+          )}
           <span className="text-xs text-muted">{c.count} {t("transactions")}</span>
           <div className="flex items-center gap-1" role="radiogroup" aria-label={t("Colour for {name}", { name: c.name })}>
             {Array.from({ length: 8 }, (_, i) => i + 1).map((slot) => (
@@ -116,6 +147,8 @@ export function CategoryManager({ onChanged, currency }: { onChanged: () => void
         />
       )}
     </section>
+    <RulesPanel categories={(data ?? []).map((c) => c.name)} onChanged={onChanged} />
+    </>
   );
 }
 

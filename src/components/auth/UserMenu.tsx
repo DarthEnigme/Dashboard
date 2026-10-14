@@ -5,10 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, LogIn, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { KeyRound, LogIn, LogOut, Palette, Settings, ShieldCheck, UserRound } from "lucide-react";
 import { sendJson } from "@/lib/fetcher";
 import type { ClientAuth } from "@/lib/auth";
 import { Avatar, ProfileDialog } from "./ProfileDialog";
+import { AppearanceDialog } from "./AppearanceDialog";
 import { SecurityDialog } from "./SecurityDialog";
 import { useT } from "@/i18n/client";
 
@@ -18,6 +19,7 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState(false);
   const [security, setSecurity] = useState(false);
+  const [appearance, setAppearance] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -106,6 +108,16 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
               role="menuitem"
               onClick={() => {
                 setOpen(false);
+                setAppearance(true);
+              }}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover"
+            >
+              <Palette className="h-4 w-4" /> {t("Appearance")}
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
                 setSecurity(true);
               }}
               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-hover"
@@ -130,6 +142,7 @@ export function UserMenu({ auth }: { auth: ClientAuth }) {
         )}
       </AnimatePresence>
       {security && createPortal(<SecurityDialog onClose={() => setSecurity(false)} />, document.body)}
+      {appearance && createPortal(<AppearanceDialog onClose={() => setAppearance(false)} />, document.body)}
       {profile && createPortal(<ProfileDialog user={u} passwordSignIn={auth.methods.local} onClose={() => setProfile(false)} />, document.body)}
     </div>
   );

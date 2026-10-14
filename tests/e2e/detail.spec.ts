@@ -91,7 +91,8 @@ test("an admin mutes a service's alerts and turns them back on", async ({ page }
   await page.goto("/service/infra.portainer");
   await page.getByRole("button", { name: "Mute alerts for Portainer" }).click();
   await page.getByLabel("Note for admins (optional)").fill("replacing the PSU");
-  await page.getByLabel("Message on the status page (optional)").fill("Hardware work");
+  // A mute is private: no message for the status page.
+  await expect(page.getByLabel("Message on the status page (optional)")).toHaveCount(0);
   await page.getByRole("menuitem", { name: "30 minutes" }).click();
   const muted = page.getByRole("button", { name: /Alerts for Portainer are muted until .+\. Turn them back on/ });
   await expect(muted).toBeVisible();
@@ -102,8 +103,26 @@ test("an admin mutes a service's alerts and turns them back on", async ({ page }
   // The check itself keeps running and reports the mute.
   await expect.poll(async () => (await (await page.request.get("/api/ping?id=infra.portainer")).json()).muted).toBe(true);
   expect((await (await page.request.get("/api/ping?id=infra.kuma")).json()).muted).toBe(false);
+  // Muting is not maintenance.
+  expect((await (await page.request.get("/api/ping?id=infra.portainer")).json()).maintenance).toBe(false);
   await shot(page, "96-muted-service", { fullPage: false });
   await muted.click();
   await expect(page.getByRole("button", { name: "Mute alerts for Portainer" })).toBeVisible();
   await expect.poll(async () => (await (await page.request.get("/api/ping?id=infra.portainer")).json()).muted).toBe(false);
+});
+
+test("an admin puts a service in maintenance and ends it", async ({ page }) => {
+  await page.goto("/service/infra.portainer");
+  await page.getByRole("button", { name: "Start maintenance for Portainer" }).click();
+  await page.getByLabel("Note for admins (optional)").fill("disk swap");
+  await page.getByLabel("Message on the status page (optional)").fill("Storage upgrade");
+  await page.getByRole("menuitem", { name: "2 hours" }).click();
+  const on = page.getByRole("button", { name: /Portainer is in maintenance until .+\. End it/ });
+  await expect(on).toBeVisible();
+  await expect.poll(async () => (await (await page.request.get("/api/ping?id=infra.portainer")).json()).maintenance).toBe(true);
+  // Maintenance does not mute: the bell stays as it was.
+  expect((await (await page.request.get("/api/ping?id=infra.portainer")).json()).muted).toBe(false);
+  await on.click();
+  await expect(page.getByRole("button", { name: "Start maintenance for Portainer" })).toBeVisible();
+  await expect.poll(async () => (await (await page.request.get("/api/ping?id=infra.portainer")).json()).maintenance).toBe(false);
 });

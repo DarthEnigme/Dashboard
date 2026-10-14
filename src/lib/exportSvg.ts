@@ -9,7 +9,7 @@ const PAINT = ["fill", "stroke", "opacity", "fill-opacity", "stroke-opacity", "s
  * A standalone SVG document of `svg`: just what is drawn (cropped to it, labels included), on a
  * transparent background unless `background` is given.
  */
-export function standaloneSvg(svg: SVGSVGElement, opts: { background?: string; padding?: number } = {}): { markup: string; width: number; height: number } {
+function standaloneSvg(svg: SVGSVGElement, opts: { background?: string; padding?: number } = {}): { markup: string; width: number; height: number } {
   const pad = opts.padding ?? 4;
   const bbox = svg.getBBox();
   const x0 = Math.floor(bbox.x - pad);

@@ -5,6 +5,7 @@ import { glowAmount, glowAttr, paletteCss, resolveTheme, serverAccent } from "@/
 import { buildInfo } from "@/lib/version";
 import { fontFamily } from "@/lib/fonts";
 import { getLocale } from "@/i18n/server";
+import { personal } from "@/lib/userLook";
 import { I18nProvider } from "@/i18n/client";
 import { BrandingProvider } from "@/components/Branding";
 import { iconVersion } from "@/lib/logo";
@@ -31,7 +32,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = { themeColor: "#0b0b14", viewportFit: "cover" };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const { settings } = loadConfig();
+  // The viewer's own look over the global one (signed out: the global one).
+  const settings = await personal(loadConfig().settings);
   const locale = await getLocale();
   const look = resolveTheme(settings.theme, settings.customThemes);
   return (

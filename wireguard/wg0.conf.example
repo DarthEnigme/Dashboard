@@ -1,0 +1,22 @@
+# WireGuard client config for NanoDash (see docker-compose.wireguard.yml).
+# Copy to wireguard/wg_confs/wg0.conf and fill in the values from your WireGuard server
+# (in wg-easy: create a client for NanoDash and download its config).
+
+[Interface]
+# This client's private key and its address inside the tunnel.
+PrivateKey = <client private key>
+Address = 10.8.0.20/32
+# Leave DNS out to keep using your usual DNS. Setting it sends every lookup through the tunnel;
+# only do that if you need names that only the remote side knows.
+# DNS = 192.168.50.1
+
+[Peer]
+# The server: its public key and where it is reachable from here.
+PublicKey = <server public key>
+# PresharedKey = <preshared key, if the server gave one>
+Endpoint = vpn.example.com:51820
+# Only the tunnel and the remote network(s). Never 0.0.0.0/0 here: that would send all of
+# NanoDash's traffic (updates, local services, alerts) through the tunnel.
+AllowedIPs = 10.8.0.0/24, 192.168.50.0/24
+# Keeps the tunnel open through NAT, so the remote side stays reachable between checks.
+PersistentKeepalive = 25

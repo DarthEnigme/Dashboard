@@ -1,3 +1,4 @@
+import { listRecurring, monthlyCents, nextOccurrence } from "../finance/recurring";
 import fs from "node:fs";
 import { monitorEventLoopDelay, type IntervalHistogram } from "node:perf_hooks";
 import path from "node:path";
@@ -7,7 +8,7 @@ import { checkSpec } from "../checks";
 import { DATA_DIR, db, incidentCountsSince, latestPing, openIncidents, uptimeSince } from "../db";
 import { latestMetrics } from "../metrics";
 import { certFor } from "../monitor";
-import { listMutes, mutedNow } from "../maintenance";
+import { listMaintenance, listMutes, quietNow } from "../maintenance";
 import { backupStatus, listBackups } from "../backup";
 import { cached } from "../cache";
 import { loadConfig } from "../config/load";
@@ -65,14 +66,16 @@ async function serviceFamilies(now: number): Promise<Family[]> {
   const ids = serviceIds(services);
   const up = family("page_service_up", "1 when the service's last status check passed, 0 when it failed.");
   const latency = family("page_service_latency_ms", "Response time of the service's last status check, in milliseconds.");
-  const uptime = family("page_service_uptime_ratio", "Share of the status checks that passed over the last 24 hours (0-1).");
+  const uptime = family("page_service_uptime_ratio", "Share of the status checks that passed over the last 24 hours (0-1); failures during maintenance are left out.");
   const checked = family("page_service_last_check_timestamp_seconds", "When the service was last checked (Unix time).");
   const cert = family("page_service_cert_days_left", "Days until the service's TLS certificate expires (negative once expired).");
   const incident = family("page_service_incident_open", "1 while the service is in an outage (down for alerts.threshold checks in a row).");
   const incidentStart = family("page_service_incident_started_timestamp_seconds", "When the service's current outage began (Unix time).");
   const incidents = family("page_service_incidents_24h", "Outages of the service that began in the last 24 hours.");
-  const maintenance = family("page_service_maintenance", "1 while the service's alerts are held back (a maintenance window or a one-off mute).");
+  const maintenance = family("page_service_maintenance", "1 while the service is in planned maintenance (a recurring window or a one-off).");
+  const muted = family("page_service_alerts_muted", "1 while the service's notifications are muted (alerts only; the service is not in maintenance).");
   const mutes = listMutes(now);
+  const oneoffs = listMaintenance(now);
   const day = uptimeSince(now - 86_400_000);
   const open = new Map(openIncidents().map((i) => [i.service_id, i]));
   const outages = incidentCountsSince(now - 86_400_000);
@@ -94,10 +97,12 @@ async function serviceFamilies(now: number): Promise<Family[]> {
       incident.samples.push({ labels: l, value: inc ? 1 : 0 });
       if (inc) incidentStart.samples.push({ labels: l, value: Math.round(inc.start / 1000) });
       incidents.samples.push({ labels: l, value: outages.get(id) ?? 0 });
-      maintenance.samples.push({ labels: l, value: mutedNow(settings.maintenance, mutes, id, new Date(now)) ? 1 : 0 });
+      const q = quietNow(settings.maintenance, mutes, oneoffs, id, new Date(now));
+      maintenance.samples.push({ labels: l, value: q.maintenance ? 1 : 0 });
+      muted.samples.push({ labels: l, value: q.muted ? 1 : 0 });
     }),
   );
-  return [up, latency, uptime, checked, cert, incident, incidentStart, incidents, maintenance];
+  return [up, latency, uptime, checked, cert, incident, incidentStart, incidents, maintenance, muted];
 }
 
 async function deviceFamilies(): Promise<Family[]> {
@@ -215,8 +220,14 @@ async function financeFamilies(now: number): Promise<Family[]> {
     saved.samples.push({ labels: { goal: goal.name, currency: goal.currency }, value: goal.saved / 100 });
     target.samples.push({ labels: { goal: goal.name, currency: goal.currency }, value: goal.target / 100 });
   }
+  const subs = family("page_finance_subscription_monthly_cost", "Average monthly cost of each running subscription, in its own currency.");
+  for (const r of listRecurring()) {
+    if (!r.subscription || !r.active || !nextOccurrence(r)) continue;
+    subs.samples.push({ labels: { subscription: r.description, currency: r.currency }, value: monthlyCents(r) / 100 });
+  }
   return [
     balance,
+    subs,
     { name: "page_finance_month_income", help: "Income so far this month, in the finance currency.", type: "gauge", samples: [{ labels: { currency }, value: s.income / 100 }] },
     { name: "page_finance_month_spending", help: "Spending so far this month, in the finance currency.", type: "gauge", samples: [{ labels: { currency }, value: Math.abs(s.expense) / 100 }] },
     budget,

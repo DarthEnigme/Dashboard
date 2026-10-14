@@ -6,7 +6,7 @@ import { seeFilter, viewer } from "@/lib/auth";
 import { checkSpec, describeCheck } from "@/lib/checks";
 import { latestPing, openIncidents, uptimeSince } from "@/lib/db";
 import { certFor } from "@/lib/monitor";
-import { listMutes, mutedNow } from "@/lib/maintenance";
+import { listMaintenance, listMutes, quietNow } from "@/lib/maintenance";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +26,12 @@ export interface StatusRow {
   /** Down for at least alerts.threshold checks: an open incident. */
   incident: { since: number; cause: string | null } | null;
   certDaysLeft: number | null;
-  /** Alerts are held back right now (maintenance window or a one-off mute). */
+  /** Notifications are muted right now (alerts only). */
   muted: boolean;
-  /** Admins only: why (the note on the mute or window). */
+  /** Admins only: why (the note on the mute). */
   mutedNote?: string;
+  /** In planned maintenance right now: a recurring window or a one-off. */
+  maintenance: { until?: number; window?: string; note?: string } | null;
 }
 
 /** Every monitored service this viewer can see, for the monitoring panel. */
@@ -41,6 +43,7 @@ export async function GET() {
   const day = uptimeSince(Date.now() - 86_400_000);
   const rows: StatusRow[] = [];
   const mutes = listMutes();
+  const oneoffs = listMaintenance();
   const now = new Date();
   const admin = (await viewer()).role === "admin";
   cfg.services.forEach((g, gi) => {
@@ -51,7 +54,7 @@ export async function GET() {
       const last = latestPing(id);
       const checks = day.get(id);
       const inc = open.get(id);
-      const muted = mutedNow(cfg.settings.maintenance, mutes, id, now);
+      const { muted, maintenance } = quietNow(cfg.settings.maintenance, mutes, oneoffs, id, now);
       rows.push({
         id,
         name: s.name,
@@ -67,6 +70,7 @@ export async function GET() {
         certDaysLeft: certFor(id)?.daysLeft ?? null,
         muted: !!muted,
         mutedNote: admin ? muted?.note : undefined,
+        maintenance: maintenance ? { until: maintenance.until, window: maintenance.window, note: admin ? maintenance.note : undefined } : null,
       });
     });
   });

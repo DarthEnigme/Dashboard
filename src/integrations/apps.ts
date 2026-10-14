@@ -175,13 +175,33 @@ export const paperless: Integration<typeof paperlessSchema> = {
 
 // ---------- Authentik ----------
 
-export function parseAuthentik(users: number, logins: number, failed: number): WidgetResult {
+/** An outpost (proxy, LDAP…) and whether one of its instances checked in lately. */
+export interface AuthentikOutpost {
+  name: string;
+  /** Last time an instance of it checked in (ms), if ever. */
+  lastSeen: number | null;
+}
+
+/** An outpost not heard from in this long is down. */
+const OUTPOST_STALE = 5 * 60_000;
+
+export function parseAuthentik(users: number, logins: number, failed: number, extra: { version?: string; outposts?: AuthentikOutpost[]; now?: number } = {}): WidgetResult {
+  const now = extra.now ?? Date.now();
+  const outposts = extra.outposts ?? [];
+  const healthy = outposts.filter((o) => o.lastSeen !== null && now - o.lastSeen < OUTPOST_STALE);
   return {
     fields: [
       { label: "Users", value: users },
       { label: "Logins 24h", value: logins, raw: logins },
       { label: "Failed 24h", value: failed, raw: failed, status: failed >= 10 ? "error" : failed ? "warn" : "ok" },
+      ...(outposts.length ? [{ label: "Outposts", value: `${healthy.length}/${outposts.length}`, raw: healthy.length, status: healthy.length < outposts.length ? ("error" as const) : ("ok" as const) }] : []),
+      ...(extra.version ? [{ label: "Version", value: extra.version }] : []),
     ],
+    list: outposts.map((o) => ({
+      label: o.name,
+      value: o.lastSeen === null ? "never seen" : now - o.lastSeen < OUTPOST_STALE ? "up" : "down",
+      status: o.lastSeen !== null && now - o.lastSeen < OUTPOST_STALE ? ("ok" as const) : ("error" as const),
+    })),
   };
 }
 
@@ -194,11 +214,83 @@ export const authentik: Integration<typeof authentikSchema> = {
     const opts = { insecure: cfg.insecure, headers: { Authorization: `Bearer ${cfg.key}` } };
     const since = new Date(Date.now() - 86_400_000).toISOString();
     const count = (path: string) => httpJson<{ pagination: { count: number } }>(`${b}/api/v3${path}`, opts).then((r) => r.pagination.count);
-    const [users, logins, failed] = await Promise.all([
+    // Version and outposts need more rights than the counts: without them the tile shows the rest.
+    const optional = <T,>(p: Promise<T>) => p.catch(() => undefined);
+    const outposts = async (): Promise<AuthentikOutpost[]> => {
+      const list = await httpJson<{ results: { pk: string; name: string }[] }>(`${b}/api/v3/outposts/instances/?page_size=50`, opts);
+      return Promise.all(
+        list.results.map(async (o) => {
+          const health = await optional(httpJson<{ last_seen?: string }[]>(`${b}/api/v3/outposts/instances/${encodeURIComponent(o.pk)}/health/`, opts));
+          const seen = (health ?? []).map((h) => Date.parse(h.last_seen ?? "")).filter((t) => !Number.isNaN(t));
+          return { name: o.name, lastSeen: seen.length ? Math.max(...seen) : null };
+        }),
+      );
+    };
+    const [users, logins, failed, version, posts] = await Promise.all([
       count("/core/users/?page_size=1&is_active=true"),
       count(`/events/events/?action=login&page_size=1&created__gte=${encodeURIComponent(since)}`),
       count(`/events/events/?action=login_failed&page_size=1&created__gte=${encodeURIComponent(since)}`),
+      optional(httpJson<{ version_current?: string }>(`${b}/api/v3/admin/version/`, opts)),
+      optional(outposts()),
     ]);
-    return parseAuthentik(users, logins, failed);
+    return parseAuthentik(users, logins, failed, { version: version?.version_current, outposts: posts });
+  },
+};
+
+// ---------- Vaultwarden ----------
+
+export interface VaultwardenUser {
+  userEnabled?: boolean;
+  twoFactorEnabled?: boolean;
+  lastActive?: string | null;
+}
+
+export function parseVaultwarden(r: { up: boolean; latencyMs: number; version?: string; users?: VaultwardenUser[]; now?: number }): WidgetResult {
+  const now = r.now ?? Date.now();
+  const users = r.users;
+  const enabled = users?.filter((u) => u.userEnabled !== false) ?? [];
+  const with2fa = enabled.filter((u) => u.twoFactorEnabled).length;
+  const active = enabled.filter((u) => u.lastActive && now - Date.parse(u.lastActive) < 30 * 86_400_000).length;
+  return {
+    fields: [
+      { label: "Status", value: r.up ? "up" : "down", status: r.up ? "ok" : "error" },
+      { label: "Response", value: `${r.latencyMs} ms`, raw: r.latencyMs },
+      ...(r.version ? [{ label: "Version", value: r.version }] : []),
+      ...(users
+        ? [
+            { label: "Users", value: enabled.length, raw: enabled.length },
+            { label: "2FA", value: enabled.length ? `${Math.round((with2fa / enabled.length) * 100)}%` : "–", raw: with2fa, status: with2fa < enabled.length ? ("warn" as const) : ("ok" as const) },
+            { label: "Active 30d", value: active, raw: active },
+          ]
+        : []),
+    ],
+  };
+}
+
+const vaultwardenSchema = base.extend({ adminToken: z.string().min(1).optional() });
+export const vaultwarden: Integration<typeof vaultwardenSchema> = {
+  type: "vaultwarden",
+  schema: vaultwardenSchema,
+  async fetch(cfg) {
+    const b = trimSlash(cfg.url);
+    const started = Date.now();
+    const alive = await http(`${b}/alive`, { insecure: cfg.insecure }).catch(() => undefined);
+    const latencyMs = Date.now() - started;
+    if (!alive?.ok) return parseVaultwarden({ up: false, latencyMs });
+    const version = await httpJson<string>(`${b}/api/version`, { insecure: cfg.insecure }).catch(() => undefined);
+    let users: VaultwardenUser[] | undefined;
+    if (cfg.adminToken) {
+      // The admin page signs in with a form post and a cookie; without it the tile shows the rest.
+      const login = await http(`${b}/admin`, {
+        method: "POST",
+        insecure: cfg.insecure,
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token: cfg.adminToken }).toString(),
+        redirect: "manual",
+      }).catch(() => undefined);
+      const cookie = login?.headers.get("set-cookie")?.split(";")[0];
+      if (cookie) users = await httpJson<VaultwardenUser[]>(`${b}/admin/users`, { insecure: cfg.insecure, headers: { Cookie: cookie } }).catch(() => undefined);
+    }
+    return parseVaultwarden({ up: true, latencyMs, version: typeof version === "string" ? version : undefined, users });
   },
 };

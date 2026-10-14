@@ -23,7 +23,10 @@ export function percentile(values: number[], q: number): number | null {
   return sorted[Math.min(sorted.length - 1, Math.ceil(q * sorted.length) - 1)];
 }
 
-type Raw = { ts: number; up: number; latency_ms: number | null };
+type Raw = { ts: number; up: number; latency_ms: number | null; maint?: number };
+
+/** Failures during maintenance are left out of uptime (see COUNTED in db.ts). */
+const counted = (r: Raw) => !(r.maint && !r.up);
 
 /** Split [from, to) into `count` equal buckets of raw ping results. */
 export function bucketize(rows: Raw[], from: number, to: number, count = 48): Bucket[] {
@@ -31,7 +34,7 @@ export function bucketize(rows: Raw[], from: number, to: number, count = 48): Bu
   const acc = Array.from({ length: count }, () => ({ n: 0, up: 0, lat: [] as number[] }));
   for (const r of rows) {
     const i = Math.floor((r.ts - from) / size);
-    if (i < 0 || i >= count) continue;
+    if (i < 0 || i >= count || !counted(r)) continue;
     acc[i].n++;
     if (r.up) {
       acc[i].up++;
@@ -47,8 +50,9 @@ export function bucketize(rows: Raw[], from: number, to: number, count = 48): Bu
   }));
 }
 
-/** One hour of raw pings → a rollup row. */
-export function rollupHour(rows: Raw[]): { checks: number; up: number; avg_ms: number | null; p95_ms: number | null } {
+/** One hour of raw pings → a rollup row (`checks` counts the ones that count for uptime). */
+export function rollupHour(all: Raw[]): { checks: number; up: number; avg_ms: number | null; p95_ms: number | null } {
+  const rows = all.filter(counted);
   const lat = rows.filter((r) => r.up && r.latency_ms != null).map((r) => r.latency_ms!);
   return {
     checks: rows.length,

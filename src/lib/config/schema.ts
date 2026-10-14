@@ -52,7 +52,7 @@ export type Visibility = (typeof visibilities)[number] | string[];
 const visible = z.union([z.enum(visibilities), z.array(z.string().min(1)).min(1)]).optional();
 
 /** What a signed-in user may do beyond seeing things; admins may do everything. */
-export const PERMISSIONS = ["finance", "actions", "travel", "watchlist", "inventory"] as const;
+export const PERMISSIONS = ["finance", "actions", "travel", "watchlist", "inventory", "notes"] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 const providerSchema = z.object({
@@ -281,6 +281,10 @@ export const settingsSchema = z
         showBars: z.boolean().default(true),
         showIncidents: z.boolean().default(true),
         showGroups: z.boolean().default(true),
+        /** Incidents admins post, with their updates. */
+        showPosted: z.boolean().default(true),
+        /** Planned maintenance of the next 7 days (one-off and recurring). */
+        showUpcoming: z.boolean().default(true),
         /** How far back the outage list goes. */
         incidentDays: z.number().int().min(1).max(90).default(14),
         /** Another name for a service on this page, by service id. */
@@ -356,6 +360,33 @@ export const settingsSchema = z
       .refine((list) => new Set(list.map((t) => t.id)).size === list.length, "two themes have the same id"),
   })
   .prefault({});
+
+/**
+ * A user's own look, over the global one in settings.yaml: every field is optional, and a missing
+ * one follows the global setting. The wallpaper is only ever one of their own uploads.
+ */
+export const userPrefsSchema = z
+  .object({
+    language: z.enum(["auto", "en", "fr"]).optional(),
+    theme: z
+      .string()
+      .refine((t) => (themes as readonly string[]).includes(t) || paletteThemeIds.includes(t) || customRef.test(t), "not a known theme")
+      .optional(),
+    style: z.enum(stylePresets).optional(),
+    accent: z.string().regex(/^(auto|#[0-9a-f]{3}([0-9a-f]{3})?)$/i, "a colour like #1e1e2e, or auto").optional(),
+    glow: z.union([z.enum(glowLevels), z.number().min(0).max(100)]).optional(),
+    font: z.enum(fontIds).optional(),
+    background: z
+      .object({
+        image: z.string().regex(/^\/api\/uploads\/backgrounds\/[\w.-]+$/, "an uploaded image").optional(),
+        gradient: z.union([z.enum(gradientPresets), z.string().regex(customRef, "not a known gradient")]).optional(),
+        blur: z.number().min(0).max(40).optional(),
+        brightness: z.number().min(0).max(1).optional(),
+      })
+      .optional(),
+  })
+  .strict();
+export type UserPrefs = z.infer<typeof userPrefsSchema>;
 
 export const widgetSchema = z.object({ type: z.string().min(1) }).passthrough();
 

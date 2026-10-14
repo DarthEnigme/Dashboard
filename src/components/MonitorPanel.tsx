@@ -5,12 +5,13 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import useSWR from "swr";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, BellOff, CheckCircle2, CircleDashed, Search, X, XCircle } from "lucide-react";
+import { Activity, BellOff, CheckCircle2, CircleDashed, Megaphone, Search, Wrench, X, XCircle } from "lucide-react";
+import { IncidentsDialog } from "./IncidentsDialog";
 import { fetcher } from "@/lib/fetcher";
 import type { StatusRow } from "@/app/api/status/route";
 import { duration } from "@/integrations/format";
 import { Icon } from "./Icon";
-import { MuteButton } from "./MuteButton";
+import { MaintenanceButton, MuteButton } from "./MuteButton";
 import { useT } from "@/i18n/client";
 
 type Filter = "all" | "down" | "up";
@@ -27,6 +28,7 @@ export function MonitorPanel({ refreshSeconds, canMute }: { refreshSeconds: numb
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
+  const [incidents, setIncidents] = useState(false);
   const { data } = useSWR<StatusRow[]>("/api/status", fetcher, { refreshInterval: Math.max(10, refreshSeconds) * 1000 });
   const closeRef = useRef<HTMLButtonElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
@@ -104,6 +106,12 @@ export function MonitorPanel({ refreshSeconds, canMute }: { refreshSeconds: numb
                       <Activity className="h-5 w-5 text-accent" /> {t("Monitoring")}
                     </h2>
                     <span className="flex items-center gap-1">
+                      {canMute && (
+                        <button type="button" onClick={() => setIncidents(true)} aria-label={t("Status page incidents")} title={t("Status page incidents")} className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-hover hover:text-fg">
+                          <Megaphone className="h-4 w-4" />
+                        </button>
+                      )}
+                      {canMute && <MaintenanceButton target="*" name={t("all services")} compact />}
                       {canMute && <MuteButton target="*" name={t("all services")} compact />}
                       <button ref={closeRef} onClick={() => setOpen(false)} aria-label={t("Close")} className="rounded-full p-1.5 text-muted hover:bg-hover hover:text-fg">
                         <X className="h-5 w-5" />
@@ -141,9 +149,11 @@ export function MonitorPanel({ refreshSeconds, canMute }: { refreshSeconds: numb
                           <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-1.5 text-sm font-medium">
                               <span className="truncate">{r.name}</span>
+                              {r.maintenance && <Wrench className="h-3.5 w-3.5 shrink-0 text-accent" aria-label={t("in maintenance")} />}
                               {r.muted && <BellOff className="h-3.5 w-3.5 shrink-0 text-[var(--warn)]" aria-label={t("alerts muted")} />}
                             </span>
                             <span className="block truncate text-xs text-muted">
+                              {r.maintenance?.note ? <span className="text-accent">{r.maintenance.note} · </span> : null}
                               {r.mutedNote ? <span className="text-[var(--warn)]">{r.mutedNote} · </span> : null}
                               {r.incident ? <span className="text-[var(--err)]">{t("down for")}{" "}{since(r.incident.since)}{r.incident.cause ? ` · ${r.incident.cause}` : ""}</span> : `${r.group} · ${r.check}`}
                             </span>
@@ -154,6 +164,7 @@ export function MonitorPanel({ refreshSeconds, canMute }: { refreshSeconds: numb
                             {r.certDaysLeft !== null && r.certDaysLeft < 15 && <span className="block text-[var(--warn)]">{t("cert")}{" "}{r.certDaysLeft} d</span>}
                           </span>
                         </Link>
+                        {canMute && <MaintenanceButton target={r.id} name={r.name} compact />}
                         {canMute && <MuteButton target={r.id} name={r.name} compact />}
                       </li>
                     ))}
@@ -164,6 +175,12 @@ export function MonitorPanel({ refreshSeconds, canMute }: { refreshSeconds: numb
               </>
             )}
           </AnimatePresence>,
+          document.body,
+        )}
+      {incidents &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <IncidentsDialog services={data.map((r) => ({ id: r.id, name: r.name }))} onClose={() => setIncidents(false)} />,
           document.body,
         )}
     </>

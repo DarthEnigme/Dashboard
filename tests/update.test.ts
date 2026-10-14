@@ -128,6 +128,21 @@ describe("updater", () => {
     expect(plan.body.Cmd).toEqual(["node", "server.js", "--debug"]);
   });
 
+  it("keeps sharing a sidecar's network, without a hostname of its own", () => {
+    const sidecar = {
+      ...old,
+      Config: { ...old.Config, Hostname: "9f8e7d6c5b4a", Domainname: "" },
+      HostConfig: { ...old.HostConfig, NetworkMode: "container:9f8e7d6c5b4a" + "1".repeat(52), PortBindings: {} },
+      NetworkSettings: { Networks: {} },
+    };
+    const plan = planRecreate(sidecar, oldImage, "img:new");
+    expect(plan.body.HostConfig.NetworkMode).toBe(sidecar.HostConfig.NetworkMode);
+    expect(plan.body).not.toHaveProperty("Hostname");
+    expect(plan.body).not.toHaveProperty("Domainname");
+    expect(plan.body.NetworkingConfig).toBeUndefined();
+    expect(plan.extraNetworks).toEqual([]);
+  });
+
   it("finds the image repository and the install hour", () => {
     expect(imageRepo("ghcr.io/me/page:0.3.0")).toBe("ghcr.io/me/page");
     expect(imageRepo("registry.local:5000/page")).toBe("registry.local:5000/page");

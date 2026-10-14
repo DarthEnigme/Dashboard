@@ -9,3 +9,6 @@ test-results
 playwright-report
 /tests/e2e/.data
 /tests/e2e/.config
+# WireGuard client config (private keys) for docker-compose.wireguard.yml
+/wireguard/*
+!/wireguard/wg0.conf.example

@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { userPrefsSchema, type UserPrefs } from "../config/schema";
 
 export type Role = "admin" | "user";
 
@@ -100,6 +101,24 @@ export function updateUser(
   db()
     .prepare(`UPDATE users SET ${set.map(([k]) => `${k} = ?`).join(", ")} WHERE id = ?`)
     .run(...set.map(([, v]) => v ?? null), id);
+}
+
+/** A user's own look (theme, wallpaper…); empty when they follow the global settings. */
+export function getPrefs(id: number): UserPrefs {
+  const row = db().prepare("SELECT prefs FROM users WHERE id = ?").get(id) as { prefs: string | null } | undefined;
+  if (!row?.prefs) return {};
+  try {
+    // Anything that no longer validates (a theme since removed…) is dropped, not fatal.
+    const parsed = userPrefsSchema.safeParse(JSON.parse(row.prefs));
+    return parsed.success ? parsed.data : {};
+  } catch {
+    return {};
+  }
+}
+
+export function setPrefs(id: number, prefs: UserPrefs) {
+  const empty = !Object.keys(prefs).length;
+  db().prepare("UPDATE users SET prefs = ? WHERE id = ?").run(empty ? null : JSON.stringify(prefs), id);
 }
 
 /** The sealed TOTP secret and recovery-code hashes, or null when 2FA is off. */

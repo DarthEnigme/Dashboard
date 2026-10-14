@@ -1,5 +1,6 @@
 import { db } from "../db";
 import { freeSlot, type CategoryInfo, type Txn } from "./aggregate";
+import { categorize, listRules, uncategorizedMatches, type Rule } from "./rules";
 
 export interface Transaction extends Txn {
   id: number;
@@ -33,7 +34,8 @@ export function listTransactions(filter: { from?: string; to?: string; category?
   if (filter.from) add("date >= ?", filter.from);
   if (filter.to) add("date <= ?", filter.to);
   if (filter.category === "") add("category IS NULL");
-  else if (filter.category) add("category = ? COLLATE NOCASE", filter.category);
+  // A parent category also matches its subcategories.
+  else if (filter.category) add("(category = ? COLLATE NOCASE OR category IN (SELECT name FROM fin_categories WHERE parent = ? COLLATE NOCASE))", filter.category, filter.category);
   if (filter.account === "") add("account IS NULL");
   else if (filter.account) add("account = ? COLLATE NOCASE", filter.account);
   if (filter.q) add("(description LIKE ? OR category LIKE ?)", `%${filter.q}%`, `%${filter.q}%`);
@@ -64,7 +66,7 @@ export const currenciesInUse = () =>
 export function listCategories(): (CategoryInfo & { count: number })[] {
   return db()
     .prepare(
-      `SELECT c.name, c.slot, c.color, c.budget_cents AS budget, (SELECT COUNT(*) FROM fin_transactions t WHERE t.category = c.name COLLATE NOCASE) AS count
+      `SELECT c.name, c.slot, c.color, c.parent, c.budget_cents AS budget, (SELECT COUNT(*) FROM fin_transactions t WHERE t.category = c.name COLLATE NOCASE) AS count
        FROM fin_categories c ORDER BY c.slot IS NULL, c.slot, c.name`,
     )
     .all() as unknown as (CategoryInfo & { count: number })[];
@@ -80,7 +82,9 @@ export function ensureCategory(name: string | null | undefined): string | null {
   return n;
 }
 
-export function addTransaction(t: NewTransaction): "added" | "duplicate" {
+/** Add a transaction; one without a category gets it from the category rules (not transfers). */
+export function addTransaction(input: NewTransaction, rules?: Rule[]): "added" | "duplicate" {
+  const t = input.source === "transfer" || input.transferId ? input : categorize(input, rules);
   const category = ensureCategory(t.category);
   const res = db()
     .prepare(
@@ -106,7 +110,8 @@ export function importTransactions(list: NewTransaction[]): { added: number; ski
   let added = 0;
   db().exec("BEGIN");
   try {
-    for (const t of list) if (addTransaction(t) === "added") added++;
+    const rules = listRules();
+    for (const t of list) if (addTransaction(t, rules) === "added") added++;
     db().exec("COMMIT");
   } catch (e) {
     db().exec("ROLLBACK");
@@ -135,6 +140,29 @@ export function deleteTransaction(id: number) {
   else db().prepare("DELETE FROM fin_transactions WHERE id = ?").run(id);
 }
 
+/** Fill the category of uncategorised transactions from the rules; returns how many changed. */
+export function applyRules(): number {
+  const matches = uncategorizedMatches();
+  db().exec("BEGIN");
+  try {
+    for (const m of matches) db().prepare("UPDATE fin_transactions SET category = ? WHERE id = ?").run(ensureCategory(m.category), m.id);
+    db().exec("COMMIT");
+  } catch (e) {
+    db().exec("ROLLBACK");
+    throw e;
+  }
+  return matches.length;
+}
+
+/** Everything else that names a category by text: rules, recurring payments, shortcuts and subcategories. */
+const CATEGORY_REFS = [
+  "UPDATE fin_transactions SET category = ? WHERE category = ? COLLATE NOCASE",
+  "UPDATE fin_recurring SET category = ? WHERE category = ? COLLATE NOCASE",
+  "UPDATE fin_shortcuts SET category = ? WHERE category = ? COLLATE NOCASE",
+  "UPDATE fin_rules SET category = ? WHERE category = ? COLLATE NOCASE",
+  "UPDATE fin_categories SET parent = ? WHERE parent = ? COLLATE NOCASE",
+];
+
 /** Rename a category, or merge it into another one when the new name exists. */
 export function renameCategory(from: string, to: string) {
   const target = to.trim();
@@ -142,13 +170,12 @@ export function renameCategory(from: string, to: string) {
   const exists = db().prepare("SELECT name FROM fin_categories WHERE name = ?").get(target) as { name: string } | undefined;
   db().exec("BEGIN");
   try {
-    if (exists && exists.name.toLowerCase() !== from.toLowerCase()) {
-      db().prepare("UPDATE fin_transactions SET category = ? WHERE category = ? COLLATE NOCASE").run(exists.name, from);
-      db().prepare("DELETE FROM fin_categories WHERE name = ?").run(from);
-    } else {
-      db().prepare("UPDATE fin_categories SET name = ? WHERE name = ?").run(target, from);
-      db().prepare("UPDATE fin_transactions SET category = ? WHERE category = ? COLLATE NOCASE").run(target, from);
-    }
+    const name = exists && exists.name.toLowerCase() !== from.toLowerCase() ? exists.name : target;
+    if (name === target) db().prepare("UPDATE fin_categories SET name = ? WHERE name = ?").run(target, from);
+    else db().prepare("DELETE FROM fin_categories WHERE name = ?").run(from);
+    for (const sql of CATEGORY_REFS) db().prepare(sql).run(name, from);
+    // Merged into its own child, or the other way round: no category is its own parent.
+    db().prepare("UPDATE fin_categories SET parent = NULL WHERE parent = name COLLATE NOCASE").run();
     db().exec("COMMIT");
   } catch (e) {
     db().exec("ROLLBACK");
@@ -175,8 +202,30 @@ export function setCategoryBudget(name: string, cents: number | null) {
   db().prepare("UPDATE fin_categories SET budget_cents = ? WHERE name = ?").run(cents || null, name);
 }
 
+/**
+ * Put a category under another one (null: top level). One level only: a parent can't have a
+ * parent itself, and a category with subcategories can't become one.
+ */
+export function setCategoryParent(name: string, parent: string | null) {
+  const p = parent?.trim() || null;
+  if (p) {
+    if (p.toLowerCase() === name.toLowerCase()) throw new Error("A category can't be its own parent");
+    const target = db().prepare("SELECT name, parent FROM fin_categories WHERE name = ?").get(p) as { name: string; parent: string | null } | undefined;
+    if (!target) throw new Error("No such parent category");
+    if (target.parent) throw new Error(`${target.name} is a subcategory itself`);
+    const children = db().prepare("SELECT COUNT(*) AS n FROM fin_categories WHERE parent = ? COLLATE NOCASE").get(name) as { n: number };
+    if (children.n) throw new Error(`${name} has subcategories of its own`);
+    db().prepare("UPDATE fin_categories SET parent = ? WHERE name = ?").run(target.name, name);
+  } else db().prepare("UPDATE fin_categories SET parent = NULL WHERE name = ?").run(name);
+}
+
 export function deleteCategory(name: string) {
   db().prepare("UPDATE fin_transactions SET category = NULL WHERE category = ? COLLATE NOCASE").run(name);
+  db().prepare("UPDATE fin_recurring SET category = NULL WHERE category = ? COLLATE NOCASE").run(name);
+  db().prepare("UPDATE fin_shortcuts SET category = NULL WHERE category = ? COLLATE NOCASE").run(name);
+  db().prepare("DELETE FROM fin_rules WHERE category = ? COLLATE NOCASE").run(name);
+  // Its subcategories move up to the top level.
+  db().prepare("UPDATE fin_categories SET parent = NULL WHERE parent = ? COLLATE NOCASE").run(name);
   db().prepare("DELETE FROM fin_categories WHERE name = ?").run(name);
 }
 

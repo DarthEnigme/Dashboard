@@ -19,12 +19,13 @@ import { TransactionList } from "./TransactionList";
 import { CategoryManager } from "./CategoryManager";
 import { CsvImport } from "./CsvImport";
 import { Plan } from "./Plan";
+import { Subscriptions } from "./Subscriptions";
 import { GOALS_KEY, SaveDialog, Savings } from "./Savings";
 import type { Goal } from "@/lib/finance/goals";
 import { msg } from "@/i18n";
 import { useT } from "@/i18n/client";
 
-const VIEWS = ["overview", "flow", "transactions", "accounts", "plan", "savings", "categories", "import"] as const;
+const VIEWS = ["overview", "flow", "transactions", "accounts", "plan", "subscriptions", "savings", "categories", "import"] as const;
 type View = (typeof VIEWS)[number];
 const VIEW_LABELS: Record<View, string> = {
   overview: msg("Overview"),
@@ -32,6 +33,7 @@ const VIEW_LABELS: Record<View, string> = {
   transactions: msg("Transactions"),
   accounts: msg("Accounts"),
   plan: msg("Plan"),
+  subscriptions: msg("Subscriptions"),
   savings: msg("Savings"),
   categories: msg("Categories"),
   import: msg("Import"),
@@ -252,6 +254,7 @@ export function FinancePage({ currency: defaultCurrency }: { currency: string })
       {view === "transactions" && <TransactionList period={period} currency={currency} account={account} accounts={accounts} onChanged={refresh} />}
       {view === "accounts" && <Accounts currency={defaultCurrency} selected={account} onSelect={setAccount} onChanged={refresh} />}
       {view === "plan" && <Plan currency={currency} onChanged={refresh} />}
+      {view === "subscriptions" && <Subscriptions currency={currency} onChanged={refresh} />}
       {view === "savings" && <Savings currency={defaultCurrency} />}
       {view === "categories" && <CategoryManager onChanged={refresh} currency={defaultCurrency} />}
       {view === "import" && <CsvImport currency={currency} accounts={accounts} onImported={refresh} />}

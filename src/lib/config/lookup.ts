@@ -18,3 +18,15 @@ export async function findService(id: string, canSee: (v: Visibility) => boolean
   }
   return undefined;
 }
+
+/** Every service with its id, in config order (full server config: keep it on the server). */
+export async function allServices(): Promise<{ id: string; group: string; service: Service }[]> {
+  const { services } = await getConfig();
+  const ids = serviceIds(services);
+  return services.flatMap((g, gi) => g.services.map((service, si) => ({ id: ids[gi][si], group: g.name, service })));
+}
+
+/** Services whose widget is one of these types (e.g. every Jellyfin and Plex server). */
+export async function servicesOfType(types: readonly string[]): Promise<{ id: string; group: string; service: Service }[]> {
+  return (await allServices()).filter((s) => !!s.service.widget && types.includes((s.service.widget as { type: string }).type));
+}

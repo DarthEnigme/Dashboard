@@ -247,7 +247,7 @@ export const sections: Section[] = [
         label: msg("Maintenance windows"),
         kind: "yaml",
         placeholder: msg("- name: Backups\n  days: [sun]          # none = every day\n  from: \"03:00\"\n  to: \"05:00\"\n  services: [infra.nas]   # none = all services\n  note: Weekly snapshots   # for admins\n  publicNote: Weekly maintenance   # shown on the status page"),
-        help: msg("Recurring times (server time) when alerts are held back. Checks keep running; outages are recorded as planned. For a one-off, use the bell on a service's page or in the monitoring panel."),
+        help: msg("Recurring times (server time) for planned work: alerts are held back, outages are recorded as planned and left out of uptime, and the status page shows it. For a one-off, use the wrench on a service's page or in the monitoring panel. To only silence notifications, use the bell."),
       },
       { key: "alerts.title", label: msg("Sender name"), placeholder: msg("NanoDash"), help: msg("Discord username, Gotify and ntfy title, and `title` in the webhook's JSON.") },
     ],
@@ -268,7 +268,7 @@ export const sections: Section[] = [
         label: msg("Every signed-in user may"),
         kind: "list",
         placeholder: msg("finance, travel, watchlist"),
-        help: msg("Comma-separated: finance, travel, watchlist (those sections), inventory (the device list), actions (start/stop buttons and switches). Empty field = finance, travel, watchlist. Groups below can add more."),
+        help: msg("Comma-separated: finance, travel, watchlist (those sections), inventory (the device list), notes (notes and runbooks), actions (start/stop buttons and switches). Empty field = finance, travel, watchlist. Groups below can add more."),
       },
       { key: "auth.baseUrl", label: msg("Public URL (for SSO redirects)"), placeholder: "https://home.example.com" },
       {
@@ -389,6 +389,8 @@ export const sections: Section[] = [
       { key: "statusPage.days", label: msg("Days of history on the status page"), kind: "number", placeholder: "90" },
       { key: "statusPage.showIncidents", label: msg("List of outages"), kind: "boolean", default: true },
       { key: "statusPage.incidentDays", label: msg("Outages of the last (days)"), kind: "number", placeholder: "14" },
+      { key: "statusPage.showPosted", label: msg("Incidents you post"), kind: "boolean", default: true, help: msg("Post them, with updates, from the monitoring panel (press m).") },
+      { key: "statusPage.showUpcoming", label: msg("Upcoming maintenance"), kind: "boolean", default: true, help: msg("Planned maintenance of the next 7 days, with its public message.") },
       { key: "statusPage.footer", label: msg("Footer"), kind: "textarea", placeholder: msg("Questions: me@example.com") },
       { key: "statusPage.dashboardLink", label: msg("Link to the dashboard"), kind: "boolean" },
 

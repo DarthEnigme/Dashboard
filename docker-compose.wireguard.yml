@@ -1,0 +1,36 @@
+# Reach services behind a WireGuard VPN (a second site, a remote homelab) from NanoDash.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.wireguard.yml up -d
+#
+# A small WireGuard client runs next to NanoDash, and NanoDash shares its network: every check,
+# widget and integration can then reach the subnets the tunnel carries. NanoDash itself stays
+# unprivileged; only the "wg" container gets NET_ADMIN.
+#
+# Put the client config at ./wireguard/wg_confs/wg0.conf (see wireguard/wg0.conf.example). Keep its
+# AllowedIPs to the remote subnets only, so local and internet traffic don't go through the tunnel.
+# Needs Docker Compose 2.24 or newer (for !reset below).
+services:
+  wg:
+    image: lscr.io/linuxserver/wireguard:latest
+    container_name: page-wg
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ:-Etc/UTC}
+    volumes:
+      # wg_confs/wg0.conf holds the client's private key: keep this folder private.
+      - ./wireguard:/config
+    # NanoDash's port is published here: a container sharing another one's network can't publish its own.
+    ports:
+      - "3000:3000"
+
+  page:
+    network_mode: service:wg
+    depends_on:
+      - wg
+    ports: !reset []

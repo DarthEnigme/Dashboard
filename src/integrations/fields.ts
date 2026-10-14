@@ -427,7 +427,39 @@ export const integrationFields: Record<string, { label: string; fields: FieldSpe
     label: "Authentik",
     fields: [
       { key: "url", label: "URL", placeholder: "https://auth.example.com", required: true },
-      { key: "key", label: "API token", secret: true, required: true },
+      { key: "key", label: "API token", secret: true, required: true, help: "Outposts and version need a token of a user who may see them (admin)." },
+      { key: "insecure", label: "Allow self-signed TLS", kind: "boolean" },
+    ],
+  },
+  vaultwarden: {
+    label: "Vaultwarden",
+    fields: [
+      { key: "url", label: "URL", placeholder: "https://vault.example.com", required: true },
+      {
+        key: "adminToken",
+        label: "Admin token (optional)",
+        secret: true,
+        help: "The ADMIN_TOKEN (the plain one, not its hash). Adds users, 2FA and activity. Only use it on a private network.",
+      },
+      { key: "insecure", label: "Allow self-signed TLS", kind: "boolean" },
+    ],
+  },
+  "homeassistant-energy": {
+    label: "Home Assistant energy",
+    fields: [
+      { key: "url", label: "URL", placeholder: "http://homeassistant.local:8123", required: true },
+      { key: "token", label: "Long-lived access token", secret: true, required: true, help: "Profile → Security → Long-lived access tokens." },
+      {
+        key: "entities",
+        label: "Energy sensors",
+        kind: "yaml",
+        placeholder: "consumption: sensor.house_energy\nsolar: sensor.solar_energy\ngridImport: sensor.grid_import\ngridExport: sensor.grid_export\npower: [sensor.house_power]",
+        help: "Meters that count up, in kWh (the ones in Settings → Energy). Any can be left out; power lists sensors in W shown as they are now.",
+        required: true,
+      },
+      { key: "price", label: "Price per kWh from the grid", kind: "number", placeholder: "0.25" },
+      { key: "currency", label: "Currency", placeholder: "€" },
+      { key: "insecure", label: "Allow self-signed TLS", kind: "boolean" },
     ],
   },
   jellyfin: {

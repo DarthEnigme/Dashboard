@@ -3,7 +3,7 @@ import { serviceIds } from "./config/slug";
 import { closeIncident, getAppMeta, insertPing, openIncident, openIncidents, pingsBetween, pruneHistory, setAppMeta, unrolledHours, upsertHour } from "./db";
 import { checkSpec, runCheck, type CertInfo, type PingResult } from "./checks";
 import { alertDecision, evaluate, hasAlertChannel, sendAlert, sendNotice, type AlertState } from "./alerts";
-import { listMutes, mutedNow, type Mutes } from "./maintenance";
+import { listMaintenance, listMutes, mutedNow, quietNow, type Maintenance, type Mutes } from "./maintenance";
 import type { Service, Settings } from "./config/schema";
 import { fetchWidget } from "./widgets";
 import { describeRule, evaluateThreshold, numericValue, widgetExtras, type BreachState } from "./thresholds";
@@ -33,7 +33,7 @@ interface MonitorState {
  * Read widgets that record history or have thresholds: store their numbers and alert when a
  * value stays past its limit (and again when it is back).
  */
-async function recordMetrics(state: MonitorState, services: { id: string; service: Service }[], settings: Settings, mutes: Mutes) {
+async function recordMetrics(state: MonitorState, services: { id: string; service: Service }[], settings: Settings, mutes: Mutes, oneoffs: Maintenance[]) {
   const now = Date.now();
   const alertsOn = hasAlertChannel(settings.alerts);
   await mapLimit(services, CONCURRENCY, async ({ id, service }) => {
@@ -57,8 +57,8 @@ async function recordMetrics(state: MonitorState, services: { id: string; servic
       const v = field ? numericValue(field) : undefined;
       if (v === undefined) continue;
       const key = `${id}|${label}`;
-      // Muted (maintenance): no alert, and no memory of the breach, so one that outlasts the mute is reported then.
-      if (mutedNow(settings.maintenance, mutes, id, new Date(now))) {
+      // Muted or in maintenance: no alert, and no memory of the breach, so one that outlasts it is reported then.
+      if (quietNow(settings.maintenance, mutes, oneoffs, id, new Date(now)).held) {
         state.breaches.delete(key);
         continue;
       }
@@ -87,7 +87,7 @@ async function recordMetrics(state: MonitorState, services: { id: string; servic
 export const certFor = (id: string): CertInfo | undefined => g.__pageMonitor?.certs.get(id);
 
 /** Why a check failed, for incidents and alerts: the check's own reason beats the bare status. */
-export const failureCause = (r: PingResult) => r.error ?? (r.status ? `HTTP ${r.status}` : "no response");
+const failureCause = (r: PingResult) => r.error ?? (r.status ? `HTTP ${r.status}` : "no response");
 
 /** Once a day per service while a certificate is within `certDays` of expiring (or expired). */
 async function certNotice(settings: Settings, id: string, service: Service, cert: CertInfo) {
@@ -157,34 +157,34 @@ async function tick(state: MonitorState): Promise<number> {
   const alertsOn = hasAlertChannel(settings.alerts);
   dropStale(state, new Set(targets.map((t) => t.id)), new Set(ids.flat()));
   const mutes = listMutes();
+  const oneoffs = listMaintenance();
 
   // Alongside the checks, so a slow widget doesn't hold them up.
   let metrics: Promise<void> | undefined;
   if (Date.now() - state.lastMetrics >= settings.metricsInterval * 1000 - 1000) {
     state.lastMetrics = Date.now();
     const widgets = cfg.services.flatMap((grp, gi) => grp.services.map((s, si) => ({ id: ids[gi][si], service: s }))).filter((t) => t.service.widget);
-    metrics = recordMetrics(state, widgets, settings, mutes).catch((e) => console.error("[nanodash] recording metrics failed:", e));
+    metrics = recordMetrics(state, widgets, settings, mutes, oneoffs).catch((e) => console.error("[nanodash] recording metrics failed:", e));
   }
 
   await mapLimit(targets, CONCURRENCY, async ({ id, service, check }) => {
     const r = await runCheck(check);
     const now = r.at ?? Date.now();
-    insertPing({ service_id: id, ts: now, up: r.up ? 1 : 0, status: r.status ?? null, latency_ms: r.latencyMs ?? null });
+    const { maintenance, held } = quietNow(settings.maintenance, mutes, oneoffs, id, new Date(now));
+    insertPing({ service_id: id, ts: now, up: r.up ? 1 : 0, status: r.status ?? null, latency_ms: r.latencyMs ?? null, maint: maintenance ? 1 : 0 });
     count("page_checks_total", { result: r.up ? "up" : "down" });
-    const maintenance = mutedNow(settings.maintenance, mutes, id, new Date(now));
-    const muted = !!maintenance;
     if (r.cert) {
       state.certs.set(id, r.cert);
-      if (!muted) await certNotice(settings, id, service, r.cert).catch((e) => console.warn(`[nanodash] certificate notice for ${service.name} failed:`, e));
+      if (!held) await certNotice(settings, id, service, r.cert).catch((e) => console.warn(`[nanodash] certificate notice for ${service.name} failed:`, e));
     }
 
     // Outages are always recorded as incidents; alerts are only sent when a channel is configured.
     const prev = state.outages.get(id) ?? { failures: 0, down: false };
     const { state: evaluated, event } = evaluate(prev, r.up, settings.alerts.threshold, now);
-    // While muted (maintenance) an outage is recorded as planned and its alert held back.
-    const { state: next, send } = alertDecision(prev, evaluated, event, muted);
+    // Muted or in maintenance: the alert is held back. Only maintenance makes the outage planned.
+    const { state: next, send } = alertDecision(prev, evaluated, event, held);
     state.outages.set(id, next);
-    if (event?.kind === "down") openIncident(id, event.since, failureCause(r), muted, maintenance);
+    if (event?.kind === "down") openIncident(id, event.since, failureCause(r), !!maintenance, maintenance);
     else if (event?.kind === "recovered") closeIncident(id, now);
 
     if (!send || !alertsOn || service.alert === false) return;
@@ -234,7 +234,9 @@ export function startMonitor() {
   g.__pageMonitor = state;
   // Outages that were open when the server stopped stay open until the service is seen up again.
   try {
-    for (const i of openIncidents()) state.outages.set(i.service_id, { failures: 1, down: true, since: i.start, suppressed: !!i.planned });
+    // Held back if planned, or if the service is still muted (a muted outage is not planned).
+    const mutes = listMutes();
+    for (const i of openIncidents()) state.outages.set(i.service_id, { failures: 1, down: true, since: i.start, suppressed: !!i.planned || !!mutedNow(mutes, i.service_id) });
   } catch (e) {
     console.warn("[nanodash] could not load open incidents:", e);
   }

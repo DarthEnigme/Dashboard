@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { loadConfig } from "@/lib/config/load";
 import { clientAuth } from "@/lib/auth";
+import { personal } from "@/lib/userLook";
 import { Background } from "@/components/Background";
 import { FinancePage } from "@/components/finance/FinancePage";
 
@@ -14,7 +15,7 @@ export default async function Finance() {
   const { alerts, docker, auth: _a, ...settings } = loadConfig().settings;
   return (
     <>
-      <Background settings={settings} />
+      <Background settings={await personal(settings)} />
       <FinancePage currency={settings.finance.currency} />
     </>
   );

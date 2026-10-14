@@ -5,5 +5,10 @@ data
 scripts
 !scripts/updater.mjs
 .git
+.github
 tests
+test-results
+playwright-report
+*.tsbuildinfo
 grafana
+wireguard

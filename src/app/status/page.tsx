@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, CircleDashed, Info, LayoutGrid, TriangleAlert, Wrench, XCircle } from "lucide-react";
+import { CalendarClock, CheckCircle2, CircleDashed, Info, LayoutGrid, Megaphone, TriangleAlert, Wrench, XCircle } from "lucide-react";
 import { loadConfig } from "@/lib/config/load";
-import { statusPageData, type StatusDay, type StatusService } from "@/lib/statusPage";
+import { statusPageData, type StatusDay, type StatusPosted, type StatusService } from "@/lib/statusPage";
+import { msg } from "@/i18n";
 import { duration } from "@/integrations/format";
+import { personal } from "@/lib/userLook";
 import { Background } from "@/components/Background";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { Markdown } from "@/components/settings/Markdown";
@@ -23,6 +25,9 @@ export function generateMetadata(): Metadata {
 }
 
 const pct = (u: number | null) => (u === null ? "–" : `${(u * 100).toFixed(u === 1 ? 0 : 2)}%`);
+const STATUS_LABELS = { investigating: msg("Investigating"), identified: msg("Identified"), monitoring: msg("Monitoring"), resolved: msg("Resolved") } as const;
+const IMPACT_LABELS = { minor: msg("Minor"), major: msg("Major"), maintenance: msg("Maintenance") } as const;
+
 const barColor = (u: number | null) => (u === null ? "bg-track" : u >= 0.999 ? "bg-[var(--ok)]" : u >= 0.95 ? "bg-[var(--warn)]" : "bg-[var(--err)]");
 
 /**
@@ -46,10 +51,15 @@ export default async function StatusPage() {
   const groups = cfg.showGroups ? [...new Set(data.services.map((s) => s.group))] : [undefined];
   const unknown = data.services.length > 0 && data.services.every((s) => s.up === null);
   const warn = cfg.announcementLevel === "warn";
+  // Incidents an admin posted and hasn't resolved: they shape the banner too.
+  const open = data.posted.filter((p) => p.end === null);
+  const past = data.posted.filter((p) => p.end !== null);
+  const issue = open.find((p) => p.impact === "major") ?? open.find((p) => p.impact === "minor");
+  const tone = data.down || issue?.impact === "major" ? "text-[var(--err)]" : issue ? "text-[var(--warn)]" : unknown || !data.services.length ? "text-muted" : "text-[var(--ok)]";
 
   return (
     <>
-      <Background settings={settings} />
+      <Background settings={await personal(settings)} />
       <AutoRefresh seconds={60} />
       <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10 sm:px-6">
         <header className="flex items-center gap-4">
@@ -81,19 +91,58 @@ export default async function StatusPage() {
           </section>
         )}
 
-        <section
-          role="status"
-          className={`glass flex items-center gap-3 rounded-3xl p-5 text-lg font-semibold ${data.down ? "text-[var(--err)]" : unknown || !data.services.length ? "text-muted" : "text-[var(--ok)]"}`}
-        >
-          {data.down ? <XCircle className="h-6 w-6 shrink-0" aria-hidden /> : unknown || !data.services.length ? <CircleDashed className="h-6 w-6 shrink-0" aria-hidden /> : <CheckCircle2 className="h-6 w-6 shrink-0" aria-hidden />}
+        <section role="status" className={`glass flex items-center gap-3 rounded-3xl p-5 text-lg font-semibold ${tone}`}>
+          {data.down ? (
+            <XCircle className="h-6 w-6 shrink-0" aria-hidden />
+          ) : issue ? (
+            <TriangleAlert className="h-6 w-6 shrink-0" aria-hidden />
+          ) : unknown || !data.services.length ? (
+            <CircleDashed className="h-6 w-6 shrink-0" aria-hidden />
+          ) : (
+            <CheckCircle2 className="h-6 w-6 shrink-0" aria-hidden />
+          )}
           {!data.services.length
             ? t("No services are listed here yet.")
             : data.down
               ? t.plural(data.down, "{n} service is down", "{n} services are down")
-              : unknown
-                ? t("Waiting for the first checks")
-                : t("All services are up")}
+              : issue
+                ? issue.title
+                : unknown
+                  ? t("Waiting for the first checks")
+                  : t("All services are up")}
         </section>
+
+        {open.length > 0 && (
+          <section className="glass flex flex-col gap-4 rounded-3xl p-5" aria-labelledby="current-incidents">
+            <h2 id="current-incidents" className="flex items-center gap-2 text-sm font-semibold tracking-wider text-muted uppercase">
+              <Megaphone className="h-4 w-4" aria-hidden /> {t("Current incidents")}
+            </h2>
+            {open.map((p) => (
+              <Posted key={p.id} p={p} t={t} when={when} />
+            ))}
+          </section>
+        )}
+
+        {data.upcoming.length > 0 && (
+          <section className="glass flex flex-col gap-3 rounded-3xl p-5" aria-labelledby="upcoming">
+            <h2 id="upcoming" className="flex items-center gap-2 text-sm font-semibold tracking-wider text-muted uppercase">
+              <CalendarClock className="h-4 w-4" aria-hidden /> {t("Upcoming maintenance")}
+            </h2>
+            <ol className="flex flex-col gap-1.5">
+              {data.upcoming.map((u) => (
+                <li key={`${u.start}-${u.services.join()}-${u.name ?? ""}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-xl bg-chip px-3 py-2 text-sm" data-upcoming>
+                  <span className="font-medium">{u.services.length ? u.services.join(", ") : t("All services")}</span>
+                  {u.name && <span className="rounded-full bg-track px-2 text-xs text-muted">{u.name}</span>}
+                  <span className="ml-auto text-muted tabular-nums">
+                    {when(u.start)}
+                    {u.end !== null && ` → ${when(u.end)}`}
+                  </span>
+                  {u.note && <span className="w-full text-xs text-muted">{u.note}</span>}
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
 
         {groups.map((group) => (
           <section key={group ?? "all"} className="glass flex flex-col gap-4 rounded-3xl p-5">
@@ -127,6 +176,17 @@ export default async function StatusPage() {
             </ul>
           </section>
         ))}
+
+        {past.length > 0 && (
+          <section className="glass flex flex-col gap-4 rounded-3xl p-5" aria-labelledby="past-incidents">
+            <h2 id="past-incidents" className="text-sm font-semibold tracking-wider text-muted uppercase">
+              {t.plural(cfg.incidentDays, "Incidents in the last day", "Incidents in the last {n} days")}
+            </h2>
+            {past.map((p) => (
+              <Posted key={p.id} p={p} t={t} when={when} />
+            ))}
+          </section>
+        )}
 
         {cfg.showIncidents && (
           <section className="glass flex flex-col gap-3 rounded-3xl p-5">
@@ -167,4 +227,38 @@ export default async function StatusPage() {
 function State({ s, t }: { s: StatusService; t: T }) {
   if (s.up === null) return <CircleDashed className="h-4 w-4 shrink-0 text-muted" aria-label={t("Not checked yet")} />;
   return s.up ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--ok)]" aria-label={t("Up")} /> : <XCircle className="h-4 w-4 shrink-0 text-[var(--err)]" aria-label={t("Down")} />;
+}
+
+/** One posted incident: title, impact, services, and its updates (newest first; older ones folded). */
+function Posted({ p, t, when }: { p: StatusPosted; t: T; when: (ms: number) => string }) {
+  const [latest, ...older] = p.updates;
+  const tone = p.end !== null ? "text-[var(--ok)]" : p.impact === "major" ? "text-[var(--err)]" : p.impact === "maintenance" ? "text-accent" : "text-[var(--warn)]";
+  const Update = ({ u }: { u: StatusPosted["updates"][number] }) => (
+    <li className="flex flex-col gap-0.5">
+      <span className="text-xs text-muted">
+        <strong className="font-semibold text-fg">{t(STATUS_LABELS[u.status])}</strong> · {when(u.at)}
+      </span>
+      {u.body && <Markdown text={u.body} />}
+    </li>
+  );
+  return (
+    <article className="flex flex-col gap-2 rounded-2xl bg-chip p-4" data-posted={p.title}>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className={`min-w-0 flex-1 font-semibold ${tone}`}>{p.title}</h3>
+        <span className="rounded-full bg-track px-2 py-0.5 text-xs text-muted">{t(IMPACT_LABELS[p.impact])}</span>
+      </div>
+      {p.services.length > 0 && <p className="text-xs text-muted">{p.services.join(", ")}</p>}
+      <ol className="flex flex-col gap-2">{latest && <Update u={latest} />}</ol>
+      {older.length > 0 && (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-xs text-muted">{t.plural(older.length, "{n} earlier update", "{n} earlier updates")}</summary>
+          <ol className="mt-2 flex flex-col gap-2 border-l border-line pl-3">
+            {older.map((u, i) => (
+              <Update key={i} u={u} />
+            ))}
+          </ol>
+        </details>
+      )}
+    </article>
+  );
 }

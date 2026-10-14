@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getConfig } from "@/lib/config";
 import { sanitize } from "@/lib/config/sanitize";
 import { clientAuth, seeFilter } from "@/lib/auth";
+import { personal } from "@/lib/userLook";
 import { Background } from "@/components/Background";
 import { ServiceDetail } from "@/components/ServiceDetail";
 
@@ -15,10 +16,11 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
   const group = config.services.find((g) => g.services.some((s) => s.id === id));
   const service = group?.services.find((s) => s.id === id);
   if (!group || !service) notFound();
+  const settings = await personal(config.settings);
   return (
     <>
-      <Background settings={config.settings} />
-      <ServiceDetail service={service} group={group.name} settings={config.settings} canAct={!!auth.user?.permissions.includes("actions")} canMute={auth.user?.role === "admin"} />
+      <Background settings={settings} />
+      <ServiceDetail service={service} group={group.name} settings={settings} canAct={!!auth.user?.permissions.includes("actions")} canMute={auth.user?.role === "admin"} />
     </>
   );
 }

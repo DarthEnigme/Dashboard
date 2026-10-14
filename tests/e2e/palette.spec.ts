@@ -71,8 +71,11 @@ test.describe.serial("command palette", () => {
     await box.fill("theme light");
     await box.press("Enter");
     await expect(page.locator('html[data-theme="light"]')).toBeAttached();
-    expect(readConfig("settings")).toMatch(/^theme: light$/m);
-    expect(readConfig("settings")).toContain("# e2e fixture"); // comments kept
+    // Your own look: the global theme stays as it was.
+    const mine = (await (await page.request.get("/api/profile/prefs")).json()) as { prefs: { theme?: string } };
+    expect(mine.prefs.theme).toBe("light");
+    expect(readConfig("settings")).not.toMatch(/^theme: light$/m);
+    await page.request.patch("/api/profile/prefs", { data: { reset: true }, headers: { origin: new URL(page.url()).origin } });
 
     await openPalette(page);
     await box.fill("edit dashboard");

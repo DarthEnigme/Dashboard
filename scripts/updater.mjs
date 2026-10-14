@@ -38,9 +38,17 @@ export function planRecreate(old, oldImage, newImageRef) {
   }
   // Docker's default hostname is the short container id: let the new container get its own.
   if (oc.Hostname && old.Id?.startsWith(oc.Hostname)) delete config.Hostname;
+  // Sharing another container's network (a WireGuard sidecar): the hostname is that container's,
+  // and Docker refuses one of our own.
+  const shared = /^(container|service):/.test(old.HostConfig?.NetworkMode ?? "");
+  if (shared) {
+    delete config.Hostname;
+    delete config.Domainname;
+    delete config.ExposedPorts;
+  }
 
   const shortId = (old.Id ?? "").slice(0, 12);
-  const networks = Object.entries(old.NetworkSettings?.Networks ?? {}).map(([name, n]) => ({
+  const networks = Object.entries(shared ? {} : (old.NetworkSettings?.Networks ?? {})).map(([name, n]) => ({
     name,
     endpoint: {
       Aliases: (n.Aliases ?? []).filter((a) => a !== shortId && a !== old.Id),

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { loadConfig } from "@/lib/config/load";
 import { clientAuth } from "@/lib/auth";
+import { personal } from "@/lib/userLook";
 import { Background } from "@/components/Background";
 import { WatchlistPage } from "@/components/watchlist/WatchlistPage";
 
@@ -14,7 +15,7 @@ export default async function Watchlist() {
   const { alerts, docker, auth: _a, ...settings } = loadConfig().settings;
   return (
     <>
-      <Background settings={settings} />
+      <Background settings={await personal(settings)} />
       <WatchlistPage />
     </>
   );

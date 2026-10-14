@@ -37,3 +37,26 @@ test.describe.serial("watchlist", () => {
     await expect(page.locator("[data-watch='Dune']")).toBeVisible();
   });
 });
+
+test.describe.serial("watchlist lists, tags and sync", () => {
+  test("tag an item, put it on a list, and sync from Jellyfin", async ({ page }) => {
+    await page.goto("/watchlist");
+    await page.getByRole("tab", { name: /Planned/ }).click();
+    await page.locator("[data-watch='Arrival']").click();
+    await page.getByLabel("List", { exact: true }).fill("Sci-fi night");
+    await page.getByLabel("Tags (comma-separated)").fill("sci-fi, with Sam");
+    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "with Sam" }).click();
+    await expect(page.locator("[data-watch='Arrival']")).toBeVisible();
+    await page.getByRole("button", { name: "with Sam" }).click();
+
+    await page.getByText("Sync from Jellyfin or Plex").click();
+    await page.getByLabel("Your name on that server").fill("tester");
+    await page.getByRole("button", { name: "Link" }).click();
+    await page.getByRole("button", { name: "Sync now" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "1 added, 1 updated." })).toBeVisible();
+    await page.getByRole("tab", { name: /Finished/ }).click();
+    await expect(page.locator("[data-watch='Arrival']")).toBeVisible();
+    await expect(page.locator("[data-watch='Severance']")).toBeVisible();
+  });
+});

@@ -108,3 +108,26 @@ test.describe.serial("appearance", () => {
   });
 
 });
+
+test("each user picks their own look, without touching the global one", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Account: / }).click();
+  await page.getByRole("menuitem", { name: "Appearance" }).click();
+  await expect(page.getByRole("heading", { name: "Your appearance" })).toBeVisible();
+  // Previews at once.
+  await page.locator('[data-theme-option="nord"]').click();
+  await expect(page.locator("html[data-palette]")).toBeAttached();
+  await page.getByRole("button", { name: "Save" }).click();
+  // Saving reloads the page, drawn with the new look.
+  await expect(page.getByRole("heading", { name: "Your appearance" })).toHaveCount(0);
+  await page.goto("/");
+  await expect(page.locator("html[data-palette]")).toBeAttached();
+  const mine = (await (await page.request.get("/api/profile/prefs")).json()) as { prefs: { theme?: string }; defaults: { theme: string } };
+  expect(mine.prefs.theme).toBe("nord");
+  expect(mine.defaults.theme).not.toBe("nord");
+  // Back to the dashboard's look.
+  const reset = await page.request.patch("/api/profile/prefs", { data: { reset: true }, headers: { origin: new URL(page.url()).origin } });
+  expect(reset.ok()).toBe(true);
+  await page.goto("/");
+  await expect(page.locator("html[data-palette]")).toHaveCount(0);
+});

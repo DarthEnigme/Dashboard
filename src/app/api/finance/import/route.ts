@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { loadConfig } from "@/lib/config/load";
 import { guessMapping, mapRows, parseCsv, type CsvMapping } from "@/lib/finance/csv";
 import { importTransactions } from "@/lib/finance/store";
+import { listRules, matchRule } from "@/lib/finance/rules";
 import { isZip, readXlsx } from "@/lib/finance/xlsx";
 import { audit } from "@/lib/auth/users";
 import { bad, guard } from "../_shared";
@@ -45,7 +46,13 @@ export async function POST(req: Request) {
     return bad("Choose the date, description and amount (or debit/credit) columns");
   }
   const { transactions, errors } = mapRows(rows, m);
-  if (!b.commit) return NextResponse.json({ preview: transactions.slice(0, 10), total: transactions.length, errors: errors.slice(0, 20) });
+  if (!b.commit) {
+    // Show the category the rules will give rows that have none.
+    const rules = listRules();
+    const account = typeof b.account === "string" ? b.account : null;
+    const preview = transactions.slice(0, 10).map((t) => (t.category ? t : { ...t, category: matchRule(rules, t.description, account)?.category, byRule: !!matchRule(rules, t.description, account) }));
+    return NextResponse.json({ preview, total: transactions.length, errors: errors.slice(0, 20) });
+  }
 
   const currency = typeof b.currency === "string" && /^[A-Za-z]{3}$/.test(b.currency) ? b.currency.toUpperCase() : loadConfig().settings.finance.currency;
   const result = importTransactions(

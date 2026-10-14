@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { localDay } from "@/lib/day";
 
-export const WATCH_KINDS = ["book", "movie", "show", "game", "other"] as const;
+const WATCH_KINDS = ["book", "movie", "show", "game", "other"] as const;
 export const WATCH_STATUSES = ["planned", "active", "done", "dropped"] as const;
 export type WatchKind = (typeof WATCH_KINDS)[number];
 export type WatchStatus = (typeof WATCH_STATUSES)[number];
@@ -22,6 +22,10 @@ export interface WatchItem {
   started: string | null;
   finished: string | null;
   notes: string | null;
+  /** Free labels: "sci-fi", "with Sam"… */
+  tags: string[];
+  /** A shelf of your own ("Summer 2026", "Classics"), or null. */
+  list: string | null;
 }
 
 export interface WatchStats {
@@ -44,14 +48,43 @@ const day = (d: unknown) => (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test
 /** Covers come from Open Library, or any http(s) image the person gives. */
 const coverUrl = (u: unknown) => (typeof u === "string" && /^https?:\/\/\S+$/.test(u) ? u.slice(0, 500) : null);
 
+/** Up to 20 tags of 40 characters, trimmed, without duplicates (ignoring case). */
+export function cleanTags(v: unknown): string[] {
+  const list = Array.isArray(v) ? v : typeof v === "string" ? v.split(",") : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of list) {
+    const tag = typeof t === "string" ? t.trim().slice(0, 40) : "";
+    if (!tag || seen.has(tag.toLowerCase())) continue;
+    seen.add(tag.toLowerCase());
+    out.push(tag);
+  }
+  return out.slice(0, 20);
+}
+
+const parseTags = (json: string | null): string[] => {
+  try {
+    return cleanTags(JSON.parse(json ?? "[]"));
+  } catch {
+    return [];
+  }
+};
+
 export function listItems(userId: number): WatchItem[] {
-  return db()
+  const rows = db()
     .prepare(
-      `SELECT id, kind, title, creator, year, cover, external_id, status, rating, progress, total, started, finished, notes FROM watch_items
+      `SELECT id, kind, title, creator, year, cover, external_id, status, rating, progress, total, started, finished, notes, tags, list FROM watch_items
        WHERE owner_id = ?
        ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'planned' THEN 1 WHEN 'done' THEN 2 ELSE 3 END, COALESCE(finished, '') DESC, created_at DESC`,
     )
-    .all(userId) as unknown as WatchItem[];
+    .all(userId) as unknown as (Omit<WatchItem, "tags"> & { tags: string | null })[];
+  return rows.map((r) => ({ ...r, tags: parseTags(r.tags) }));
+}
+
+/** Every tag and list in use, for suggestions and filters. */
+export function tagsAndLists(items: WatchItem[]): { tags: string[]; lists: string[] } {
+  const sorted = (xs: string[]) => [...new Map(xs.map((x) => [x.toLowerCase(), x])).values()].sort((a, b) => a.localeCompare(b));
+  return { tags: sorted(items.flatMap((i) => i.tags)), lists: sorted(items.flatMap((i) => (i.list ? [i.list] : []))) };
 }
 
 export function addItem(userId: number, b: Record<string, unknown>): WatchItem[] {
@@ -61,8 +94,8 @@ export function addItem(userId: number, b: Record<string, unknown>): WatchItem[]
   const status = WATCH_STATUSES.includes(b.status as WatchStatus) ? (b.status as WatchStatus) : "planned";
   db()
     .prepare(
-      `INSERT INTO watch_items (owner_id, kind, title, creator, year, cover, external_id, status, total, started, finished, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO watch_items (owner_id, kind, title, creator, year, cover, external_id, status, total, started, finished, tags, list, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       userId,
@@ -75,7 +108,9 @@ export function addItem(userId: number, b: Record<string, unknown>): WatchItem[]
       status,
       int(b.total, 1, 100_000),
       status === "active" || status === "done" ? today() : null,
-      status === "done" ? today() : null,
+      status === "done" ? (day(b.finished) ?? today()) : null,
+      JSON.stringify(cleanTags(b.tags)),
+      text(b.list, 60),
       Date.now(),
     );
   return listItems(userId);
@@ -86,8 +121,9 @@ export function addItem(userId: number, b: Record<string, unknown>): WatchItem[]
  * it today and fills the progress; going back to "planned" clears both dates.
  */
 export function updateItem(userId: number, id: number, b: Record<string, unknown>): WatchItem[] {
-  const cur = db().prepare("SELECT * FROM watch_items WHERE id = ? AND owner_id = ?").get(id, userId) as WatchItem | undefined;
-  if (!cur) throw new Error("No such item");
+  const row = db().prepare("SELECT * FROM watch_items WHERE id = ? AND owner_id = ?").get(id, userId) as (Omit<WatchItem, "tags"> & { tags: string | null }) | undefined;
+  if (!row) throw new Error("No such item");
+  const cur: WatchItem = { ...row, tags: parseTags(row.tags) };
   const next: WatchItem = { ...cur };
   if (b.title !== undefined) next.title = text(b.title, 200) ?? cur.title;
   if (b.creator !== undefined) next.creator = text(b.creator, 200);
@@ -100,6 +136,8 @@ export function updateItem(userId: number, id: number, b: Record<string, unknown
   if (b.notes !== undefined) next.notes = text(b.notes, 4000);
   if (b.started !== undefined) next.started = day(b.started);
   if (b.finished !== undefined) next.finished = day(b.finished);
+  if (b.tags !== undefined) next.tags = cleanTags(b.tags);
+  if (b.list !== undefined) next.list = text(b.list, 60);
   if (b.status !== undefined && WATCH_STATUSES.includes(b.status as WatchStatus) && b.status !== cur.status) {
     next.status = b.status as WatchStatus;
     if (next.status === "active") next.started ??= today();
@@ -112,8 +150,8 @@ export function updateItem(userId: number, id: number, b: Record<string, unknown
   }
   if (next.total !== null && next.progress !== null && next.progress > next.total) next.progress = next.total;
   db()
-    .prepare("UPDATE watch_items SET kind = ?, title = ?, creator = ?, year = ?, cover = ?, status = ?, rating = ?, progress = ?, total = ?, started = ?, finished = ?, notes = ? WHERE id = ?")
-    .run(next.kind, next.title, next.creator, next.year, next.cover, next.status, next.rating, next.progress, next.total, next.started, next.finished, next.notes, id);
+    .prepare("UPDATE watch_items SET kind = ?, title = ?, creator = ?, year = ?, cover = ?, status = ?, rating = ?, progress = ?, total = ?, started = ?, finished = ?, notes = ?, tags = ?, list = ? WHERE id = ?")
+    .run(next.kind, next.title, next.creator, next.year, next.cover, next.status, next.rating, next.progress, next.total, next.started, next.finished, next.notes, JSON.stringify(next.tags), next.list, id);
   return listItems(userId);
 }
 

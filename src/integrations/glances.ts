@@ -81,7 +81,7 @@ export function shortUptime(s: string): string {
   return d ? `${d}d ${Number(h)}h` : Number(h) ? `${Number(h)}h ${Number(min)}m` : `${Number(min)}m`;
 }
 
-export function glancesClient(cfg: { url: string; version: number; username?: string; password?: string; insecure?: boolean }) {
+function glancesClient(cfg: { url: string; version: number; username?: string; password?: string; insecure?: boolean }) {
   const headers: Record<string, string> = {};
   if (cfg.username) headers.Authorization = `Basic ${Buffer.from(`${cfg.username}:${cfg.password ?? ""}`).toString("base64")}`;
   return <T,>(path: string) => httpJson<T>(`${trimSlash(cfg.url)}/api/${cfg.version}/${path}`, { headers, insecure: cfg.insecure });

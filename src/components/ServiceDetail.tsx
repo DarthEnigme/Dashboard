@@ -3,7 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink, Megaphone } from "lucide-react";
+import { createPortal } from "react-dom";
+import { IncidentsDialog } from "./IncidentsDialog";
 import { fetcher } from "@/lib/fetcher";
 import type { ClientService, ClientSettings } from "@/lib/config/sanitize";
 import type { Bucket, Range } from "@/lib/history";
@@ -14,7 +16,8 @@ import { StatusDot } from "./StatusDot";
 import { WidgetFields } from "./WidgetFields";
 import { MetricsSection } from "./MetricsSection";
 import { ActionMenu } from "./ActionMenu";
-import { MuteButton } from "./MuteButton";
+import { MaintenanceButton, MuteButton } from "./MuteButton";
+import { Runbook } from "./notes/Runbook";
 import { LineChart } from "./charts/LineChart";
 import { Legend, Tooltip, useWidth } from "./charts/common";
 import { msg } from "@/i18n";
@@ -46,13 +49,14 @@ interface Props {
   group: string;
   settings: ClientSettings;
   canAct: boolean;
-  /** Admins can mute this service's alerts. */
+  /** Admins can mute this service's alerts or put it in maintenance. */
   canMute?: boolean;
 }
 
 export function ServiceDetail({ service: s, group, settings, canAct, canMute }: Props) {
   const t = useT();
   const [range, setRange] = useState<Range>("24h");
+  const [posting, setPosting] = useState(false);
   const { data, isLoading } = useSWR<HistoryData>(
     s.ping ? `/api/history/${encodeURIComponent(s.id)}?range=${range}&incidents=1` : null,
     fetcher,
@@ -75,7 +79,14 @@ export function ServiceDetail({ service: s, group, settings, canAct, canMute }: 
           {s.description && <p className="text-sm text-muted">{s.description}</p>}
         </div>
         {s.ping && <StatusDot id={s.id} interval={settings.pingInterval} />}
+        {canMute && s.ping && <MaintenanceButton target={s.id} name={s.name} />}
         {canMute && s.ping && <MuteButton target={s.id} name={s.name} />}
+        {canMute && (
+          <button type="button" onClick={() => setPosting(true)} aria-label={t("Post an incident about {name}", { name: s.name })} title={t("Post an incident")} className="grid h-9 w-9 place-items-center rounded-full bg-chip text-muted hover:text-fg">
+            <Megaphone className="h-4 w-4" />
+          </button>
+        )}
+        {posting && createPortal(<IncidentsDialog services={[{ id: s.id, name: s.name }]} service={s.id} onClose={() => setPosting(false)} />, document.body)}
         {canAct && s.actions && <ActionMenu service={s} />}
         {s.href && (
           <a
@@ -88,6 +99,8 @@ export function ServiceDetail({ service: s, group, settings, canAct, canMute }: 
           </a>
         )}
       </header>
+
+      <Runbook serviceId={s.id} />
 
       {s.widget && (
         <section className="glass flex flex-col gap-3 rounded-3xl p-5">

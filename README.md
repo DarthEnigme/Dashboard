@@ -20,7 +20,9 @@ A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Hom
   - calendars (iCal, Sonarr, Radarr), RSS, and any JSON API
 - **Status checks:** HTTP (status codes, keywords, JSON values), TCP, UDP, TCP + UDP together, ICMP, DNS, SNMP and Minecraft, with TLS certificate expiry warnings
 - **Widget history:** record any widget's numbers, chart them, and alert when they cross a threshold
-- **Finance tracker:** spending, income and balance charts; a money-flow (Sankey) chart; budgets per category with alerts; CSV bank import; Firefly III sync
+- **Finance tracker:** spending, income and balance charts; a money-flow (Sankey) chart; budgets per category with alerts; subcategories and category rules; subscriptions with renewal reminders; CSV bank import; Firefly III sync
+- **Apps:** a travel log, a watchlist and reading list (with lists, tags and sync from Jellyfin or Plex), a device inventory, and notes with runbooks shown on service pages
+- **Public status page** with uptime bars, incidents you post with updates, and upcoming maintenance
 - **Accounts:**
   - local users, LDAP, OpenID Connect (Authentik, Authelia, Keycloak…), Google, GitHub, or your reverse proxy
   - signups off by default
@@ -43,6 +45,29 @@ docker compose up -d
 Open http://localhost:3000 and choose **Set up** to create the admin account (or set `HOMEPAGE_ADMIN_PASSWORD` to create user `admin` automatically). On first start, example config files are written to `./config`. History, users and finance data are stored in `./data`.
 
 `docker-compose.yml` runs the image CI publishes to `ghcr.io/darthenigme/dashboard` (amd64 and arm64): `:latest` follows `main`, and every release also gets its version tag (`:0.4.0`). To build from source instead, swap `image:` for `build: .` and run `docker compose up -d --build`.
+
+### Reaching services through WireGuard
+
+When NanoDash runs somewhere else than the services it watches (a VPS, a second site), it can reach them through a WireGuard tunnel. A small WireGuard client runs next to NanoDash and NanoDash shares its network, so every check, widget, integration and inventory status reaches the remote subnets with nothing to change in NanoDash. NanoDash stays unprivileged; only the WireGuard container gets `NET_ADMIN`.
+
+1. On your WireGuard server, create a client for NanoDash (in wg-easy: **New client**, then download its config).
+2. Save it as `wireguard/wg_confs/wg0.conf` (`wireguard/wg0.conf.example` explains each line). Set `AllowedIPs` to the remote subnets only, e.g. `10.8.0.0/24, 192.168.50.0/24`. With `0.0.0.0/0`, all of NanoDash's traffic (local services, updates, alerts) would go through the tunnel.
+3. Start both files together (Docker Compose 2.24 or newer):
+
+   ```sh
+   docker compose -f docker-compose.yml -f docker-compose.wireguard.yml up -d
+   ```
+
+4. Use the remote addresses in your services as usual, e.g. `href: http://192.168.50.10:8080`.
+
+Good to know:
+- NanoDash's port is published by the `wg` container (a container sharing another one's network can't publish its own), so it is still at http://localhost:3000.
+- The Docker socket, Docker discovery and one-click updates work as before.
+- If the tunnel drops, remote services show as down and alert like any outage. To watch the tunnel itself, add the `wireguard` widget for your wg-easy server, or a `tcp` check on a host on the far side.
+- Names that only the remote side knows need their IP address, or `DNS =` in the config, which sends *every* lookup through the tunnel.
+- `docker compose exec wg wg show` shows the tunnel and its last handshake. `docker compose exec page wget -qO- http://192.168.50.10:8080` tests a remote address from NanoDash's side.
+- Wake-on-LAN doesn't cross the tunnel: the magic packet is a broadcast, and WireGuard only carries routed traffic.
+- Without Docker, run `wg-quick up wg0` with the same split `AllowedIPs` on the machine that runs NanoDash.
 
 ## Updating
 
@@ -275,6 +300,7 @@ When no icon is set or it fails to load, the tile shows the service's initials.
 | `ghostfolio` | `url`, `token` (security token), `currency` | Net worth, today, total return |
 | `customapi` | `url`, `method`, `headers`, `body`, `mappings` | Any JSON values you map |
 | `homeassistant` | `url`, `token` (long-lived access token), `entities` (list of ids, or `{entity, label}`), `controls` (default true) | Those entities' states; without entities: lights/switches on, unavailable. Listed lights, switches, fans, input booleans and covers get a switch on the tile, scenes and scripts a run button (see "Actions") |
+| `homeassistant-energy` | `url`, `token`, `entities: { consumption, solar, gridImport, gridExport, power: [] }` (any can be left out), `price` (per kWh), `currency` | Today's consumption, solar production, grid in and out (kWh), the share of solar used at home and today's cost; `power` sensors (W) as they are now on large tiles |
 | `truenas` | `url`, `key` (API key) | Pool health and usage, alerts, uptime; pool list on large tiles |
 | `synology` | `url`, `username`, `password` | CPU, RAM, storage, volume status |
 | `calendar` | `sources` (`{type: ical, url}`, `{type: sonarr\|radarr, url, key}`), `days`, `timezone` | Upcoming events; more rows on bigger tiles |
@@ -298,7 +324,8 @@ When no icon is set or it fails to load, the tile shows the service's initials.
 | `gitea` | `url`, `key` (access token) | Repositories, open issues and PRs, unread notifications, version (Gitea and Forgejo) |
 | `speedtest` | `url`, `key` (v0.20+ API token), `version` (`1` or `0`) | Speedtest Tracker: latest download, upload, ping and when |
 | `paperless` | `url`, `key` (API token) | Documents, inbox |
-| `authentik` | `url`, `key` (API token) | Active users, logins and failed logins in the last 24 hours |
+| `authentik` | `url`, `key` (API token), `insecure` | Active users, logins and failed logins in the last 24 hours; with an admin token also the version and outposts (one not seen for 5 minutes turns the tile red), each listed on large tiles |
+| `vaultwarden` | `url`, `adminToken` (optional), `insecure` | Up/down from `/alive`, response time and version; with the admin token also users, the share with 2FA and how many were active in 30 days |
 | `jellyfin` | `url`, `key` (API key) | Jellyfin or Emby: streams, movies, shows, episodes; who is watching what |
 | `plex` | `url`, `key` (X-Plex-Token) | Streams, transcodes, libraries; now playing |
 | `tautulli` | `url`, `key` | Streams, transcodes, bandwidth; now playing |
@@ -311,7 +338,7 @@ When no icon is set or it fails to load, the tile shows the service's initials.
 | `scrutiny` | `url` | Disks, failing disks, hottest disk; every disk on large tiles |
 | `gotify` | `url`, `key` (client token) | Apps, clients, recent messages |
 | `ntfy` | `url` | Messages sent and rate (from `/v1/stats`) |
-| `wireguard` | `url` (wg-easy), `password`, `username` (wg-easy 15+; empty for 14), `onlineMinutes` (default 3) | Connected peers (handshake within the last few minutes), enabled/total, traffic; each peer with when it was last seen |
+| `wireguard` | `url` (wg-easy), `password`, `username` (wg-easy 15+; empty for 14), `onlineMinutes` (default 3) | Connected peers (handshake within the last few minutes), enabled/total, traffic; each peer with when it was last seen. To reach services behind the VPN, see "Reaching services through WireGuard" |
 | `wgdashboard` | `url` (with WGDashboard's path prefix, if any), `key` (Settings → API Keys), `config` (one interface, e.g. `wg0`; default all), `insecure` | Connected peers, peers, interfaces up, traffic; every peer with its interface and when it was last seen on large tiles. Peer keys never leave the server |
 | `pelican` | `url` (panel), `key` (client API key, `ptlc_…`) | Game servers running/offline, CPU and memory; each server's state. Start, stop, restart and kill buttons (also works with Pterodactyl) |
 | `minecraft` | `host`, `edition` (`java`/`bedrock`), `port` | Players online/max, version, ping, the MOTD and who is online (Java). Talks the game's own status protocol: no plugin or query port needed |
@@ -434,11 +461,25 @@ History is stored per service id (group name + service name), so renaming a serv
 
 Raw checks are kept 7 days; hourly summaries are kept `history.retentionDays` (default 90). Outages are recorded whether or not alerts are configured.
 
+### Muting alerts
+
+A mute only stops notifications: nothing else changes. Outages still show on the dashboard and on the status page, and they count against uptime. Use it when a service is flapping and you already know about it.
+
+Admins get a **bell** on each service's page and on each row of the monitoring panel. The bell in the panel's header mutes everything. A mute lasts 30 minutes, 2 hours, 8 hours, or until you turn alerts back on. It can carry a note for admins. A muted tile shows a crossed-out bell.
+
 ### Maintenance
 
-Hold back alerts while you work on something. Checks keep running and history is kept; an outage that starts meanwhile is recorded as **planned**.
+Maintenance is for planned work. Checks keep running and history is kept, and:
 
-- **One-off:** admins get a bell on each service's page and on each row of the monitoring panel (the bell in the panel's header mutes everything): 30 minutes, 2 hours, 8 hours, or until you turn alerts back on.
+- alerts are held back, as with a mute;
+- an outage that starts during maintenance is recorded as **planned**;
+- failed checks during maintenance are **left out of uptime**;
+- the public status page shows a "Maintenance" badge, with your message if you wrote one;
+- the tile shows a **wrench**.
+
+There are two kinds:
+
+- **One-off:** admins get a wrench next to the bell. Start maintenance now (30 minutes, 2 hours, 8 hours, or until you end it), or plan it for a set time up to 90 days ahead. Planned ones are listed in the same menu, where you can cancel them.
 - **Recurring:** windows in `settings.yaml`, in server local time. `days` name the day a window starts on (leave it out for every day), so `sat 23:00`–`02:00` runs into Sunday. Leave `services` out to cover all of them.
 
 ```yaml
@@ -446,9 +487,9 @@ maintenance:
   - { name: Backups, days: [sun], from: "03:00", to: "05:00", services: [infra.nas] }
 ```
 
-**Notes:** a mute can carry a note for admins ("replacing the PSU") and a separate message for the public status page; recurring windows take `note:` and `publicNote:`. The admin note shows on the bell, in the monitoring panel, on planned outages and in the audit log. Only the public message ever appears on `/status`.
+**Notes:** maintenance can carry a note for admins ("replacing the PSU") and a separate message for the public status page. Recurring windows take `note:` and `publicNote:`. The admin note shows on the wrench, in the monitoring panel, on planned outages and in the audit log. Only the public message ever appears on `/status`.
 
-While a service is muted, there are no down/up alerts, threshold alerts or certificate notices for it, and its tile shows a crossed-out bell. If it is still down when the mute ends, the DOWN alert goes out then. Recovery is only announced for an outage that was.
+While a service is muted or in maintenance, it gets no down/up alerts, threshold alerts or certificate notices. If it is still down when that ends, the DOWN alert goes out then. Recovery is only announced for an outage whose DOWN alert went out.
 
 ### Public status page
 
@@ -469,7 +510,9 @@ statusPage:
   showUptime: true          # percentages
   showBars: true            # one bar per day
   showIncidents: true       # the list of outages…
-  incidentDays: 14          # …of this many days (1–90)
+  incidentDays: 14          # …of this many days (1–90), also for posted incidents
+  showPosted: true          # incidents you post, with their updates
+  showUpcoming: true        # maintenance planned in the next 7 days
   footer: "Questions: me@example.com"
   dashboardLink: false      # a link to the dashboard
 ```
@@ -477,6 +520,16 @@ statusPage:
 `intro`, `announcement` and `footer` take basic Markdown (bold, code, links, lists). All of this is also under **Settings → Pages**.
 
 It shows whether everything is up, each service's state with one bar per day of uptime, and recent outages ("planned" for maintenance, with the public message of that maintenance if you wrote one). It never shows links, addresses, check targets, failure reasons or widget data. Services marked `visible: users`, `admins` or a group stay off it unless you list their ids.
+
+**Incidents you post:** the megaphone in the monitoring panel (press `m`), or on a service's page, lets admins write what visitors should know:
+- a title, an impact (minor, major or maintenance), the services concerned and a first message (Markdown);
+- then updates as things change: investigating, identified, monitoring, resolved. Each update sets the incident's state, and "resolved" closes it.
+
+Open incidents show at the top of the page with their latest update (earlier ones fold away). An open major incident turns the banner red, a minor one amber, even while the checks pass. Resolved ones stay listed for `incidentDays`. Only incidents about services on the page, or about none in particular, are shown, and never who wrote them.
+
+**Upcoming maintenance:** one-off maintenance planned with the wrench, and the next run of each recurring window, for the next 7 days, with their public messages.
+
+**For other tools:** `/status/feed.json` gives the same data as JSON (only while the page is on).
 
 ### Check types
 
@@ -496,7 +549,7 @@ ping: { type: snmp, host: 10.0.0.2, community: public, oid: 1.3.6.1.2.1.1.3.0 } 
 
 **TCP + UDP:** for services that need both (DNS, game servers, VPNs with a TCP fallback). It is up only when the TCP port accepts a connection and the UDP port replies; the failure says which one didn't (`udp: no reply`). `payload` and `expect` work as for a UDP check, and `udpPort` sets a different UDP port.
 
-**UDP:** there is no handshake, so a UDP check sends `payload` (text, or bytes as `0x…` hex; default one zero byte) and is up when anything answers (and the answer contains `expect`, if set). A closed port usually reports `ECONNREFUSED`. Many services only answer their own protocol: WireGuard, for one, stays silent to strangers, so watch it through the `wireguard` widget or a TCP check on its web UI instead.
+**UDP:** there is no handshake, so a UDP check sends `payload` (text, or bytes as `0x…` hex; default one zero byte) and is up when anything answers (and the answer contains `expect`, if set). A closed port usually reports `ECONNREFUSED`. Many services only answer their own protocol: WireGuard, for one, stays silent to strangers, so watch it through the `wireguard` widget or a TCP check on its web UI instead. To reach services behind a WireGuard VPN, see "Reaching services through WireGuard".
 
 **Certificates:** HTTPS checks also read the server's certificate (at most every 6 hours). When it gets within `alerts.certDays` days of expiry (default 14, `0` turns this off), the tile shows a `cert 9d` badge and the alert channels get one message a day.
 
@@ -527,7 +580,7 @@ Vaultwarden and other apps without a stats API can still be watched with an HTTP
 
 NanoDash can be scraped by Prometheus (or Grafana Agent, VictoriaMetrics…) at `/api/export/metrics`:
 - `page_service_up`, `page_service_latency_ms`, `page_service_uptime_ratio` (last 24 hours) and `page_service_last_check_timestamp_seconds` for every service with a status check, labelled `service`, `name` and `group`
-- per service too: `page_service_cert_days_left` (HTTPS checks), `page_service_incident_open`, `page_service_incident_started_timestamp_seconds`, `page_service_incidents_24h` and `page_service_maintenance` (alerts held back)
+- per service too: `page_service_cert_days_left` (HTTPS checks), `page_service_incident_open`, `page_service_incident_started_timestamp_seconds`, `page_service_incidents_24h`, `page_service_maintenance` (planned maintenance) and `page_service_alerts_muted` (notifications muted). Uptime leaves out failed checks during maintenance
 - `page_widget_value{service, field}`: the latest value of every recorded widget field (`record: true` or thresholds)
 - `page_device_up` and `page_device_latency_ms` for every inventory device with an address, labelled `device` and `name`
 - `page_backup_last_ok`, `page_backup_last_run_timestamp_seconds` and `page_backup_last_size_bytes`
@@ -696,7 +749,7 @@ Each change is validated and written straight to the YAML file; comments on unto
 
 On first start, create the admin account at **Set up**. Add more people under **Edit → Users**. Roles:
 - **admin**: can edit, run actions, manage users and history.
-- **user**: can see items marked `users`, and do what `auth.userPermissions` allows (by default: use the finance tracker).
+- **user**: can see items marked `users`, and do what `auth.userPermissions` allows (by default: the finance tracker, the travel log and the watchlist).
 - **groups** add to that: see items shown to the group, and extra permissions (see "Groups and permissions").
 
 ```yaml
@@ -748,12 +801,15 @@ Create groups under **Settings → Accounts & sign-in → Groups**:
 - **Members** are added by hand (the people icon on a user), or automatically. A group's *sign-in groups* are names as your SSO provider (the `groupsClaim`), LDAP (`memberOf`) or proxy (`Remote-Groups`) reports them. Members join at each sign-in and leave when the provider no longer lists them. Hand-made memberships are never touched.
 - **Permissions** are on top of `auth.userPermissions`:
   - `finance`: the finance tracker, its tile and its API.
+  - `travel`, `watchlist`: those apps.
+  - `inventory`: the device inventory.
+  - `notes`: reading and writing notes and runbooks.
   - `actions`: start, stop and restart buttons on services the person can see.
 - Admins have every permission and see everything.
 
 ```yaml
 auth:
-  userPermissions: [finance]   # what every signed-in user may do; [] for nothing
+  userPermissions: [finance, travel, watchlist]   # what every signed-in user may do (this is the default); [] for nothing
 ```
 
 ### Security
@@ -787,10 +843,17 @@ Signed-in users get **Finance** in the header (the wallet button) and the accoun
   - **Recurring transactions** (rent, salary, subscriptions, every n weeks, months or years, with an optional end date) are added as real transactions on their date, checked hourly.
   - A start date in the past fills in the occurrences since then. Months keep their day: the 31st becomes the 28th in February and the 31st again in March.
   - Pausing stops new ones; resuming adds what came due meanwhile. Deleting a rule keeps what it already added, and a deleted occurrence never comes back.
+- **Subscriptions:** streaming, domains, servers… Each is a recurring payment (it adds its transaction when it renews, and counts in the Plan), with a link, notes, the account it is paid from and a reminder:
+  - Cards show the price, the billing cycle and the next renewal; the totals show what they cost per month and per year in the currency shown, and per category.
+  - **Remind me N days before** sends a notice through your alert channels before each renewal, once per renewal. A **cancel by** date (a trial ending, a notice period) gets its own reminder.
+  - **Track a recurring payment** turns an existing one from the Plan into a subscription (the card icon there does the same). Pausing stops it adding transactions; **End** stops it after today.
+  - The webhook receives `{ kind: "subscription", level, message, subscription, date, days, amount, currency, url }`. With `exportMetrics`, `page_finance_subscription_monthly_cost` gives each running one's monthly cost.
 - **Savings:**
   - Goals with a target and an optional deadline. Each shows what is put aside, the share reached, and how much a month it takes to make the deadline.
   - **Put aside** and **Take out**, or the **Savings** button in the header, record moves between your own pots. They are not spending, so they stay out of the totals and charts.
-- **Categories:** pick each category's chart colour. The eight palette colours are checked to stay apart, also for colour-blind people. Beyond that, **Custom** lets a category take any colour and keep its own band in the charts, at the cost of that guarantee. Categories with no colour are grouped as "Other". Renaming to an existing name merges the two. Each category can have a **monthly budget**: the Overview shows how much of it is used (×12 in the year view), and an alert is sent when it runs out.
+- **Categories:** pick each category's chart colour. The eight palette colours are checked to stay apart, also for colour-blind people. Beyond that, **Custom** lets a category take any colour and keep its own band in the charts, at the cost of that guarantee. Categories with no colour are grouped as "Other". Renaming to an existing name merges the two (rules, recurring payments and shortcuts follow). Each category can have a **monthly budget**: the Overview shows how much of it is used (×12 in the year view), and an alert is sent when it runs out.
+  - **Subcategories:** put a category under another one (Food › Restaurants), one level deep. A subcategory without its own colour shows as its parent in the charts; its spending counts towards the parent's budget as well as its own. Filtering transactions by a parent includes its subcategories. Deleting a parent moves its subcategories to the top level.
+  - **Rules:** "description contains NETFLIX → Subscriptions" (or starts with, is exactly, or a regular expression, optionally for one account only). A transaction added without a category, by hand, from a CSV or Excel import, from Firefly III or by a recurring payment, gets the category of the first rule that matches; a category it already has is kept. Reorder rules to decide which wins, try a description to see which one matches, and **Apply to uncategorised transactions** to fill in older ones. The import preview marks the categories a rule chose with ✦.
 - **Import:**
   - Upload a bank CSV or Excel (.xlsx) export and match its columns. For Excel, the first sheet with data is read, and dates and amounts are taken as Excel stores them. Old .xls and .ods files need saving as .xlsx or .csv first. NanoDash guesses them from English and French headers and handles decimal commas, day-first dates and debit/credit columns.
   - The mapping is remembered.
@@ -825,8 +888,18 @@ Each person has their own log. It needs the `travel` permission, which signed-in
 - **Statuses:** in progress, planned, finished and dropped, each with its own tab, and a filter by kind. Starting something records the date; finishing it records that too and fills in the progress.
 - **Each item:** progress (pages, episodes, minutes or hours, shown on the cover while in progress), a rating out of 5, and notes.
 - **Stats:** what you're on, what's planned, what you finished this year by kind, and the pages read.
+- **Lists and tags:** put an item on a list of your own ("Summer 2026", "Classics") and give it tags; filter by both above the covers.
+- **Sync from Jellyfin or Plex:** pick one of the dashboard's Jellyfin or Plex services and your name there. Once a day (or with **Sync now**), the movies and shows you watched there are marked finished here, and added (tagged `synced`) when missing. On Plex, a show with episodes watched is marked in progress. Items are matched by their TMDB/IMDb id, or by kind, title and year. Nothing ever moves back: a finished or dropped item stays as it is.
 
-Each person's list is private. It needs the `watchlist` permission, which signed-in users have by default.
+Each person's list is private. It needs the `watchlist` permission, which signed-in users have by default. The sync uses the API key of the Jellyfin or Plex widget, so anyone with the watchlist permission who can see that service can read the play history of any account on that server: only offer it to people you trust with that.
+
+## Notes and runbooks
+
+**Notes** (in the Apps menu) holds runbooks, how-tos and anything worth writing down, for everyone with the `notes` permission (admins, or a group that grants it):
+- Markdown with headings, **bold**, *italic*, `code`, code blocks (with a copy button), bullet and numbered lists, `- [ ]` checklists, quotes and links. **Preview** shows it before saving. New notes start from a small runbook outline.
+- **Linked services:** link a note to any number of services. It then shows as the **Runbook** on those services' pages (the first, oldest note open, longer ones folded), and the maintenance menu (the wrench) links to it. Runbooks are readable by everyone who can see the service, also without the notes permission, so don't keep secrets in a linked note.
+- A service renamed or moved to another group gets a new id: its notes then show the old id in orange, to link again.
+- Search covers titles and text. Every change is in the audit log, and each note says who edited it last.
 
 ## Inventory
 

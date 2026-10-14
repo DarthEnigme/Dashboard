@@ -115,8 +115,6 @@ export function StatusWidget({ refreshSeconds }: { refreshSeconds: number }) {
   );
 }
 
-export const FINANCE_PARTS = ["spent", "income", "net", "balance", "budgets"] as const;
-
 /** This month's money at a glance. Personal: shows nothing without the finance permission. */
 export function FinanceWidget({ show, currency }: { show?: unknown; currency?: string }) {
   const t = useT();

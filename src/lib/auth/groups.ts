@@ -9,13 +9,6 @@ import { db } from "../db";
 import { PERMISSIONS, type Permission } from "../config/schema";
 
 export { PERMISSIONS, type Permission };
-export const PERMISSION_LABELS: Record<Permission, string> = {
-  finance: "Use the finance tracker",
-  actions: "Run widget actions (start, stop, restart)",
-  travel: "Use the travel log",
-  watchlist: "Use the watchlist and reading list",
-  inventory: "See and edit the device inventory (and wake devices, with actions)",
-};
 
 export interface Group {
   id: number;

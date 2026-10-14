@@ -162,6 +162,17 @@ const routes = {
   // Apps tab (fixtures shared with tests/apps-integrations.test.ts)
   "GET /jellyfin/Sessions": (req, res) => (req.headers["x-emby-token"] === "jf-key" ? json(res, 200, apps["jellyfin-sessions"]) : json(res, 401, {})),
   "GET /jellyfin/Items/Counts": (req, res) => (req.headers["x-emby-token"] === "jf-key" ? json(res, 200, apps["jellyfin-counts"]) : json(res, 401, {})),
+  // Watchlist sync: the users, and what "tester" has played.
+  "GET /jellyfin/Users": (req, res) => (req.headers["x-emby-token"] === "jf-key" ? json(res, 200, [{ Id: "u1", Name: "Tester" }, { Id: "u2", Name: "Sam" }]) : json(res, 401, {})),
+  "GET /jellyfin/Users/u1/Items": (req, res) =>
+    req.headers["x-emby-token"] === "jf-key"
+      ? json(res, 200, {
+          Items: [
+            { Id: "m1", Name: "Arrival", Type: "Movie", ProductionYear: 2016, ProviderIds: { Tmdb: "329865" }, UserData: { Played: true, LastPlayedDate: "2026-10-01T20:00:00Z" } },
+            { Id: "s1", Name: "Severance", Type: "Series", ProductionYear: 2022, ProviderIds: { Tmdb: "95396" }, UserData: { Played: true } },
+          ],
+        })
+      : json(res, 401, {}),
   "GET /sonarr/api/v3/health": (req, res) => (req.headers["x-api-key"] === "sonarr-key" ? json(res, 200, apps["sonarr-health"]) : json(res, 401, {})),
   "GET /sonarr/api/v3/queue": (_q, res) => json(res, 200, apps["sonarr-queue"]),
   "GET /sonarr/api/v3/wanted/missing": (_q, res) => json(res, 200, apps["sonarr-missing"]),

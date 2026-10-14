@@ -150,7 +150,7 @@ export interface CustomTheme {
 export const CUSTOM_PREFIX = "custom:";
 
 /** The palette (colours) behind a theme setting, or none for dark / light / system / oled / sepia. */
-export function themePalette(theme: string, custom: CustomTheme[] = []): PaletteTheme | undefined {
+function themePalette(theme: string, custom: CustomTheme[] = []): PaletteTheme | undefined {
   if (theme.startsWith(CUSTOM_PREFIX)) return custom.find((t) => t.id === theme.slice(CUSTOM_PREFIX.length));
   return paletteThemes[theme];
 }

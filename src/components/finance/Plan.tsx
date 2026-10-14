@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import useSWR from "swr";
-import { Pause, Play, Plus, Repeat } from "lucide-react";
+import { CreditCard, Pause, Play, Plus, Repeat } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import type { Projection } from "@/lib/finance/projection";
 import type { RecurringRule } from "@/lib/finance/recurring";
@@ -22,7 +22,7 @@ const EVERY = {
   month: [msg("every month"), msg("every {n} months")],
   year: [msg("every year"), msg("every {n} years")],
 } as const;
-const everyText = (r: Pick<RecurringRule, "every" | "every_n">, t: T) => {
+export const everyText = (r: Pick<RecurringRule, "every" | "every_n">, t: T) => {
   const [one, many] = EVERY[r.every as keyof typeof EVERY] ?? EVERY.month;
   return r.every_n === 1 ? t(one) : t(many, { n: r.every_n });
 };
@@ -113,6 +113,7 @@ export function Plan({ currency, onChanged }: { currency: string; onChanged: () 
                     <td className="max-w-72 truncate px-2 py-1.5">
                       {r.description}
                       {r.category && <span className="ml-2 rounded-full bg-chip px-2 py-0.5 text-xs">{r.category}</span>}
+                      {r.subscription && <span className="ml-2 rounded-full bg-[color-mix(in_oklab,var(--accent)_18%,transparent)] px-2 py-0.5 text-xs text-accent">{t("subscription")}</span>}
                     </td>
                     <td className="px-2 py-1.5 whitespace-nowrap">
                       {everyText(r, t)}
@@ -122,6 +123,18 @@ export function Plan({ currency, onChanged }: { currency: string; onChanged: () 
                     <td className={`px-2 py-1.5 text-right whitespace-nowrap tabular-nums ${r.amount_cents > 0 ? "text-[var(--ok)]" : ""}`}>{money(r.amount_cents, r.currency, true)}</td>
                     <td className="px-1 py-1">
                       <div className="flex items-center justify-end">
+                        {r.amount_cents < 0 && (
+                          <button
+                            type="button"
+                            onClick={() => act(() => sendJson("/api/finance/recurring", "PATCH", { id: r.id, subscription: !r.subscription }))}
+                            aria-pressed={r.subscription}
+                            aria-label={r.subscription ? t("Stop tracking {name} as a subscription", { name: r.description }) : t("Track {name} as a subscription", { name: r.description })}
+                            title={r.subscription ? t("Tracked in Subscriptions") : t("Track as a subscription")}
+                            className={`rounded-lg p-1.5 hover:bg-hover ${r.subscription ? "text-accent" : "text-muted hover:text-fg"}`}
+                          >
+                            <CreditCard className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => act(() => sendJson("/api/finance/recurring", "PATCH", { id: r.id, active: !r.active }))}

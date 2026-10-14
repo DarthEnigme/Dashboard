@@ -78,8 +78,10 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (!target) return err("No such user", 404);
   if (target.id === admin.id) return err("You can't delete your own account");
   if (target.role === "admin" && users.countAdmins() <= 1) return err("This is the last admin", 409);
+  const wallpaper = users.getPrefs(id).background?.image;
   users.deleteUser(id);
   removeUpload(target.avatar);
+  removeUpload(wallpaper);
   users.audit(admin.username, "user-delete", { username: target.username });
   return NextResponse.json({ ok: true });
 }

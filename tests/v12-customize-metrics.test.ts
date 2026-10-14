@@ -8,7 +8,7 @@ import { servicesFileSchema, settingsSchema } from "@/lib/config/schema";
 import { db, incidentsSince, openIncident } from "@/lib/db";
 import { collectMetrics } from "@/lib/export/prometheus";
 import { addTransaction } from "@/lib/finance/store";
-import { listMutes, mute, mutedNow, unmute } from "@/lib/maintenance";
+import { endMaintenance, listMaintenance, listMutes, maintenanceNow, mute, mutedNow, quietNow, startMaintenance, unmute } from "@/lib/maintenance";
 import { count, counters, dropLabel, gauge, gauges } from "@/lib/stats";
 import { pickServices } from "@/lib/statusPage";
 
@@ -40,13 +40,14 @@ describe("backups: age limit", () => {
 });
 
 describe("maintenance notes", () => {
-  it("keeps a note for admins and a message for the status page on a mute", () => {
+  it("keeps a note for admins on a mute, and nothing public", () => {
     const now = Date.now();
     mute("infra.nas", 30, "root", now, { note: "  replacing the PSU ", publicNote: "Hardware work", extra: "ignored" } as never);
     mute("infra.router", 30, "root", now);
-    expect(listMutes(now)["infra.nas"]).toMatchObject({ note: "replacing the PSU", publicNote: "Hardware work" });
-    expect(mutedNow([], listMutes(now), "infra.nas", new Date(now))).toEqual({ until: now + 30 * 60_000, note: "replacing the PSU", publicNote: "Hardware work" });
-    expect(mutedNow([], listMutes(now), "infra.router", new Date(now))).toEqual({ until: now + 30 * 60_000 });
+    expect(listMutes(now)["infra.nas"]).toMatchObject({ note: "replacing the PSU" });
+    expect(listMutes(now)["infra.nas"]).not.toHaveProperty("publicNote");
+    expect(mutedNow(listMutes(now), "infra.nas", new Date(now))).toEqual({ until: now + 30 * 60_000, note: "replacing the PSU" });
+    expect(mutedNow(listMutes(now), "infra.router", new Date(now))).toEqual({ until: now + 30 * 60_000 });
     // Long notes are cut, not refused.
     mute("infra.nas", null, "root", now, { note: "x".repeat(500) });
     expect(listMutes(now)["infra.nas"].note).toHaveLength(200);
@@ -54,9 +55,29 @@ describe("maintenance notes", () => {
     unmute("infra.router", now);
   });
 
+  it("runs one-off maintenance now or later, and keeps it apart from mutes", () => {
+    const now = Date.now();
+    const a = startMaintenance("infra.nas", now, now + 60 * 60_000, "root", now, { note: " disk swap ", publicNote: "Storage upgrade" });
+    const later = startMaintenance("infra.router", now + 3600_000, null, "root", now);
+    expect(maintenanceNow([], listMaintenance(now), "infra.nas", new Date(now))).toEqual({ id: a.id, until: now + 60 * 60_000, note: "disk swap", publicNote: "Storage upgrade" });
+    // Planned for later: not yet, then yes.
+    expect(maintenanceNow([], listMaintenance(now), "infra.router", new Date(now))).toBeUndefined();
+    expect(maintenanceNow([], listMaintenance(now), "infra.router", new Date(now + 2 * 3600_000))).toMatchObject({ id: later.id });
+    // A mute is not maintenance, and maintenance is not a mute; both hold alerts back.
+    mute("infra.kuma", 30, "root", now);
+    expect(quietNow([], listMutes(now), listMaintenance(now), "infra.kuma", new Date(now))).toMatchObject({ maintenance: undefined, held: true });
+    expect(quietNow([], listMutes(now), listMaintenance(now), "infra.nas", new Date(now))).toMatchObject({ muted: undefined, held: true });
+    unmute("infra.kuma", now);
+    // Ending one under way closes it; ending one still to come drops it.
+    expect(endMaintenance(a.id, now + 1000)).toBe(true);
+    expect(endMaintenance(later.id, now + 1000)).toBe(true);
+    expect(listMaintenance(now + 2000)).toEqual([]);
+    expect(endMaintenance("nope")).toBe(false);
+  });
+
   it("takes notes from recurring windows, and stores both on a planned outage", () => {
     const windows = settingsSchema.parse({ maintenance: [{ from: "00:00", to: "00:00", services: ["infra.nas"], note: "weekly snapshots", publicNote: "Weekly maintenance" }] }).maintenance;
-    expect(mutedNow(windows, {}, "infra.nas")).toEqual({ window: "00:00–00:00", note: "weekly snapshots", publicNote: "Weekly maintenance" });
+    expect(maintenanceNow(windows, [], "infra.nas")).toEqual({ window: "00:00–00:00", note: "weekly snapshots", publicNote: "Weekly maintenance" });
     expect(() => settingsSchema.parse({ maintenance: [{ from: "00:00", to: "01:00", note: "x".repeat(201) }] })).toThrow();
 
     openIncident("notes.a", 5000, "no response", true, { note: "weekly snapshots", publicNote: "Weekly maintenance" });

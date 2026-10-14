@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { guardPermission } from "@/lib/auth";
-import { addItem, deleteItem, listItems, updateItem, watchStats } from "@/lib/watchlist/store";
+import { addItem, deleteItem, listItems, tagsAndLists, updateItem, watchStats } from "@/lib/watchlist/store";
 
 export const dynamic = "force-dynamic";
 
 const guard = (req?: Request) => guardPermission("watchlist", req, "the watchlist");
 const bad = (error: string) => NextResponse.json({ error }, { status: 400 });
 const body = async (req: Request) => ((await req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
-const reply = (items: ReturnType<typeof listItems>, status = 200) => NextResponse.json({ items, stats: watchStats(items) }, { status });
+const reply = (items: ReturnType<typeof listItems>, status = 200) => NextResponse.json({ items, stats: watchStats(items), ...tagsAndLists(items) }, { status });
 
 /** Your watchlist and reading list (private to you), with this year's stats. */
 export async function GET() {
@@ -16,7 +16,7 @@ export async function GET() {
   return reply(listItems(g.user.id));
 }
 
-/** { kind, title, creator?, year?, cover?, external_id?, total?, status? } */
+/** { kind, title, creator?, year?, cover?, external_id?, total?, status?, tags?: string[], list? } */
 export async function POST(req: Request) {
   const g = await guard(req);
   if ("error" in g) return g.error;

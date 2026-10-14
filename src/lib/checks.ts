@@ -88,7 +88,7 @@ const DAY = 86_400_000;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 /** The certificate a TLS server presents (no verification: we only want its dates). */
-export function readCert(host: string, port = 443, timeoutMs = 5000): Promise<CertInfo | undefined> {
+function readCert(host: string, port = 443, timeoutMs = 5000): Promise<CertInfo | undefined> {
   return new Promise((resolve) => {
     const socket = tls.connect({ host, port, servername: net.isIP(host) ? undefined : host, rejectUnauthorized: false, timeout: timeoutMs }, () => {
       const c = socket.getPeerCertificate();

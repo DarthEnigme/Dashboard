@@ -73,7 +73,7 @@ export function rangeValues(data: PromRange): number[] {
 
 const seconds = (r: string) => Number(r.slice(0, -1)) * { s: 1, m: 60, h: 3600, d: 86400 }[r.slice(-1) as "s"];
 
-export function parseTargets(targets: PromTarget[]): { field: WidgetField; down: WidgetField[] } {
+function parseTargets(targets: PromTarget[]): { field: WidgetField; down: WidgetField[] } {
   const up = targets.filter((t) => t.health === "up").length;
   const bad = targets.filter((t) => t.health !== "up");
   return {

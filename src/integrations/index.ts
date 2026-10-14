@@ -30,7 +30,8 @@ import { npm } from "./npm";
 import { traefik } from "./traefik";
 import { tailscale } from "./tailscale";
 import { cloudflare } from "./cloudflare";
-import { authentik, gitea, immich, nextcloud, paperless, speedtest } from "./apps";
+import { authentik, gitea, immich, nextcloud, paperless, speedtest, vaultwarden } from "./apps";
+import { homeassistantEnergy } from "./energy";
 import { arr, jellyfin, overseerr, plex, qbittorrent, sabnzbd, tautulli, transmission } from "./media";
 import { frigate, gotify, ntfy, scrutiny } from "./homelab";
 import { minecraft } from "./minecraft";
@@ -46,7 +47,7 @@ export const integrations: Record<string, Integration> = Object.fromEntries(
     homeassistant, truenas, synology, calendar, rss, finance,
     prometheus, grafana, glances, netdata, metric, dockhand, arcane, snmpIntegration, pbs,
     opnsense, pfsense, npm, traefik, tailscale, cloudflare,
-    immich, nextcloud, gitea, speedtest, paperless, authentik,
+    immich, nextcloud, gitea, speedtest, paperless, authentik, vaultwarden, homeassistantEnergy,
     jellyfin, plex, tautulli, arr, overseerr, qbittorrent, transmission, sabnzbd,
     frigate, scrutiny, gotify, ntfy,
     wireguard, wgdashboard, pelican, minecraft,

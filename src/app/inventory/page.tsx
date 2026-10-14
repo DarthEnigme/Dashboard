@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { loadConfig } from "@/lib/config/load";
 import { clientAuth } from "@/lib/auth";
+import { personal } from "@/lib/userLook";
 import { Background } from "@/components/Background";
 import { InventoryPage } from "@/components/inventory/InventoryPage";
 
@@ -14,7 +15,7 @@ export default async function Inventory() {
   const { alerts, docker, auth: _a, ...settings } = loadConfig().settings;
   return (
     <>
-      <Background settings={settings} />
+      <Background settings={await personal(settings)} />
       <InventoryPage canWake={auth.user.permissions.includes("actions")} />
     </>
   );

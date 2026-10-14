@@ -10,7 +10,12 @@ export interface PingRow {
   up: number;
   status: number | null;
   latency_ms: number | null;
+  /** 1 when made during maintenance: a failure then is left out of uptime. */
+  maint?: number;
 }
+
+/** Checks that count for uptime: every one, except failures during maintenance. */
+const COUNTED = "NOT (maint = 1 AND up = 0)";
 
 // One handle per process: route handlers and the monitor may load this module separately.
 const g = globalThis as typeof globalThis & { __pageDb?: DatabaseSync };
@@ -263,8 +268,78 @@ export function db(): DatabaseSync {
     addColumn(d, "incidents", "planned INTEGER NOT NULL DEFAULT 0");
     addColumn(d, "incidents", "note TEXT");
     addColumn(d, "incidents", "public_note TEXT");
+    addColumn(d, "pings", "maint INTEGER NOT NULL DEFAULT 0");
+    // Personal look (theme, background, …) over the global one, as JSON.
+    addColumn(d, "users", "prefs TEXT");
     // Both halves of a transfer between own accounts share this id (left out of income and spending).
     addColumn(d, "fin_transactions", "transfer_id TEXT");
+    // Subcategories: one level, by the parent's name.
+    addColumn(d, "fin_categories", "parent TEXT");
+    // Recurring rules tracked as subscriptions (Finance → Subscriptions).
+    addColumn(d, "fin_recurring", "subscription INTEGER NOT NULL DEFAULT 0");
+    addColumn(d, "fin_recurring", "url TEXT");
+    addColumn(d, "fin_recurring", "notes TEXT");
+    addColumn(d, "fin_recurring", "remind_days INTEGER");
+    addColumn(d, "fin_recurring", "account TEXT");
+    addColumn(d, "fin_recurring", "cancel_by TEXT");
+    // Watchlist: tags (JSON list) and one shelf per item.
+    addColumn(d, "watch_items", "tags TEXT");
+    addColumn(d, "watch_items", "list TEXT");
+    d.exec(`
+      -- Fill in the category of new transactions: the first rule that matches wins.
+      CREATE TABLE IF NOT EXISTS fin_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        match TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'contains',
+        category TEXT NOT NULL,
+        account TEXT,
+        priority INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS watch_items_external ON watch_items (owner_id, external_id);
+      -- Each user's link to their account on a Jellyfin or Plex server.
+      CREATE TABLE IF NOT EXISTS watch_sync (
+        owner_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        service_id TEXT NOT NULL,
+        media_user TEXT NOT NULL,
+        last_sync INTEGER,
+        last_error TEXT
+      );
+      CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        updated_by TEXT
+      );
+      CREATE TABLE IF NOT EXISTS note_services (
+        note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+        service_id TEXT NOT NULL,
+        PRIMARY KEY (note_id, service_id)
+      );
+      CREATE INDEX IF NOT EXISTS note_services_service ON note_services (service_id);
+      -- Incidents written by admins for the status page (outages found by checks are in incidents).
+      CREATE TABLE IF NOT EXISTS status_incidents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'investigating',
+        impact TEXT NOT NULL DEFAULT 'minor',
+        services TEXT NOT NULL DEFAULT '[]',
+        created_at INTEGER NOT NULL,
+        resolved_at INTEGER,
+        created_by TEXT
+      );
+      CREATE TABLE IF NOT EXISTS status_updates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        incident_id INTEGER NOT NULL REFERENCES status_incidents(id) ON DELETE CASCADE,
+        status TEXT NOT NULL,
+        body TEXT NOT NULL DEFAULT '',
+        at INTEGER NOT NULL,
+        by TEXT
+      );
+      CREATE INDEX IF NOT EXISTS status_updates_incident ON status_updates (incident_id, at);
+    `);
     d.exec("PRAGMA foreign_keys = ON;");
     // Compile each SQL text once: most statements run on every check or every request.
     // (After the schema is in place: a statement compiled earlier would not see new columns.)
@@ -310,8 +385,8 @@ export function setAppMeta(key: string, value: unknown) {
 
 export function insertPing(row: PingRow) {
   db()
-    .prepare("INSERT INTO pings (service_id, ts, up, status, latency_ms) VALUES (?, ?, ?, ?, ?)")
-    .run(row.service_id, row.ts, row.up, row.status, row.latency_ms);
+    .prepare("INSERT INTO pings (service_id, ts, up, status, latency_ms, maint) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(row.service_id, row.ts, row.up, row.status, row.latency_ms, row.maint ?? 0);
 }
 
 export function latestPing(serviceId: string): PingRow | undefined {
@@ -320,9 +395,9 @@ export function latestPing(serviceId: string): PingRow | undefined {
     .get(serviceId) as PingRow | undefined;
 }
 
-/** Checks made and checks that were up since `since`, per service (one pass, for the monitoring panel). */
+/** Checks counted for uptime and checks that were up since `since`, per service (one pass, for the monitoring panel). */
 export function uptimeSince(since: number): Map<string, { checks: number; up: number }> {
-  const rows = db().prepare("SELECT service_id, COUNT(*) AS checks, SUM(up) AS up FROM pings WHERE ts >= ? GROUP BY service_id").all(since) as unknown as {
+  const rows = db().prepare(`SELECT service_id, COUNT(*) AS checks, SUM(up) AS up FROM pings WHERE ts >= ? AND ${COUNTED} GROUP BY service_id`).all(since) as unknown as {
     service_id: string;
     checks: number;
     up: number;
@@ -343,7 +418,7 @@ export function bucketsSince(since: number, sizeMs: number): Map<string, Map<num
   const rows = db()
     .prepare(
       `SELECT service_id, CAST((ts - ?) / ? AS INTEGER) AS slot, COUNT(*) AS checks, SUM(up) AS up, AVG(CASE WHEN up = 1 THEN latency_ms END) AS avgMs
-       FROM pings WHERE ts >= ? GROUP BY service_id, slot`,
+       FROM pings WHERE ts >= ? AND ${COUNTED} GROUP BY service_id, slot`,
     )
     .all(since, sizeMs, since) as unknown as { service_id: string; slot: number; checks: number; up: number; avgMs: number | null }[];
   const out = new Map<string, Map<number, { checks: number; up: number; avgMs: number | null }>>();
@@ -411,7 +486,7 @@ export interface IncidentRow {
   start: number;
   end: number | null;
   cause: string | null;
-  /** 1 when it began while the service's alerts were muted (maintenance). */
+  /** 1 when it began during maintenance (not a mere mute). */
   planned: number;
   /** Planned outages: the maintenance note for admins, and the one for the status page. */
   note: string | null;
@@ -452,7 +527,7 @@ export function hourlyChecksSince(since: number, rawFrom: number): Map<string, {
     .prepare(
       `SELECT service_id, hour, checks, up FROM pings_hourly WHERE hour >= ? AND hour < ?
        UNION ALL
-       SELECT service_id, (ts / 3600000) * 3600000 AS hour, COUNT(*) AS checks, SUM(up) AS up FROM pings WHERE ts >= ? GROUP BY service_id, hour`,
+       SELECT service_id, (ts / 3600000) * 3600000 AS hour, COUNT(*) AS checks, SUM(up) AS up FROM pings WHERE ts >= ? AND ${COUNTED} GROUP BY service_id, hour`,
     )
     .all(since, rawFrom, Math.max(since, rawFrom)) as unknown as { service_id: string; hour: number; checks: number; up: number }[];
   const out = new Map<string, { hour: number; checks: number; up: number }[]>();

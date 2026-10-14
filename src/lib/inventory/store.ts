@@ -51,7 +51,7 @@ const ipOrHost = (s: unknown) => {
 };
 
 /** A device from a form, the API or a CSV row (all values may be strings). */
-export function cleanDevice(b: Record<string, unknown>): Omit<Device, "id"> {
+function cleanDevice(b: Record<string, unknown>): Omit<Device, "id"> {
   const name = text(b.name, 100);
   if (!name) throw new Error("Name required");
   const mac = text(b.mac, 30);

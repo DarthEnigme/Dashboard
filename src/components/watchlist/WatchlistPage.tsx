@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { motion } from "framer-motion";
-import { ArrowLeft, BookOpen, Clapperboard, Gamepad2, Plus, Search, Shapes, Star, Tv } from "lucide-react";
+import { ArrowLeft, BookOpen, Clapperboard, Gamepad2, Plus, RefreshCw, Search, Shapes, Star, Tag, Tv } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import type { BookHit, WatchItem, WatchKind, WatchStats, WatchStatus } from "@/lib/watchlist/store";
 import { msg } from "@/i18n";
@@ -17,6 +17,8 @@ import { inputBase, inputClass } from "../edit/FieldInput";
 interface Data {
   items: WatchItem[];
   stats: WatchStats;
+  tags: string[];
+  lists: string[];
 }
 
 const KEY = "/api/watchlist";
@@ -42,8 +44,13 @@ export function WatchlistPage() {
   const [status, setStatus] = useState<WatchStatus>("active");
   const [kind, setKind] = useState<WatchKind | "all">("all");
   const [open, setOpen] = useState<WatchItem>();
+  const [list, setList] = useState<string>();
+  const [tag, setTag] = useState<string>();
   const items = data?.items ?? [];
-  const shown = items.filter((i) => i.status === status && (kind === "all" || i.kind === kind));
+  const same = (a: string | null | undefined, b: string) => !!a && a.toLowerCase() === b.toLowerCase();
+  const shown = items.filter(
+    (i) => i.status === status && (kind === "all" || i.kind === kind) && (list === undefined || same(i.list, list)) && (tag === undefined || i.tags.some((x) => same(x, tag))),
+  );
   const save = (d: Data) => mutate(d, { revalidate: false });
 
   // Start on the first status that has something in it.
@@ -101,6 +108,34 @@ export function WatchlistPage() {
         </div>
       </div>
 
+      {data && (data.lists.length > 0 || data.tags.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          {data.lists.length > 0 && (
+            <select aria-label={t("List")} value={list ?? ""} onChange={(e) => setList(e.target.value || undefined)} className={`${inputBase} w-44`}>
+              <option value="">{t("All lists")}</option>
+              {data.lists.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="flex flex-wrap gap-1" role="group" aria-label={t("Tags")}>
+            {data.tags.map((x) => (
+              <button
+                key={x}
+                type="button"
+                aria-pressed={same(tag, x)}
+                onClick={() => setTag(same(tag, x) ? undefined : x)}
+                className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs text-muted hover:bg-hover hover:text-fg aria-pressed:bg-accent aria-pressed:text-white"
+              >
+                <Tag className="h-3 w-3" /> {x}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {data && !shown.length && <p className="glass rounded-3xl p-8 text-center text-sm text-muted">{t("Nothing here yet.")}</p>}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {shown.map((i) => (
@@ -110,7 +145,8 @@ export function WatchlistPage() {
         ))}
       </ul>
 
-      {open && <ItemDialog item={open} onClose={() => setOpen(undefined)} onSaved={save} />}
+      {open && <ItemDialog item={open} tags={data?.tags ?? []} lists={data?.lists ?? []} onClose={() => setOpen(undefined)} onSaved={save} />}
+      <SyncPanel onSynced={save} />
     </main>
   );
 }
@@ -267,9 +303,10 @@ function AddBar({ onAdded }: { onAdded: (d: Data) => void }) {
   );
 }
 
-function ItemDialog({ item, onClose, onSaved }: { item: WatchItem; onClose: () => void; onSaved: (d: Data) => void }) {
+function ItemDialog({ item, tags, lists, onClose, onSaved }: { item: WatchItem; tags: string[]; lists: string[]; onClose: () => void; onSaved: (d: Data) => void }) {
   const t = useT();
   const [v, setV] = useState({ ...item });
+  const [tagText, setTagText] = useState(item.tags.join(", "));
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const set = <K extends keyof WatchItem>(k: K, value: WatchItem[K]) => setV((cur) => ({ ...cur, [k]: value }));
@@ -278,7 +315,7 @@ function ItemDialog({ item, onClose, onSaved }: { item: WatchItem; onClose: () =
   const submit = async () => {
     setBusy(true);
     try {
-      onSaved(await sendJson<Data>(KEY, "PATCH", v));
+      onSaved(await sendJson<Data>(KEY, "PATCH", { ...v, tags: tagText.split(",") }));
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -330,6 +367,21 @@ function ItemDialog({ item, onClose, onSaved }: { item: WatchItem; onClose: () =
           </button>
         ))}
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+          {t("List")}
+          <input value={v.list ?? ""} onChange={(e) => set("list", e.target.value || null)} list="watch-lists" placeholder={t("None")} className={inputClass} />
+          <datalist id="watch-lists">
+            {lists.map((l) => (
+              <option key={l} value={l} />
+            ))}
+          </datalist>
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+          {t("Tags (comma-separated)")}
+          <input value={tagText} onChange={(e) => setTagText(e.target.value)} placeholder={tags.slice(0, 3).join(", ") || t("sci-fi, with Sam")} className={inputClass} />
+        </label>
+      </div>
       <label className="flex flex-col gap-1 text-xs font-medium text-muted">
         {t("Notes")}
         <textarea value={v.notes ?? ""} onChange={(e) => set("notes", e.target.value || null)} rows={3} className={`${inputClass} h-auto py-2`} />
@@ -347,5 +399,94 @@ function ItemDialog({ item, onClose, onSaved }: { item: WatchItem; onClose: () =
         />
       </div>
     </Dialog>
+  );
+}
+
+type SyncInfo = {
+  setup: { service_id: string; media_user: string; last_sync: number | null; last_error: string | null } | null;
+  services: { id: string; name: string; type: "jellyfin" | "plex" }[];
+};
+
+/** Link your account on a Jellyfin or Plex server: what you watched there gets finished here, daily. */
+function SyncPanel({ onSynced }: { onSynced: (d: Data) => void }) {
+  const t = useT();
+  const { data, mutate } = useSWR<SyncInfo>(`${KEY}/sync`, fetcher);
+  const [service, setService] = useState<string>();
+  const [user, setUser] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ text: string; error?: boolean }>();
+  if (!data?.services.length) return null;
+  const serviceId = service ?? data.setup?.service_id ?? data.services[0].id;
+  const mediaUser = user ?? data.setup?.media_user ?? "";
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await fn();
+    } catch (e) {
+      setMessage({ text: (e as Error).message, error: true });
+      await mutate();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const link = () => run(async () => void (await mutate(await sendJson<SyncInfo>(`${KEY}/sync`, "PUT", { serviceId, mediaUser }), { revalidate: false })));
+  const unlink = () =>
+    run(async () => {
+      await mutate(await sendJson<SyncInfo>(`${KEY}/sync`, "PUT", { serviceId: null }), { revalidate: false });
+      setUser("");
+    });
+  const syncNow = () =>
+    run(async () => {
+      const r = await sendJson<Data & { added: number; updated: number }>(`${KEY}/sync`, "POST");
+      onSynced(r);
+      await mutate();
+      setMessage({ text: t("{added} added, {updated} updated.", { added: r.added, updated: r.updated }) });
+    });
+  const linked = !!data.setup && data.setup.service_id === serviceId && data.setup.media_user === mediaUser;
+
+  return (
+    <details className="glass rounded-2xl p-4" open={!!data.setup}>
+      <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
+        <RefreshCw className="h-4 w-4 text-accent" /> {t("Sync from Jellyfin or Plex")}
+      </summary>
+      <p className="mt-2 text-sm text-muted">{t("Movies and shows you watched there are marked finished here (and added when missing), once a day. Nothing is ever moved back.")}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <select aria-label={t("Server")} value={serviceId} onChange={(e) => setService(e.target.value)} className={`${inputBase} w-48`}>
+          {data.services.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name} ({s.type === "plex" ? "Plex" : "Jellyfin"})
+            </option>
+          ))}
+        </select>
+        <input aria-label={t("Your name on that server")} placeholder={t("Your name on that server")} value={mediaUser} onChange={(e) => setUser(e.target.value)} className={`${inputBase} w-52`} />
+        {!linked ? (
+          <button type="button" disabled={busy || !mediaUser.trim()} onClick={link} className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">
+            {t("Link")}
+          </button>
+        ) : (
+          <>
+            <button type="button" disabled={busy} onClick={syncNow} className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">
+              <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} /> {t("Sync now")}
+            </button>
+            <button type="button" disabled={busy} onClick={unlink} className="rounded-xl px-3 py-2 text-sm text-muted hover:bg-hover">
+              {t("Unlink")}
+            </button>
+          </>
+        )}
+      </div>
+      {data.setup?.last_sync && (
+        <p className="mt-2 text-xs text-muted">
+          {t("Last sync {date}", { date: new Date(data.setup.last_sync).toLocaleString() })}
+          {data.setup.last_error && <span className="text-[var(--err)]"> · {data.setup.last_error}</span>}
+        </p>
+      )}
+      {message && (
+        <p role="status" className={`mt-2 text-sm ${message.error ? "text-[var(--err)]" : "text-muted"}`}>
+          {message.text}
+        </p>
+      )}
+    </details>
   );
 }

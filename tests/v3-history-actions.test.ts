@@ -113,6 +113,17 @@ describe("uptime per service", () => {
     expect(day.get("up.b")).toEqual({ checks: 1, up: 0 });
     expect(day.get("up.none")).toBeUndefined();
   });
+
+  it("leaves failures during maintenance out of uptime, but not passes", async () => {
+    const { insertPing, uptimeSince } = await import("@/lib/db");
+    const ping = (ts: number, up: number, maint: number) => insertPing({ service_id: "up.maint", ts, up, status: 200, latency_ms: 5, maint });
+    ping(1000, 1, 0);
+    ping(1100, 0, 1); // down in maintenance: not counted
+    ping(1200, 1, 1); // up in maintenance: counted
+    ping(1300, 0, 0); // down outside it: counted
+    expect(uptimeSince(1000).get("up.maint")).toEqual({ checks: 3, up: 2 });
+    expect(rollupHour([{ ts: 0, up: 0, latency_ms: null, maint: 1 }, { ts: 1, up: 1, latency_ms: 10 }])).toMatchObject({ checks: 1, up: 1 });
+  });
 });
 
 describe("maintenance", () => {
@@ -139,20 +150,20 @@ describe("maintenance", () => {
   });
 
   it("applies windows and one-off mutes to the right services", async () => {
-    const { ALL, listMutes, mute, mutedNow, unmute } = await import("@/lib/maintenance");
+    const { ALL, listMutes, maintenanceNow, mute, mutedNow, unmute } = await import("@/lib/maintenance");
     const windows = [{ name: "Backups", from: "03:00", to: "05:00", services: ["infra.nas"] }];
-    expect(mutedNow(windows, {}, "infra.nas", at(12, 4))).toEqual({ window: "Backups" });
-    expect(mutedNow(windows, {}, "infra.router", at(12, 4))).toBeUndefined();
-    expect(mutedNow(windows, {}, "infra.nas", at(12, 6))).toBeUndefined();
+    expect(maintenanceNow(windows, [], "infra.nas", at(12, 4))).toEqual({ window: "Backups" });
+    expect(maintenanceNow(windows, [], "infra.router", at(12, 4))).toBeUndefined();
+    expect(maintenanceNow(windows, [], "infra.nas", at(12, 6))).toBeUndefined();
 
     const now = at(12, 12).getTime();
     mute("infra.router", 30, "root", now);
-    expect(mutedNow([], listMutes(now), "infra.router", new Date(now))).toEqual({ until: now + 30 * 60_000 });
-    expect(mutedNow([], listMutes(now), "infra.nas", new Date(now))).toBeUndefined();
+    expect(mutedNow(listMutes(now), "infra.router", new Date(now))).toEqual({ until: now + 30 * 60_000 });
+    expect(mutedNow(listMutes(now), "infra.nas", new Date(now))).toBeUndefined();
     // It runs out on its own.
     expect(listMutes(now + 31 * 60_000)).toEqual({});
     mute(ALL, null, "root", now);
-    expect(mutedNow([], listMutes(now), "anything", new Date(now + 86_400_000 * 30))).toEqual({});
+    expect(mutedNow(listMutes(now), "anything", new Date(now + 86_400_000 * 30))).toEqual({ all: true });
     unmute(ALL, now);
     unmute("infra.router", now);
     expect(listMutes(now)).toEqual({});
@@ -190,7 +201,7 @@ describe("maintenance", () => {
     expect(sent).toEqual(["down", "up", "down", "up"]);
   });
 
-  it("records an outage that starts while muted as planned", async () => {
+  it("records an outage that starts in maintenance as planned", async () => {
     const { incidentsSince, openIncident } = await import("@/lib/db");
     openIncident("infra.planned", 2000, "no response", true);
     openIncident("infra.unplanned", 2000, "no response");

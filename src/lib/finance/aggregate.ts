@@ -19,7 +19,12 @@ export interface CategoryInfo {
   budget?: number | null;
   /** Own colour (#rrggbb) instead of a palette slot; such categories get their own band too. */
   color?: string | null;
+  /** Parent category (one level only): "Restaurants" under "Food" shows as Food › Restaurants. */
+  parent?: string | null;
 }
+
+/** "Food › Restaurants" for a subcategory, the name otherwise. */
+export const categoryLabel = (c: Pick<CategoryInfo, "name" | "parent">) => (c.parent ? `${c.parent} › ${c.name}` : c.name);
 
 export interface Slice {
   name: string;
@@ -118,10 +123,16 @@ export function summarize(txns: Txn[], categories: CategoryInfo[], period: strin
   const expense = -inPeriod.filter((t) => t.amount_cents < 0).reduce((a, t) => a + t.amount_cents, 0);
 
   const slots = new Map(categories.map((c) => [c.name.toLowerCase(), c]));
+  // A subcategory without its own slot or colour shows as its parent in charts.
+  const shown = (name: string | null) => {
+    const info = name ? slots.get(name.toLowerCase()) : undefined;
+    if (info && !info.slot && !info.color && info.parent) return slots.get(info.parent.toLowerCase()) ?? info;
+    return info;
+  };
   const byCat = new Map<string, Slice>();
   for (const t of inPeriod) {
     if (t.amount_cents >= 0) continue;
-    const info = t.category ? slots.get(t.category.toLowerCase()) : undefined;
+    const info = shown(t.category);
     const own = info && (info.slot || info.color);
     const name = own ? info.name : "Other";
     const s = byCat.get(name) ?? { name, cents: 0, slot: own ? (info.slot ?? null) : null, ...(own && info.color ? { color: info.color } : {}) };
@@ -133,11 +144,15 @@ export function summarize(txns: Txn[], categories: CategoryInfo[], period: strin
   const bySource = new Map<string, Slice>();
   const spentByName = new Map<string, number>();
   for (const t of inPeriod) {
-    const info = t.category ? slots.get(t.category.toLowerCase()) : undefined;
+    const cat = t.category ? slots.get(t.category.toLowerCase()) : undefined;
     if (t.amount_cents < 0) {
-      if (info) spentByName.set(info.name, (spentByName.get(info.name) ?? 0) - t.amount_cents);
+      // Counts for its own budget, and for its parent's.
+      if (cat) spentByName.set(cat.name, (spentByName.get(cat.name) ?? 0) - t.amount_cents);
+      const parent = cat?.parent ? slots.get(cat.parent.toLowerCase()) : undefined;
+      if (parent) spentByName.set(parent.name, (spentByName.get(parent.name) ?? 0) - t.amount_cents);
       continue;
     }
+    const info = shown(t.category);
     const own = info && (info.slot || info.color);
     const name = own ? info.name : "Income";
     const s = bySource.get(name) ?? { name, cents: 0, slot: own ? (info.slot ?? null) : null, ...(own && info.color ? { color: info.color } : {}) };

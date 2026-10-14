@@ -38,7 +38,7 @@ export function CsvImport({ currency, accounts = [], onImported }: { currency: s
   const source: Source = excel ?? { text };
   const [step, setStep] = useState<Step>({ kind: "start" });
   const [map, setMap] = useState<CsvMapping>({ date: 0, description: 1, amount: 2, dateFormat: "auto", decimal: ".", header: true });
-  const [preview, setPreview] = useState<{ preview: ParsedTransaction[]; total: number; errors: string[] }>();
+  const [preview, setPreview] = useState<{ preview: (ParsedTransaction & { byRule?: boolean })[]; total: number; errors: string[] }>();
   const [msg, setMsg] = useState<{ text: string; error?: boolean }>();
   const [busy, setBusy] = useState(false);
   const { data: ff, mutate: refreshFf } = useSWR<{ configured: boolean; lastSync: string | null }>("/api/finance/firefly", fetcher);
@@ -277,12 +277,15 @@ export function CsvImport({ currency, accounts = [], onImported }: { currency: s
                 ))}
                 <table className="text-sm">
                   <tbody>
-                    {preview.preview.map((t) => (
-                      <tr key={t.externalId} className="border-t border-line/50">
-                        <td className="py-1 pr-3 text-muted tabular-nums">{t.date}</td>
-                        <td className="max-w-80 truncate py-1 pr-3">{t.description}</td>
-                        <td className="py-1 pr-3 text-xs text-muted">{t.category}</td>
-                        <td className={`py-1 text-right tabular-nums ${t.amountCents > 0 ? "text-[var(--ok)]" : ""}`}>{money(t.amountCents, currency, true)}</td>
+                    {preview.preview.map((row) => (
+                      <tr key={row.externalId} className="border-t border-line/50">
+                        <td className="py-1 pr-3 text-muted tabular-nums">{row.date}</td>
+                        <td className="max-w-80 truncate py-1 pr-3">{row.description}</td>
+                        <td className="py-1 pr-3 text-xs text-muted" title={row.byRule ? t("From a rule") : undefined}>
+                          {row.category}
+                          {row.byRule && " ✦"}
+                        </td>
+                        <td className={`py-1 text-right tabular-nums ${row.amountCents > 0 ? "text-[var(--ok)]" : ""}`}>{money(row.amountCents, currency, true)}</td>
                       </tr>
                     ))}
                   </tbody>

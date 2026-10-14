@@ -5,7 +5,8 @@ import type { ServiceGroup, Settings } from "./config/schema";
 import { checkSpec } from "./checks";
 import { hourlyChecksSince, incidentsOverlapping, latestPing } from "./db";
 import { localDay } from "./day";
-import { listMutes, mutedNow } from "./maintenance";
+import { ALL, listMaintenance, maintenanceNow, nextWindowStart } from "./maintenance";
+import { listIncidents, type Impact, type IncidentStatus } from "./statusIncidents";
 
 /**
  * The public status page (/status): names, state, uptime and outage times only. Never links,
@@ -14,7 +15,7 @@ import { listMutes, mutedNow } from "./maintenance";
 export interface StatusDay {
   /** YYYY-MM-DD, server local time. */
   day: string;
-  /** Share of checks that passed that day; null without checks. */
+  /** Share of checks that passed that day (failures during maintenance left out); null without checks. */
   uptime: number | null;
 }
 
@@ -23,7 +24,7 @@ export interface StatusService {
   group: string;
   /** null: not checked yet. */
   up: boolean | null;
-  /** Alerts are held back (maintenance). */
+  /** Planned maintenance is under way (a mere mute of alerts is not shown here). */
   maintenance: boolean;
   /** The public message of that maintenance, when one was written. */
   note?: string;
@@ -41,12 +42,40 @@ export interface StatusIncident {
   note?: string;
 }
 
+/** An incident an admin posted, as visitors see it (no author). */
+export interface StatusPosted {
+  id: number;
+  title: string;
+  status: IncidentStatus;
+  impact: Impact;
+  /** Names of the services on this page it is about; empty: not about one in particular. */
+  services: string[];
+  start: number;
+  end: number | null;
+  /** Newest first. */
+  updates: { status: IncidentStatus; body: string; at: number }[];
+}
+
+/** Planned maintenance still to come. */
+export interface StatusUpcoming {
+  start: number;
+  end: number | null;
+  /** Names of the services on this page; empty: all of them. */
+  services: string[];
+  name?: string;
+  note?: string;
+}
+
 export interface StatusPageData {
   services: StatusService[];
   incidents: StatusIncident[];
+  posted: StatusPosted[];
+  upcoming: StatusUpcoming[];
   down: number;
   at: number;
 }
+
+const UPCOMING_DAYS = 7;
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
@@ -102,24 +131,45 @@ export async function statusPageData(cfg: Settings["statusPage"], now = new Date
   const days = lastDays(cfg.days, now);
   const since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (cfg.days - 1)).getTime();
   const hours = hourlyChecksSince(since, Math.floor(now.getTime() / HOUR) * HOUR - 3 * HOUR);
-  const mutes = listMutes(now.getTime());
+  const oneoffs = listMaintenance(now.getTime());
   const names = new Map(picked.map((p) => [p.id, p.name]));
 
   const services = picked.map((p): StatusService => {
     const last = latestPing(p.id);
-    const muted = mutedNow(settings.maintenance, mutes, p.id, now);
+    const maint = maintenanceNow(settings.maintenance, oneoffs, p.id, now);
     return {
       name: p.name,
       group: p.group,
       up: last ? !!last.up : null,
-      maintenance: !!muted,
+      maintenance: !!maint,
       // Only the public message: the note for admins never leaves the dashboard.
-      note: muted?.publicNote,
+      note: maint?.publicNote,
       ...dailyUptime(hours.get(p.id) ?? [], days),
     };
   });
   const incidents = incidentsOverlapping(now.getTime() - cfg.incidentDays * DAY)
     .filter((i) => names.has(i.service_id))
     .map((i) => ({ service: names.get(i.service_id)!, start: i.start, end: i.end, planned: !!i.planned, note: i.public_note ?? undefined }));
-  return { services, incidents, down: services.filter((s) => s.up === false).length, at: now.getTime() };
+  // Only what concerns services on this page (or no service in particular), and never who wrote it.
+  const shownNames = (ids: string[]) => ids.filter((id) => id === ALL || names.has(id)).map((id) => (id === ALL ? "" : names.get(id)!)).filter(Boolean);
+  const onPage = (ids: string[]) => !ids.length || ids.includes(ALL) || ids.some((id) => names.has(id));
+  const posted = cfg.showPosted
+    ? listIncidents(now.getTime() - cfg.incidentDays * DAY)
+        .filter((i) => onPage(i.services))
+        .map((i) => ({ id: i.id, title: i.title, status: i.status, impact: i.impact, services: shownNames(i.services), start: i.created_at, end: i.resolved_at, updates: i.updates.map(({ status, body, at }) => ({ status, body, at })) }))
+    : [];
+  const until = now.getTime() + UPCOMING_DAYS * DAY;
+  const upcoming: StatusUpcoming[] = cfg.showUpcoming
+    ? [
+        ...listMaintenance(now.getTime())
+          .filter((m) => m.start > now.getTime() && m.start <= until && onPage([m.service]))
+          .map((m) => ({ start: m.start, end: m.end, services: shownNames([m.service]), note: m.publicNote })),
+        ...settings.maintenance.flatMap((w) => {
+          const next = nextWindowStart(w, now, UPCOMING_DAYS);
+          if (!next || !onPage(w.services ?? [])) return [];
+          return [{ start: next.start, end: next.end, services: shownNames(w.services ?? []), name: w.name, note: w.publicNote }];
+        }),
+      ].sort((a, b) => a.start - b.start)
+    : [];
+  return { services, incidents, posted, upcoming, down: services.filter((s) => s.up === false && !s.maintenance).length, at: now.getTime() };
 }

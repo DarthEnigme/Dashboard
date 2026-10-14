@@ -24,7 +24,7 @@ import { fetcher, sendJson } from "@/lib/fetcher";
 import { scoreItem } from "@/lib/fuzzy";
 import { listTabs } from "@/lib/tabs";
 import { stylePresets, themes } from "@/lib/config/schema";
-import { glowAmount, paletteThemes } from "@/lib/theme";
+import { paletteThemes } from "@/lib/theme";
 import type { ClientConfig, ClientService } from "@/lib/config/sanitize";
 import type { ClientAuth } from "@/lib/auth";
 import type { ServiceAction } from "@/integrations/types";
@@ -66,12 +66,6 @@ const pushRecent = (id: string) => {
     // private mode: no recents
   }
 };
-
-/** Write one top-level settings key, keeping the rest of settings.yaml (and its comments) as is. */
-async function setSetting(key: string, value: unknown) {
-  const raw = await fetcher<{ settings: Record<string, unknown> }>("/api/config?raw=1");
-  await sendJson("/api/config", "PUT", { file: "settings", data: { ...raw.settings, [key]: value } });
-}
 
 /**
  * Ctrl/⌘+K: jump to any service, bookmark, tab, page or setting, run container/VM actions and a
@@ -211,6 +205,9 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           else window.location.href = "/#edit";
         },
       });
+    }
+    // Your own look (Settings → Appearance sets everyone's).
+    if (auth?.user) {
       const command = (id: string, title: string, key: string, value: unknown, icon: LucideIcon): PaletteItem => ({
         id,
         title,
@@ -221,7 +218,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         run: async () => {
           setStatus({ text: `${title}…`, busy: true });
           try {
-            await setSetting(key, value);
+            await sendJson("/api/profile/prefs", "PATCH", { [key]: value });
             setStatus({ text: t("{name}: saved", { name: title }) });
             router.refresh();
             setTimeout(onClose, 700);
@@ -235,11 +232,11 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         ...Object.entries(paletteThemes).map(([id, t]): [string, string] => [id, t.label]),
         ...(config.settings.customThemes ?? []).map((t): [string, string] => [`custom:${t.id}`, t.label]),
       ];
-      for (const [name, label] of themeNames) if (config.settings.theme !== name) items.push(command(`cmd:theme:${name}`, t("Theme: {name}", { name: label }), "theme", name, Palette));
-      for (const s of stylePresets) if (config.settings.style !== s) items.push(command(`cmd:style:${s}`, t("Card style: {name}", { name: s }), "style", s, Palette));
-      const glow = glowAmount(config.settings.glow);
+      // Every option: the viewer's own look may differ from the global one in config.settings.
+      for (const [name, label] of themeNames) items.push(command(`cmd:theme:${name}`, t("Theme: {name}", { name: label }), "theme", name, Palette));
+      for (const s of stylePresets) items.push(command(`cmd:style:${s}`, t("Card style: {name}", { name: s }), "style", s, Palette));
       for (const [label, g] of [["off", 0], ["subtle", 50], ["strong", 100]] as const)
-        if (glow !== g) items.push(command(`cmd:glow:${label}`, t("Hover glow: {name}", { name: t(label) }), "glow", g, Palette));
+        items.push(command(`cmd:glow:${label}`, t("Hover glow: {name}", { name: t(label) }), "glow", g, Palette));
     }
     return items;
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -8,12 +8,12 @@ import { checkSpec, describeCheck, runCheck, type PingResult } from "@/lib/check
 import { bucketsSince, latestPings } from "@/lib/db";
 import type { Bucket } from "@/lib/history";
 import { certFor } from "@/lib/monitor";
-import { listMutes, mutedNow } from "@/lib/maintenance";
+import { listMaintenance, listMutes, quietNow } from "@/lib/maintenance";
 
 export const dynamic = "force-dynamic";
 
 export interface Tile {
-  ping: PingResult & { certWarn: boolean; muted: boolean };
+  ping: PingResult & { certWarn: boolean; muted: boolean; maintenance: boolean };
   /** The last 24 hours in 48 half-hour slots, and the uptime over all of them. */
   history: { uptime: number | null; buckets: Bucket[] };
 }
@@ -43,6 +43,7 @@ export async function GET() {
   const latest = latestPings(now - maxAge);
   const { from, rows } = await history();
   const mutes = listMutes(now);
+  const oneoffs = listMaintenance(now);
   const out: Record<string, Tile> = {};
 
   await Promise.all(
@@ -68,8 +69,9 @@ export async function GET() {
           up += b?.up ?? 0;
           return { start: Math.round(from + (i * DAY) / SLOTS), uptime: b?.checks ? b.up / b.checks : null, avgLatency: b?.avgMs == null ? null : Math.round(b.avgMs), p95Latency: null, checks: b?.checks ?? 0 };
         });
+        const q = quietNow(settings.maintenance, mutes, oneoffs, id, new Date(now));
         out[id] = {
-          ping: { ...r, cert, certWarn: !!(cert && days && cert.daysLeft <= days), muted: !!mutedNow(settings.maintenance, mutes, id, new Date(now)) },
+          ping: { ...r, cert, certWarn: !!(cert && days && cert.daysLeft <= days), muted: !!q.muted, maintenance: !!q.maintenance },
           history: { uptime: checks ? up / checks : null, buckets },
         };
       }),

@@ -18,6 +18,7 @@ const LABELS: Record<Permission, string> = {
   travel: msg("Use the travel log"),
   watchlist: msg("Use the watchlist and reading list"),
   inventory: msg("See and edit the device inventory (and wake devices, with actions)"),
+  notes: msg("Read and write notes and runbooks"),
 };
 
 /** Groups: who sees items marked visible: [group], extra permissions, and SSO group mapping. */
