@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { loadConfig } from "../config/load";
-import { PERMISSIONS, type Permission, type Visibility } from "../config/schema";
+import { APPS, PERMISSIONS, type Permission, type Visibility } from "../config/schema";
 import { groupsOf, syncSsoGroups } from "./groups";
 import { checkSession } from "./sessions";
 import { hashPassword } from "./password";
@@ -25,12 +25,16 @@ export interface Viewer {
 
 const ANON: Viewer = { role: "anon", groups: [], permissions: [] };
 
+/** An app turned off in settings (`apps`) is off for everyone, admins included: drop its permission. */
+export function withoutDisabledApps(granted: readonly Permission[], apps: readonly string[]): Permission[] {
+  return granted.filter((p) => !(APPS as readonly string[]).includes(p) || apps.includes(p));
+}
+
 function viewerFor(user: User, sessionId?: string): Viewer {
   const groups = groupsOf(user.id);
-  const permissions =
-    user.role === "admin"
-      ? [...PERMISSIONS]
-      : [...new Set([...loadConfig().settings.auth.userPermissions, ...groups.flatMap((g) => g.permissions)])];
+  const { auth, apps } = loadConfig().settings;
+  const granted = user.role === "admin" ? [...PERMISSIONS] : [...new Set([...auth.userPermissions, ...groups.flatMap((g) => g.permissions)])];
+  const permissions = withoutDisabledApps(granted, apps);
   return { user, role: user.role, groups: groups.map((g) => g.name), permissions, sessionId };
 }
 

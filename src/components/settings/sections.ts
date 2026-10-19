@@ -158,6 +158,13 @@ export const sections: Section[] = [
       },
       { key: "target", label: msg("Open links in"), kind: "select", options: ["_blank", "_self"], help: msg("_blank opens a new tab.") },
       { key: "tabs", label: msg("Tab order"), kind: "list", placeholder: msg("Home, Media, Infra"), help: msg("Groups pick their tab in the group settings.") },
+      {
+        key: "apps",
+        label: msg("Apps"),
+        kind: "list",
+        placeholder: "finance, travel, watchlist, inventory, notes",
+        help: msg("Comma-separated: finance, travel, watchlist, inventory, notes. The others are hidden for everyone, admins included; their data is kept. Empty field = all of them."),
+      },
     ],
   },
   {

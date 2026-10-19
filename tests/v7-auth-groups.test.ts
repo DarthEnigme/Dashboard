@@ -3,9 +3,11 @@ import { base32Decode, base32Encode, newRecoveryCodes, openSecret, sealSecret, t
 import { checkSession, createResetToken, createSession, listSessions, resetTokenUser, revokeSession, revokeUserSessions, SHORT_MS } from "@/lib/auth/sessions";
 import { createGroup, groupsOf, listGroups, setManualGroups, syncSsoGroups, updateGroup } from "@/lib/auth/groups";
 import { createUser, getTwoFactor, getUser, setTwoFactor } from "@/lib/auth/users";
-import { canSee } from "@/lib/auth";
+import { canSee, withoutDisabledApps } from "@/lib/auth";
 import { sanitize } from "@/lib/config/sanitize";
-import { settingsSchema, servicesFileSchema } from "@/lib/config/schema";
+import { APPS, PERMISSIONS, settingsSchema, servicesFileSchema } from "@/lib/config/schema";
+import { defaultFiles } from "@/lib/config/defaults";
+import YAML from "yaml";
 import { db } from "@/lib/db";
 
 describe("totp", () => {
@@ -135,6 +137,26 @@ describe("groups", () => {
     expect(servicesFileSchema.safeParse([{ name: "G", visible: ["family"], services: [] }]).success).toBe(true);
     expect(servicesFileSchema.safeParse([{ name: "G", visible: "family", services: [] }]).success).toBe(false);
     expect(settingsSchema.parse({}).auth.userPermissions).toEqual(["finance", "travel", "watchlist"]);
+  });
+});
+
+describe("apps turned off in settings", () => {
+  it("are all on when settings don't name them (installs from before 0.6)", () => {
+    expect(settingsSchema.parse({}).apps).toEqual([...APPS]);
+  });
+
+  it("start with the homelab ones on a fresh install", () => {
+    expect(settingsSchema.parse(YAML.parse(defaultFiles["settings.yaml"])).apps).toEqual(["notes", "inventory"]);
+  });
+
+  it("take their permission away from everyone, admins included, and leave actions alone", () => {
+    expect(withoutDisabledApps([...PERMISSIONS], ["notes", "inventory"])).toEqual(["actions", "inventory", "notes"]);
+    expect(withoutDisabledApps(["finance", "travel", "watchlist"], ["finance"])).toEqual(["finance"]);
+    expect(withoutDisabledApps(["finance", "actions"], [])).toEqual(["actions"]);
+  });
+
+  it("rejects names that aren't apps", () => {
+    expect(settingsSchema.safeParse({ apps: ["actions"] }).success).toBe(false);
   });
 });
 

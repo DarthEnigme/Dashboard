@@ -27,6 +27,19 @@ export interface FieldSpec {
 /** Integration types that offer admin actions (start/stop…); kept in sync with the registry by a test. */
 export const ACTION_TYPES = new Set(["docker", "proxmox", "dockhand", "arcane", "pelican", "homeassistant"]);
 
+/**
+ * Integrations checked against a live instance, plus the generic ones that follow a standard or read
+ * NanoDash's own data. The others are marked experimental in the editor: written from the API docs and
+ * tested on recorded responses only. Add a type here once it has run against the real thing.
+ */
+export const STABLE_TYPES = new Set([
+  "proxmox", "pbs",
+  "docker", "portainer", "dockhand", "arcane",
+  "pihole", "adguard", "unifi", "opnsense", "pfsense", "traefik", "npm", "tailscale", "wireguard", "wgdashboard",
+  "customapi", "metric", "calendar", "rss", "snmp", "finance",
+]);
+export const isExperimental = (type: string) => !STABLE_TYPES.has(type);
+
 const promQueriesPlaceholder =
   '- label: CPU\n  query: 100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))\n  format: percent\n  warn: 75\n  error: 90\n  chart: true\n- label: Memory\n  query: sum(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)\n  format: bytes';
 

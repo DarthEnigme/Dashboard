@@ -3,7 +3,7 @@ import os from "node:os";
 import { EventEmitter } from "node:events";
 import type Docker from "dockerode";
 import { dockerClient } from "../docker";
-import { getAppMeta, setAppMeta } from "../db";
+import { getAppMeta, setAppMeta, snapshotDb } from "../db";
 import { audit } from "../auth/users";
 import type { Settings } from "../config/schema";
 import { buildInfo } from "../version";
@@ -36,6 +36,8 @@ interface Pending {
   image: string;
   user: string | null;
   startedAt: number;
+  /** Database copy taken just before the handover: put back if the helper rolls back (see db.ts). */
+  snapshot?: string;
 }
 
 const PENDING = "update.pending";
@@ -210,14 +212,10 @@ export async function applyUpdate(cfg: Settings["updates"], status: UpdateStatus
       },
     });
 
-    setAppMeta(PENDING, {
-      from: status.current.version,
-      fromBuild: status.current.buildId,
-      to: target,
-      image: ref,
-      user,
-      startedAt: Date.now(),
-    } satisfies Pending);
+    const pending: Pending = { from: status.current.version, fromBuild: status.current.buildId, to: target, image: ref, user, startedAt: Date.now() };
+    // Recorded before the copy too, so a restored copy still knows an update was attempted.
+    setAppMeta(PENDING, pending);
+    setAppMeta(PENDING, { ...pending, snapshot: snapshotDb(`pre-update-${status.current.version}-to-${target}`) } satisfies Pending);
     setProgress({ phase: "restarting", target, percent: 100, startedAt: Date.now(), message: "Restarting with the new version…" });
     await helper.start();
   } catch (e) {

@@ -2,6 +2,8 @@
 
 A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Homepage](https://gethomepage.dev).
 
+**Homepage, plus what it leaves out:** uptime history and incidents for every tile, alerts, a public status page, start/stop buttons, and an in-browser editor that keeps your YAML comments. Already on Homepage? Import your config and you're running in a minute (see [Run with Docker](#run-with-docker)).
+
 - **Service tiles:**
   - status pings with a 24-hour uptime history
   - bento tile sizes
@@ -44,6 +46,8 @@ docker compose up -d
 
 Open http://localhost:3000 and choose **Set up** to create the admin account (or set `HOMEPAGE_ADMIN_PASSWORD` to create user `admin` automatically). On first start, example config files are written to `./config`. History, users and finance data are stored in `./data`.
 
+**Coming from Homepage:** open the editor, choose **Import**, and pick your `services.yaml`, `bookmarks.yaml`, `settings.yaml`, `widgets.yaml` and `docker.yaml`. Your tiles show up with status checks right away (see [Editing in the browser](#editing-in-the-browser)).
+
 `docker-compose.yml` runs the image CI publishes to `ghcr.io/darthenigme/dashboard` (amd64 and arm64): `:latest` follows `main`, and every release also gets its version tag (`:0.4.0`). To build from source instead, swap `image:` for `build: .` and run `docker compose up -d --build`.
 
 ### Reaching services through WireGuard
@@ -81,6 +85,7 @@ Good to know:
 
   Open pages notice the new version and offer a reload. Each attempt is listed under **History**.
 - **By hand:** `docker compose pull && docker compose up -d`, or for a source install `git pull && npm ci && npm run build`.
+- **Your data:** before an update hands over, and again before the new version changes the database, NanoDash copies the database to `data/snapshots/` (the newest 5 are kept). If the new version doesn't come up and the old container is put back, the old version puts that copy back too, and keeps the upgraded database next to it (`page.db.schema-v…`). An older NanoDash never runs on a database a newer one has changed: it stops with a message saying which copy to restore.
 - **Automatically:** set `updates.auto: true` to install new versions at `updates.window`. There is one attempt per version. If the release's image isn't in the registry yet, the attempt doesn't count, and NanoDash tries again at the next window.
 
 ```yaml
@@ -139,6 +144,8 @@ editing: true          # set false to disable the browser editor
 refreshInterval: 20    # seconds between integration refreshes
 pingInterval: 30       # seconds between status checks
 liveReload: true       # refresh open dashboards when a config file changes
+apps: [notes, inventory]   # apps in the Apps menu: finance, travel, watchlist, inventory, notes
+                       # (all of them when left out; new installs start with notes and inventory)
 tabs: [Home, Media]    # optional tab order (see "Tabs")
 history:
   retentionDays: 90    # how long hourly summaries and incidents are kept (raw checks: 7 days)
@@ -285,6 +292,8 @@ In the editor they show as masked and keep their stored value unless you type a 
 When no icon is set or it fails to load, the tile shows the service's initials.
 
 ## Integrations
+
+Integrations marked **(experimental)** in the editor were written from the API docs and tested on recorded responses, not yet against a live server. They may show empty or wrong fields after an upstream change; please open an issue with the service's version. The others (Proxmox, PBS, Docker, Portainer, Dockhand, Arcane, Pi-hole, AdGuard, UniFi, OPNsense, pfSense, Traefik, Nginx Proxy Manager, Tailscale, WireGuard, WGDashboard, and the generic ones) run against real servers.
 
 | type | Fields | Shows |
 | --- | --- | --- |
@@ -723,6 +732,8 @@ backup:
   maxAgeDays: 30     # optional: also delete backups older than this (the newest always stays)
   dir: /backups     # optional; default data/backups
 ```
+
+Separately, `data/snapshots/` holds plain copies of the database taken before updates and database upgrades (see [Updating](#updating)). To use one: stop NanoDash, copy it over `data/page.db`, delete `page.db-wal` and `page.db-shm`, and start NanoDash again.
 
 **Restore:** stop NanoDash, unzip the backup, copy `config/` over your config folder and `data/` over your data folder (delete `page.db-wal` and `page.db-shm` there first), and start NanoDash again. The zip holds secrets: keep it somewhere safe.
 

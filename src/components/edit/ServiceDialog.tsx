@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { integrationFields, type FieldSpec } from "@/integrations/fields";
+import { integrationFields, isExperimental, type FieldSpec } from "@/integrations/fields";
 import { tileSizes } from "@/lib/config/schema";
 import { visibleField } from "./fields";
 import { Icon } from "../Icon";
@@ -252,10 +252,13 @@ export function ServiceDialog({ title, initial, onClose, onSave }: Props) {
           <select id="f-widget" value={widgetType} onChange={(e) => setWidgetType(e.target.value)} className={inputClass}>
             <option value="">{t("None")}</option>
             {Object.entries(integrationFields).map(([type, spec]) => (
-              <option key={type} value={type}>{spec.label}</option>
+              <option key={type} value={type}>{isExperimental(type) ? `${spec.label} ${t("(experimental)")}` : spec.label}</option>
             ))}
             {widgetType && !widgetSpec && <option value={widgetType}>{widgetType} {t("(unknown)")}</option>}
           </select>
+          {widgetSpec && isExperimental(widgetType) && (
+            <p className="text-xs text-muted">{t("Experimental: built from the API docs and tested on recorded responses, not yet on a live server. If a field is wrong or empty, please open an issue.")}</p>
+          )}
         </div>
         {widgetSpec?.fields.map((f) => (
           <FieldInput

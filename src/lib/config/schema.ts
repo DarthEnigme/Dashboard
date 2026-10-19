@@ -54,6 +54,8 @@ const visible = z.union([z.enum(visibilities), z.array(z.string().min(1)).min(1)
 /** What a signed-in user may do beyond seeing things; admins may do everything. */
 export const PERMISSIONS = ["finance", "actions", "travel", "watchlist", "inventory", "notes"] as const;
 export type Permission = (typeof PERMISSIONS)[number];
+/** Sections beyond the dashboard that can be turned off for everyone (their permission then counts for no one). */
+export const APPS = ["finance", "travel", "watchlist", "inventory", "notes"] as const satisfies readonly Permission[];
 
 const providerSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/, "lowercase letters, digits and dashes"),
@@ -161,6 +163,8 @@ export const settingsSchema = z
     metricsInterval: z.number().min(10).default(60),
     /** Refresh open dashboards when a config file changes on disk. */
     liveReload: z.boolean().default(true),
+    /** Apps turned on (all of them when the key is missing, as before 0.6). */
+    apps: z.array(z.enum(APPS)).default([...APPS]),
     tabs: z.array(z.string()).optional(),
     history: z.object({ retentionDays: z.number().min(1).max(400).default(90) }).prefault({}),
     /** Device inventory: remind the alert channels this many days before a warranty ends (0 = off). */

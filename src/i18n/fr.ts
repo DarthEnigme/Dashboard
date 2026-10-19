@@ -12,6 +12,9 @@ export const fr: Record<string, string> = {
   "(or pick groups in the editor). Members also get the group's permissions. Admins see and do everything.":
     "(ou choisissez des groupes dans l’éditeur). Les membres reçoivent aussi les permissions du groupe. Les admins voient et font tout.",
   "(unknown)": "(inconnu)",
+  "(experimental)": "(expérimental)",
+  "Experimental: built from the API docs and tested on recorded responses, not yet on a live server. If a field is wrong or empty, please open an issue.":
+    "Expérimental : écrit d’après la documentation de l’API et testé sur des réponses enregistrées, pas encore sur un vrai serveur. Si un champ est faux ou vide, merci d’ouvrir un ticket.",
   "({n} past occurrences filled in)": "({n} occurrences passées ajoutées)",
   ", then replaces the": ", puis remplace le conteneur",
   ". A category without a colour is shown as": ". Une catégorie sans couleur apparaît comme",
@@ -791,6 +794,8 @@ export const fr: Record<string, string> = {
   "TLS certificate expires in {n} d": "Le certificat TLS expire dans {n} j",
   Tab: "Onglet",
   "Tab order": "Ordre des onglets",
+  "Comma-separated: finance, travel, watchlist, inventory, notes. The others are hidden for everyone, admins included; their data is kept. Empty field = all of them.":
+    "Séparées par des virgules : finance, travel, watchlist, inventory, notes. Les autres sont masquées pour tout le monde, administrateurs compris ; leurs données sont conservées. Champ vide = toutes.",
   Tabs: "Onglets",
   "Take money out of savings": "Retirer de l’argent de l’épargne",
   "Take out": "Retirer",

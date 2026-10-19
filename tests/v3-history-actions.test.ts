@@ -69,6 +69,12 @@ describe("action metadata", () => {
     const withActions = Object.values(integrations).filter((i) => i.actions).map((i) => i.type);
     expect(new Set(withActions)).toEqual(ACTION_TYPES);
   });
+
+  it("STABLE_TYPES only names integrations that exist", async () => {
+    const { integrations } = await import("@/integrations");
+    const { STABLE_TYPES } = await import("@/integrations/fields");
+    expect([...STABLE_TYPES].filter((t) => !integrations[t])).toEqual([]);
+  });
 });
 
 describe("services removed from the config", () => {

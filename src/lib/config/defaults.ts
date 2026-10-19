@@ -15,6 +15,7 @@ editing: true        # allow editing from the browser
 refreshInterval: 20  # seconds between widget refreshes
 pingInterval: 30     # seconds between status pings
 liveReload: true     # refresh open dashboards when these files change
+apps: [notes, inventory]  # also: finance, travel, watchlist
 `,
   "services.yaml": `# Service groups. Secrets can reference env vars: "{{HOMEPAGE_VAR_PROXMOX_SECRET}}"
 - name: Infrastructure
