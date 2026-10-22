@@ -16,6 +16,8 @@ interface State {
   enabled: boolean;
   time: string;
   keep: number;
+  snapshots: BackupInfo[];
+  keepSnapshots: number;
 }
 
 const size = (n: number) => (n > 1024 ** 2 ? `${(n / 1024 ** 2).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
@@ -89,6 +91,29 @@ export function BackupsPanel() {
         </ul>
       )}
       {data && !data.backups.length && <p className="text-sm text-muted">{t("No backups yet.")}</p>}
+      {!!data?.snapshots.length && (
+        <>
+          <h4 className="mt-2 text-sm font-medium">{t("Before updates and upgrades")}</h4>
+          <p className="-mt-2 text-xs text-muted">
+            {t("Copies of the database alone, taken before an update or a database upgrade (the newest {n} are kept). To go back to one: stop NanoDash, copy it over data/page.db, delete page.db-wal and page.db-shm, and start NanoDash again.", { n: data.keepSnapshots })}
+          </p>
+          <ul className="flex flex-col divide-y divide-line/60 rounded-2xl ring-1 ring-line" aria-label={t("Before updates and upgrades")}>
+            {data.snapshots.map((b) => (
+              <li key={b.name} className="flex items-center gap-3 px-3 py-2 text-sm">
+                <span className="mr-auto min-w-0">
+                  <span className="block truncate font-medium">{when(b.at)}</span>
+                  <span className="block truncate text-xs text-muted">
+                    {b.name} · {size(b.size)}
+                  </span>
+                </span>
+                <a href={`/api/backups/${encodeURIComponent(b.name)}`} download className="flex items-center gap-1 rounded-full px-3 py-1 text-xs hover:bg-hover" aria-label={t("Download {name}", { name: b.name })}>
+                  <Download className="h-3.5 w-3.5" /> {t("Download")}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

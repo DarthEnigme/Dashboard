@@ -3,6 +3,7 @@ import { requireAdmin, sameOrigin } from "@/lib/auth";
 import { audit } from "@/lib/auth/users";
 import { backupDir, backupStatus, listBackups, runBackup } from "@/lib/backup";
 import { loadConfig } from "@/lib/config/load";
+import { KEEP_SNAPSHOTS, listSnapshots } from "@/lib/snapshots";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -11,7 +12,16 @@ const forbidden = () => NextResponse.json({ error: "Admins only" }, { status: 40
 
 const state = () => {
   const cfg = loadConfig().settings.backup;
-  return { backups: listBackups(), last: backupStatus() ?? null, dir: backupDir(cfg), enabled: cfg.enabled, time: cfg.time, keep: cfg.keep };
+  return {
+    backups: listBackups(),
+    last: backupStatus() ?? null,
+    dir: backupDir(cfg),
+    enabled: cfg.enabled,
+    time: cfg.time,
+    keep: cfg.keep,
+    snapshots: listSnapshots(),
+    keepSnapshots: KEEP_SNAPSHOTS,
+  };
 };
 
 /** The backups on disk, the last run, and where they go. */

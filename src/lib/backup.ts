@@ -4,6 +4,7 @@ import { CONFIG_DIR, loadConfig } from "./config/load";
 import { configFiles, type Settings } from "./config/schema";
 import { DATA_DIR, db, getAppMeta, setAppMeta } from "./db";
 import { hasAlertChannel, sendNotice } from "./alerts";
+import { vacuumInto } from "./snapshots";
 import { zipToFile } from "./zip";
 
 /** page-backup-2026-10-09-0300.zip */
@@ -54,7 +55,7 @@ export function createBackup(by: string, now = new Date()): BackupInfo {
 
   const snapshot = path.join(dir, `.snapshot-${process.pid}-${now.getTime()}.db`);
   try {
-    db().exec(`VACUUM INTO '${snapshot.replace(/'/g, "''")}'`);
+    vacuumInto(db(), snapshot);
     // Files are copied into the zip in chunks: the database can be large, memory use stays flat.
     const files: Parameters<typeof zipToFile>[1] = [];
     for (const f of Object.keys(configFiles)) {

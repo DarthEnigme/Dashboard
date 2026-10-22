@@ -5,7 +5,7 @@ import { checkForUpdate, compareSemver } from "@/lib/update/check";
 import { imageRepo, isMissingImage } from "@/lib/update/apply";
 import { inWindow } from "@/lib/update/job";
 // @ts-expect-error plain ESM script without types
-import { planRecreate } from "../scripts/updater.mjs";
+import { planRecreate, run } from "../scripts/updater.mjs";
 
 describe("semver", () => {
   it("orders versions, with pre-releases before their release", () => {
@@ -149,6 +149,66 @@ describe("updater", () => {
     expect(imageRepo("Me/Page@sha256:abc")).toBe("me/page");
     expect(inWindow("04:00", new Date(2026, 9, 5, 4, 30))).toBe(true);
     expect(inWindow("04:00", new Date(2026, 9, 5, 5, 0))).toBe(false);
+  });
+
+  /** A fake Docker API: records every call; `fail` makes a call matching it throw, `health` is the new container's state. */
+  function fakeDocker({ fail, health = "healthy" }: { fail?: RegExp; health?: string } = {}) {
+    const calls: string[] = [];
+    const api = async (method: string, path: string) => {
+      const call = `${method} ${path.replace(/\?.*/, "")}`;
+      calls.push(call);
+      if (fail?.test(call)) throw new Error(`${call}: HTTP 500`);
+      if (call === `GET /containers/${old.Id}/json`) return old;
+      if (call.startsWith("GET /images/")) return oldImage;
+      if (call === "POST /containers/create") return { Id: "new" };
+      if (call === "GET /containers/new/json") return { State: { Running: true, Status: "running", Health: { Status: health } } };
+      return null;
+    };
+    return { calls, deps: { api, sleep: async () => {}, healthTimeoutMs: 1000 } };
+  }
+
+  it("replaces the old container once the new one is healthy", async () => {
+    const { calls, deps } = fakeDocker();
+    expect(await run(old.Id, "img:new", deps)).toBe(true);
+    expect(calls.at(-1)).toBe(`DELETE /containers/${old.Id}`);
+    expect(calls).not.toContain(`POST /containers/${old.Id}/start`);
+  });
+
+  it("starts the old container again when it can't be renamed out of the way", async () => {
+    const { calls, deps } = fakeDocker({ fail: /\/rename$/ });
+    expect(await run(old.Id, "img:new", deps)).toBe(false);
+    expect(calls).toContain(`POST /containers/${old.Id}/stop`);
+    expect(calls.at(-1)).toBe(`POST /containers/${old.Id}/start`);
+    expect(calls).not.toContain("POST /containers/create");
+    // Only the one failed rename: nothing to rename back.
+    expect(calls.filter((c) => c.endsWith("/rename"))).toHaveLength(1);
+  });
+
+  it("puts the old container back when the new one is unhealthy", async () => {
+    const { calls, deps } = fakeDocker({ health: "unhealthy" });
+    expect(await run(old.Id, "img:new", deps)).toBe(false);
+    const tail = calls.slice(-3);
+    expect(tail).toEqual(["DELETE /containers/new", `POST /containers/${old.Id}/rename`, `POST /containers/${old.Id}/start`]);
+  });
+
+  it("doesn't go on when the old container can't be stopped", async () => {
+    const { calls, deps } = fakeDocker({ fail: /\/stop$/ });
+    expect(await run(old.Id, "img:new", deps)).toBe(false);
+    expect(calls).not.toContain(`POST /containers/${old.Id}/rename`);
+    expect(calls).not.toContain("POST /containers/create");
+    expect(calls.at(-1)).toBe(`POST /containers/${old.Id}/start`);
+  });
+
+  it("leaves the old container running when it can't be read", async () => {
+    const { calls, deps } = fakeDocker({ fail: /^GET \/containers\// });
+    expect(await run(old.Id, "img:new", deps)).toBe(false);
+    expect(calls).not.toContain(`POST /containers/${old.Id}/stop`);
+  });
+
+  it("puts the old container back when the new one can't be created", async () => {
+    const { calls, deps } = fakeDocker({ fail: /^POST \/containers\/create$/ });
+    expect(await run(old.Id, "img:new", deps)).toBe(false);
+    expect(calls.slice(-2)).toEqual([`POST /containers/${old.Id}/rename`, `POST /containers/${old.Id}/start`]);
   });
 });
 

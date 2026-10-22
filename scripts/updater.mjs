@@ -11,7 +11,8 @@
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 
-const HEALTH_TIMEOUT_MS = 120_000;
+// Generous: a Raspberry Pi starting a new version may also migrate and copy the database first.
+const HEALTH_TIMEOUT_MS = 240_000;
 
 /** Values the old container only had because its image set them; dropped so the new image's apply. */
 function fromImage(value, imageValue) {
@@ -113,11 +114,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (msg) => console.log(`[nanodash-updater] ${new Date().toISOString()} ${msg}`);
 const q = (s) => encodeURIComponent(s);
 
-async function waitHealthy(id) {
-  const deadline = Date.now() + HEALTH_TIMEOUT_MS;
+async function waitHealthy(id, call, wait, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
   let runningSince = 0;
   while (Date.now() < deadline) {
-    const c = await api("GET", `/containers/${id}/json`);
+    const c = await call("GET", `/containers/${id}/json`);
     const health = c.State?.Health?.Status;
     if (!c.State?.Running && c.State?.Status === "exited") throw new Error(`new container exited (code ${c.State.ExitCode})`);
     if (health === "healthy") return;
@@ -127,38 +128,43 @@ async function waitHealthy(id) {
       runningSince ||= Date.now();
       if (Date.now() - runningSince > 15_000) return;
     }
-    await sleep(2000);
+    await wait(2000);
   }
   throw new Error("new container did not become healthy in time");
 }
 
-export async function run(oldId, newImage) {
-  const old = await api("GET", `/containers/${q(oldId)}/json`);
-  const oldImage = await api("GET", `/images/${q(old.Image)}/json`).catch(() => null);
-  const plan = planRecreate(old, oldImage, newImage);
-  const backup = `${plan.name}-old-${Date.now()}`;
-  log(`replacing ${plan.name} (${old.Config?.Image}) with ${newImage}`);
-
-  await api("POST", `/containers/${old.Id}/stop?t=20`).catch((e) => log(`stop: ${e.message}`));
-  await api("POST", `/containers/${old.Id}/rename?name=${q(backup)}`);
+/** `deps` replaces the Docker API and the waits in tests. */
+export async function run(oldId, newImage, { api: call = api, sleep: wait = sleep, healthTimeoutMs = HEALTH_TIMEOUT_MS } = {}) {
+  // Any failure is undone: NanoDash must never be left stopped (a container stopped through the API
+  // isn't restarted by its restart policy). Starting it again is harmless when it never stopped.
+  let plan;
+  let renamed = false;
   let created;
   try {
-    created = await api("POST", `/containers/create?name=${q(plan.name)}`, plan.body);
+    const old = await call("GET", `/containers/${q(oldId)}/json`);
+    const oldImage = await call("GET", `/images/${q(old.Image)}/json`).catch(() => null);
+    plan = planRecreate(old, oldImage, newImage);
+    log(`replacing ${plan.name} (${old.Config?.Image}) with ${newImage}`);
+    // A failed stop aborts: going on could leave two containers on the same database.
+    await call("POST", `/containers/${q(oldId)}/stop?t=20`);
+    await call("POST", `/containers/${q(oldId)}/rename?name=${q(`${plan.name}-old-${Date.now()}`)}`);
+    renamed = true;
+    created = await call("POST", `/containers/create?name=${q(plan.name)}`, plan.body);
     for (const n of plan.extraNetworks) {
-      await api("POST", `/networks/${q(n.name)}/connect`, { Container: created.Id, EndpointConfig: n.endpoint });
+      await call("POST", `/networks/${q(n.name)}/connect`, { Container: created.Id, EndpointConfig: n.endpoint });
     }
-    await api("POST", `/containers/${created.Id}/start`);
+    await call("POST", `/containers/${created.Id}/start`);
     log("started, waiting until healthy");
-    await waitHealthy(created.Id);
+    await waitHealthy(created.Id, call, wait, healthTimeoutMs);
   } catch (e) {
     log(`update failed: ${e.message}; rolling back`);
-    if (created) await api("DELETE", `/containers/${created.Id}?force=true`).catch((err) => log(`remove new: ${err.message}`));
-    await api("POST", `/containers/${old.Id}/rename?name=${q(plan.name)}`).catch((err) => log(`rename back: ${err.message}`));
-    await api("POST", `/containers/${old.Id}/start`).catch((err) => log(`start old: ${err.message}`));
+    if (created) await call("DELETE", `/containers/${created.Id}?force=true`).catch((err) => log(`remove new: ${err.message}`));
+    if (renamed) await call("POST", `/containers/${q(oldId)}/rename?name=${q(plan.name)}`).catch((err) => log(`rename back: ${err.message}`));
+    await call("POST", `/containers/${q(oldId)}/start`).catch((err) => log(`start old: ${err.message}`));
     process.exitCode = 1;
     return false;
   }
-  await api("DELETE", `/containers/${old.Id}?force=true`).catch((e) => log(`remove old: ${e.message}`));
+  await call("DELETE", `/containers/${q(oldId)}?force=true`).catch((e) => log(`remove old: ${e.message}`));
   log("update complete");
   return true;
 }

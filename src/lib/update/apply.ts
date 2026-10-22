@@ -1,13 +1,18 @@
 import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import { EventEmitter } from "node:events";
 import type Docker from "dockerode";
 import { dockerClient } from "../docker";
-import { getAppMeta, setAppMeta, snapshotDb } from "../db";
+import { db, getAppMeta, setAppMeta, transaction } from "../db";
+import { snapshotDb } from "../snapshots";
+import { hasAlertChannel, sendNotice } from "../alerts";
+import { loadConfig } from "../config/load";
 import { audit } from "../auth/users";
 import type { Settings } from "../config/schema";
 import { buildInfo } from "../version";
 import type { UpdateStatus } from "./check";
+import { PENDING, RESTORED, type Pending, type RestoredDb } from "./records";
 
 export type Phase = "idle" | "preparing" | "pulling" | "restarting" | "failed";
 
@@ -29,19 +34,12 @@ export interface HistoryEntry {
   detail?: string;
 }
 
-interface Pending {
-  from: string;
-  fromBuild: string;
-  to: string;
-  image: string;
-  user: string | null;
-  startedAt: number;
-  /** Database copy taken just before the handover: put back if the helper rolls back (see db.ts). */
-  snapshot?: string;
-}
-
-const PENDING = "update.pending";
 const HISTORY = "update.history";
+/**
+ * The helper stops this container within seconds of starting. If this process is still alive after
+ * this long, the helper gave up before touching it (scripts/updater.mjs waits up to 240 s for health).
+ */
+const HANDOVER_TIMEOUT_MS = 5 * 60_000;
 
 const g = globalThis as typeof globalThis & { __pageUpdate?: { progress: Progress; events: EventEmitter } };
 function state() {
@@ -215,17 +213,39 @@ export async function applyUpdate(cfg: Settings["updates"], status: UpdateStatus
     const pending: Pending = { from: status.current.version, fromBuild: status.current.buildId, to: target, image: ref, user, startedAt: Date.now() };
     // Recorded before the copy too, so a restored copy still knows an update was attempted.
     setAppMeta(PENDING, pending);
-    setAppMeta(PENDING, { ...pending, snapshot: snapshotDb(`pre-update-${status.current.version}-to-${target}`) } satisfies Pending);
+    setAppMeta(PENDING, { ...pending, snapshot: snapshotDb(`pre-update-${status.current.version}-to-${target}`, db()) } satisfies Pending);
     setProgress({ phase: "restarting", target, percent: 100, startedAt: Date.now(), message: "Restarting with the new version…" });
     await helper.start();
+    setTimeout(() => handoverTimedOut(pending), HANDOVER_TIMEOUT_MS).unref();
   } catch (e) {
     const message = (e as Error).message;
-    setAppMeta(PENDING, undefined);
-    audit(user, "update-failed", { to: target, error: message });
-    addHistory({ at: new Date().toISOString(), from: status.current.version, to: target, result: "failed", user, detail: message });
+    transaction(() => {
+      setAppMeta(PENDING, undefined);
+      audit(user, "update-failed", { to: target, error: message });
+      addHistory({ at: new Date().toISOString(), from: status.current.version, to: target, result: "failed", user, detail: message });
+    });
     setProgress({ phase: "failed", target, message });
     throw e;
   }
+}
+
+/** Still running long after the handover: the helper failed before it stopped this container. */
+function handoverTimedOut(p: Pending) {
+  if (updateProgress().phase !== "restarting" || getAppMeta<Pending>(PENDING)?.startedAt !== p.startedAt) return;
+  const message = "The updater never replaced this container; NanoDash kept running the current version.";
+  transaction(() => {
+    addHistory({ at: new Date().toISOString(), from: p.from, to: p.to, result: "failed", user: p.user, detail: message });
+    audit(p.user, "update-failed", { to: p.to, error: message });
+    setAppMeta(PENDING, undefined);
+  });
+  setProgress({ phase: "failed", target: p.to, message });
+}
+
+/** What reconcilePendingUpdate recorded, for the caller to announce. */
+export interface Reconciled {
+  entry: HistoryEntry;
+  /** Set when the rollback also put the database back. */
+  restored?: RestoredDb;
 }
 
 /**
@@ -233,19 +253,41 @@ export async function applyUpdate(cfg: Settings["updates"], status: UpdateStatus
  * container is the one running; the same build in a process started after the handover means the
  * helper rolled back.
  */
-export function reconcilePendingUpdate() {
+export function reconcilePendingUpdate(): Reconciled | undefined {
   const p = getAppMeta<Pending>(PENDING);
-  if (!p) return;
+  if (!p) return undefined;
   const now = buildInfo();
   const at = new Date().toISOString();
   if (now.buildId !== p.fromBuild) {
-    addHistory({ at, from: p.from, to: now.version === p.from ? p.to : now.version, result: "updated", user: p.user });
-    audit(p.user, "update-succeeded", { from: p.from, to: p.to });
-    setAppMeta(PENDING, undefined);
-  } else if (Date.now() - process.uptime() * 1000 > p.startedAt) {
-    // Same build, but this process started after the handover: the helper restored the old container.
-    addHistory({ at, from: p.from, to: p.to, result: "rolled back", user: p.user, detail: "The new version didn't become healthy; the previous one was restored." });
-    audit(p.user, "update-rolled-back", { from: p.from, to: p.to });
-    setAppMeta(PENDING, undefined);
+    const entry: HistoryEntry = { at, from: p.from, to: now.version === p.from ? p.to : now.version, result: "updated", user: p.user };
+    transaction(() => {
+      addHistory(entry);
+      audit(p.user, "update-succeeded", { from: p.from, to: p.to });
+      setAppMeta(PENDING, undefined);
+    });
+    return { entry };
   }
+  // Same build, and this process started before the handover: the update hasn't finished yet.
+  if (Date.now() - process.uptime() * 1000 <= p.startedAt) return undefined;
+  // Same build, but this process started after the handover: the helper restored the old container.
+  const restored = getAppMeta<RestoredDb>(RESTORED);
+  const detail = restored
+    ? `The new version didn't become healthy; the previous one was restored, with the database as it was before the update. Anything saved in ${p.to} meanwhile is only in data/${path.basename(restored.kept)}.`
+    : "The new version didn't become healthy; the previous one was restored.";
+  const entry: HistoryEntry = { at, from: p.from, to: p.to, result: "rolled back", user: p.user, detail };
+  transaction(() => {
+    addHistory(entry);
+    audit(p.user, "update-rolled-back", { from: p.from, to: p.to, ...(restored && { restoredFrom: restored.snapshot, kept: restored.kept }) });
+    setAppMeta(PENDING, undefined);
+    setAppMeta(RESTORED, undefined);
+  });
+  return { entry, restored };
+}
+
+/** Tell the alert channels about a rolled-back update (an error when the database was put back too). */
+export async function announceUpdateOutcome({ entry, restored }: Reconciled) {
+  if (entry.result !== "rolled back") return;
+  const { alerts } = loadConfig().settings;
+  if (!hasAlertChannel(alerts)) return;
+  await sendNotice(alerts, { kind: "update", level: restored ? "error" : "warn", message: `Update to ${entry.to} rolled back. ${entry.detail}` });
 }

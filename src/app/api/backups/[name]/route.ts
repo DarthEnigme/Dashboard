@@ -4,23 +4,25 @@ import { NextResponse } from "next/server";
 import { requireAdmin, sameOrigin } from "@/lib/auth";
 import { audit } from "@/lib/auth/users";
 import { backupPath, backupStatus, listBackups } from "@/lib/backup";
+import { snapshotPath } from "@/lib/snapshots";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type Ctx = { params: Promise<{ name: string }> };
 
-/** Download a backup (it holds secrets: admins only, and every download is audited). */
+/** Download a backup or a database snapshot (they hold secrets: admins only, and every download is audited). */
 export async function GET(_req: Request, { params }: Ctx) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Admins only" }, { status: 403 });
   const { name } = await params;
-  const p = backupPath(name);
+  const zip = backupPath(name);
+  const p = zip ?? snapshotPath(name);
   if (!p) return NextResponse.json({ error: "No such backup" }, { status: 404 });
-  audit(admin.username, "backup-download", { name });
+  audit(admin.username, zip ? "backup-download" : "snapshot-download", { name });
   // Streamed from disk: a backup can be as large as the database.
   return new Response(Readable.toWeb(fs.createReadStream(p)) as ReadableStream, {
-    headers: { "Content-Type": "application/zip", "Content-Length": String(fs.statSync(p).size), "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "no-store" },
+    headers: { "Content-Type": zip ? "application/zip" : "application/vnd.sqlite3", "Content-Length": String(fs.statSync(p).size), "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "no-store" },
   });
 }
 

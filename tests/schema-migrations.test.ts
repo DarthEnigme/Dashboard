@@ -2,7 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import { DATA_DIR, SCHEMA_VERSION, SNAPSHOT_DIR, db, snapshotDb } from "@/lib/db";
+import { DATA_DIR, SCHEMA_VERSION, db, getAppMeta, setAppMeta } from "@/lib/db";
+import { SNAPSHOT_DIR, finishRestore, listSnapshots, restoreSnapshot, snapshotDb, snapshotPath } from "@/lib/snapshots";
+import { reconcilePendingUpdate, updateHistory } from "@/lib/update/apply";
+import type { RestoredDb } from "@/lib/update/records";
+import { buildInfo } from "@/lib/version";
 
 const g = globalThis as typeof globalThis & { __pageDb?: DatabaseSync };
 const FILE = path.join(DATA_DIR, "page.db");
@@ -103,7 +107,7 @@ describe("schema migrations", () => {
     reset();
     // What the old version had just before the handover, copied as its snapshot.
     db().prepare("INSERT INTO users (username, created_at) VALUES ('before-update', 1)").run();
-    const snapshot = snapshotDb("pre-update-0.5.11-to-0.6.0");
+    const snapshot = snapshotDb("pre-update-0.5.11-to-0.6.0", db());
     g.__pageDb!.close();
     g.__pageDb = undefined;
     // What the newer version left behind: a newer schema, and the pending record pointing at the snapshot.
@@ -120,12 +124,86 @@ describe("schema migrations", () => {
     // The upgraded database is kept, not deleted.
     const kept = fs.readdirSync(DATA_DIR).filter((f) => new RegExp(`^page\\.db\\.schema-v${SCHEMA_VERSION + 1}-\\d+$`).test(f));
     expect(kept).toHaveLength(1);
+    // Left for reconcilePendingUpdate, so the rollback says the database was put back.
+    expect(getAppMeta<RestoredDb>("update.restored")).toEqual({ snapshot, kept: path.join(DATA_DIR, kept[0]), at: expect.any(String) });
+  });
+
+  it("records a rollback that restored the database in the update history", () => {
+    reset();
+    // The old build again, started after the handover, with the database put back.
+    setAppMeta("update.pending", { from: "0.6.0", fromBuild: buildInfo().buildId, to: "0.6.1", image: "img:0.6.1", user: "admin", startedAt: 0 });
+    setAppMeta("update.restored", { snapshot: "/data/snapshots/pre-update.db", kept: "/data/page.db.schema-v2-1", at: "2026-10-19T00:00:00Z" });
+    const outcome = reconcilePendingUpdate();
+    const [entry] = updateHistory();
+    expect(entry).toMatchObject({ from: "0.6.0", to: "0.6.1", result: "rolled back" });
+    // A path the user can find from the host, not the container's.
+    expect(entry.detail).toContain("only in data/page.db.schema-v2-1.");
+    expect(outcome).toEqual({ entry, restored: expect.objectContaining({ kept: "/data/page.db.schema-v2-1" }) });
+    expect(getAppMeta("update.pending")).toBeUndefined();
+    expect(getAppMeta("update.restored")).toBeUndefined();
+  });
+
+  it("lists snapshots newest first and only hands out files inside the snapshot folder", () => {
+    reset();
+    const a = snapshotDb("pre-migrate-v0-v1", db());
+    fs.utimesSync(a, new Date(1000), new Date(1000));
+    const b = snapshotDb("pre-update-0.6.0-to-0.6.1", db());
+    expect(listSnapshots().map((s) => s.name)).toEqual([path.basename(b), path.basename(a)]);
+    expect(snapshotPath(path.basename(b))).toBe(b);
+    for (const bad of ["../page.db", "..\\page.db", "sub/x.db", "page-backup.zip", ".hidden.db", "missing.db"]) expect(snapshotPath(bad)).toBeUndefined();
+  });
+
+  it("never lists a snapshot that is still being written", () => {
+    reset();
+    db();
+    fs.mkdirSync(SNAPSHOT_DIR, { recursive: true });
+    fs.writeFileSync(path.join(SNAPSHOT_DIR, "pre-update-0.6.0-to-0.6.1-x.db.tmp"), "half");
+    const done = snapshotDb("pre-migrate-v0-v1", db());
+    expect(listSnapshots().map((s) => s.name)).toEqual([path.basename(done)]);
+    expect(snapshotPath("pre-update-0.6.0-to-0.6.1-x.db.tmp")).toBeUndefined();
+  });
+
+  it("finishes a restore that stopped after the old database was moved aside", () => {
+    reset();
+    db().prepare("INSERT INTO users (username, created_at) VALUES ('from-snapshot', 1)").run();
+    const snapshot = snapshotDb("pre-update", db());
+    g.__pageDb!.close();
+    g.__pageDb = undefined;
+    // The power went out between the two renames: the copy is in place as .restoring, page.db is gone.
+    fs.renameSync(FILE, `${FILE}.schema-v9-1`);
+    fs.copyFileSync(snapshot, `${FILE}.restoring`);
+    expect((db().prepare("SELECT username FROM users").all() as { username: string }[]).map((u) => u.username)).toEqual(["from-snapshot"]);
+    expect(fs.existsSync(`${FILE}.restoring`)).toBe(false);
+  });
+
+  it("drops a leftover restore copy when the database is still there", () => {
+    reset();
+    db().prepare("INSERT INTO users (username, created_at) VALUES ('live', 1)").run();
+    g.__pageDb!.close();
+    g.__pageDb = undefined;
+    fs.writeFileSync(`${FILE}.restoring`, "stale");
+    finishRestore(FILE);
+    expect(fs.existsSync(`${FILE}.restoring`)).toBe(false);
+    expect((db().prepare("SELECT username FROM users").all() as { username: string }[]).map((u) => u.username)).toEqual(["live"]);
+  });
+
+  it("refuses to restore a damaged snapshot and leaves the database alone", () => {
+    reset();
+    db().prepare("INSERT INTO users (username, created_at) VALUES ('live', 1)").run();
+    const snapshot = snapshotDb("pre-update", db());
+    g.__pageDb!.close();
+    g.__pageDb = undefined;
+    fs.truncateSync(snapshot, 100);
+    expect(() => restoreSnapshot(snapshot, FILE, `${FILE}.kept`)).toThrow(/damaged/);
+    expect(fs.existsSync(`${FILE}.kept`)).toBe(false);
+    expect(fs.existsSync(`${FILE}.restoring`)).toBe(false);
+    expect((db().prepare("SELECT username FROM users").all() as { username: string }[]).map((u) => u.username)).toEqual(["live"]);
   });
 
   it("keeps only the newest snapshots", () => {
     reset();
     for (let i = 0; i < 8; i++) {
-      const f = snapshotDb(`test-${i}`);
+      const f = snapshotDb(`test-${i}`, db());
       fs.utimesSync(f, new Date(1000 * (i + 1)), new Date(1000 * (i + 1)));
     }
     const left = fs.readdirSync(SNAPSHOT_DIR).sort();

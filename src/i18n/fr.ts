@@ -13,6 +13,9 @@ export const fr: Record<string, string> = {
     "(ou choisissez des groupes dans l’éditeur). Les membres reçoivent aussi les permissions du groupe. Les admins voient et font tout.",
   "(unknown)": "(inconnu)",
   "(experimental)": "(expérimental)",
+  "Before updates and upgrades": "Avant les mises à jour",
+  "Copies of the database alone, taken before an update or a database upgrade (the newest {n} are kept). To go back to one: stop NanoDash, copy it over data/page.db, delete page.db-wal and page.db-shm, and start NanoDash again.":
+    "Copies de la base de données seule, prises avant une mise à jour ou une mise à niveau de la base (les {n} plus récentes sont gardées). Pour revenir à l’une d’elles : arrêtez NanoDash, copiez-la à la place de data/page.db, supprimez page.db-wal et page.db-shm, puis redémarrez NanoDash.",
   "Experimental: built from the API docs and tested on recorded responses, not yet on a live server. If a field is wrong or empty, please open an issue.":
     "Expérimental : écrit d’après la documentation de l’API et testé sur des réponses enregistrées, pas encore sur un vrai serveur. Si un champ est faux ou vide, merci d’ouvrir un ticket.",
   "({n} past occurrences filled in)": "({n} occurrences passées ajoutées)",

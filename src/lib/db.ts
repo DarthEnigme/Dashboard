@@ -1,8 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
+import { DATA_DIR } from "./data-dir";
+import { finishRestore, restoreSnapshot, snapshotDb, SNAPSHOT_DIR } from "./snapshots";
+import { PENDING, RESTORED, type Pending, type RestoredDb } from "./update/records";
 
-export const DATA_DIR = process.env.HOMEPAGE_DATA_DIR ?? path.join(/* turbopackIgnore: true */ process.cwd(), "data");
+export { DATA_DIR };
 
 export interface PingRow {
   service_id: string;
@@ -24,6 +27,7 @@ export function db(): DatabaseSync {
   if (!g.__pageDb) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     const file = path.join(DATA_DIR, "page.db");
+    finishRestore(file);
     let d = open(file);
     if (schemaVersion(d) > SCHEMA_VERSION) d = restoreAfterRollback(d, file);
     migrate(d);
@@ -67,10 +71,6 @@ const MIGRATIONS: ((d: DatabaseSync) => void)[] = [
 ];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
-/** Safety copies of the database taken before migrations and updates (raw SQLite files). */
-export const SNAPSHOT_DIR = path.join(DATA_DIR, "snapshots");
-const KEEP_SNAPSHOTS = 5;
-
 /** Run the pending schema steps, after a snapshot when the database already holds data. */
 function migrate(d: DatabaseSync) {
   const from = schemaVersion(d);
@@ -93,21 +93,6 @@ function migrate(d: DatabaseSync) {
   }
 }
 
-/** Copy the database with VACUUM INTO (consistent while NanoDash runs); returns the file. */
-export function snapshotDb(label: string, d: DatabaseSync = db()): string {
-  fs.mkdirSync(SNAPSHOT_DIR, { recursive: true });
-  const out = path.join(SNAPSHOT_DIR, `${label.replace(/[^\w.-]/g, "_")}-${new Date().toISOString().replace(/[:.]/g, "-")}.db`);
-  d.exec(`VACUUM INTO '${out.replace(/'/g, "''")}'`);
-  const old = fs
-    .readdirSync(SNAPSHOT_DIR)
-    .filter((f) => f.endsWith(".db"))
-    .map((f) => ({ f, at: fs.statSync(path.join(SNAPSHOT_DIR, f)).mtimeMs }))
-    .sort((a, b) => b.at - a.at)
-    .slice(KEEP_SNAPSHOTS);
-  for (const { f } of old) fs.rmSync(path.join(SNAPSHOT_DIR, f), { force: true });
-  return out;
-}
-
 /**
  * The database is newer than this code: a newer NanoDash migrated it. When that happened during an
  * update that was then rolled back, put back the snapshot taken before the handover (the newer file is
@@ -117,8 +102,8 @@ function restoreAfterRollback(d: DatabaseSync, file: string): DatabaseSync {
   const v = schemaVersion(d);
   let snapshot: string | undefined;
   try {
-    const row = d.prepare("SELECT value FROM app_meta WHERE key = 'update.pending'").get() as { value: string } | undefined;
-    snapshot = row ? (JSON.parse(row.value) as { snapshot?: string }).snapshot : undefined;
+    const row = d.prepare("SELECT value FROM app_meta WHERE key = ?").get(PENDING) as { value: string } | undefined;
+    snapshot = row ? (JSON.parse(row.value) as Pending).snapshot : undefined;
   } catch {
     // no app_meta table or no readable record: nothing to restore
   }
@@ -130,14 +115,17 @@ function restoreAfterRollback(d: DatabaseSync, file: string): DatabaseSync {
     );
   }
   const kept = `${file}.schema-v${v}-${Date.now()}`;
-  for (const ext of ["", "-wal", "-shm"]) if (fs.existsSync(file + ext)) fs.renameSync(file + ext, kept + ext);
-  fs.copyFileSync(snapshot, file);
+  restoreSnapshot(snapshot, file, kept);
   console.warn(`[nanodash] update rolled back: restored the database from ${snapshot} (the upgraded one is kept as ${kept})`);
   const restored = open(file);
   if (schemaVersion(restored) > SCHEMA_VERSION) {
     restored.close();
     throw new Error(`The snapshot ${snapshot} is also newer than this NanoDash (schema ${SCHEMA_VERSION}).`);
   }
+  // For reconcilePendingUpdate: whatever was saved in the newer version is only in the kept file now.
+  restored
+    .prepare("INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)")
+    .run(RESTORED, JSON.stringify({ snapshot, kept, at: new Date().toISOString() } satisfies RestoredDb));
   return restored;
 }
 
@@ -474,6 +462,19 @@ export function getAppMeta<T>(key: string): T | undefined {
     return JSON.parse(row.value) as T;
   } catch {
     return undefined;
+  }
+}
+
+/** Run `fn` in one write transaction: all of its changes land, or none do. */
+export function transaction<T>(fn: () => T): T {
+  db().exec("BEGIN IMMEDIATE");
+  try {
+    const out = fn();
+    db().exec("COMMIT");
+    return out;
+  } catch (e) {
+    db().exec("ROLLBACK");
+    throw e;
   }
 }
 

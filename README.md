@@ -4,11 +4,16 @@ A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Hom
 
 **Homepage, plus what it leaves out:** uptime history and incidents for every tile, alerts, a public status page, start/stop buttons, and an in-browser editor that keeps your YAML comments. Already on Homepage? Import your config and you're running in a minute (see [Run with Docker](#run-with-docker)).
 
+![NanoDash with Proxmox, Portainer, Uptime Kuma and PBS tiles, a resource bar and tabs (mock data)](docs/screenshot.png)
+
 - **Service tiles:**
   - status pings with a 24-hour uptime history
   - bento tile sizes
   - collapsible groups and tabs
 - **Service pages:** 24h–90d availability, response-time charts, incidents
+- **Status checks:** HTTP (status codes, keywords, JSON values), TCP, UDP, TCP + UDP together, ICMP, DNS, SNMP and Minecraft, with TLS certificate expiry warnings
+- **Alerts:** Discord, Slack, Telegram, Gotify, ntfy, Pushover, Matrix, email or a webhook when a service goes down or comes back
+- **Public status page** with uptime bars, incidents you post with updates, and upcoming maintenance
 - **Actions:** start, stop and restart Docker containers and Proxmox VMs (admins only)
 - **Info bar:** greeting and clock, weather, host resources, stock/crypto prices, exchange rates
 - **Integrations:**
@@ -20,16 +25,11 @@ A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Hom
   - Firefly III, Ghostfolio
   - Prometheus, Grafana, Glances, Netdata, Dockhand, Arcane
   - calendars (iCal, Sonarr, Radarr), RSS, and any JSON API
-- **Status checks:** HTTP (status codes, keywords, JSON values), TCP, UDP, TCP + UDP together, ICMP, DNS, SNMP and Minecraft, with TLS certificate expiry warnings
 - **Widget history:** record any widget's numbers, chart them, and alert when they cross a threshold
-- **Finance tracker:** spending, income and balance charts; a money-flow (Sankey) chart; budgets per category with alerts; subcategories and category rules; subscriptions with renewal reminders; CSV bank import; Firefly III sync
-- **Apps:** a travel log, a watchlist and reading list (with lists, tags and sync from Jellyfin or Plex), a device inventory, and notes with runbooks shown on service pages
-- **Public status page** with uptime bars, incidents you post with updates, and upcoming maintenance
 - **Accounts:**
   - local users, LDAP, OpenID Connect (Authentik, Authelia, Keycloak…), Google, GitHub, or your reverse proxy
   - signups off by default
   - admin/user roles and per-item visibility
-- **Alerts:** Discord, Slack, Telegram, Gotify, ntfy, Pushover, Matrix, email or a webhook when a service goes down or comes back
 - **Docker auto-discovery** from container labels
 - **Installable** as an app (PWA) that shows the last loaded dashboard when offline
 - **Config:**
@@ -37,6 +37,10 @@ A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Hom
   - full change history with one-click undo
   - import from gethomepage.dev
 - **Security:** API keys and webhook URLs stay on the server; the browser only ever sees service ids
+- **Optional apps** (turned on with [`apps:`](#settingsyaml); new installs start with notes and inventory):
+  - notes with runbooks shown on service pages, and a device inventory with live status, Wake-on-LAN and warranty reminders
+  - a finance tracker: spending, income and balance charts, a money-flow (Sankey) chart, budgets, subscriptions with renewal reminders, CSV bank import, Firefly III sync
+  - a travel log, and a watchlist and reading list (with lists, tags and sync from Jellyfin or Plex)
 
 ## Run with Docker
 
@@ -48,7 +52,9 @@ Open http://localhost:3000 and choose **Set up** to create the admin account (or
 
 **Coming from Homepage:** open the editor, choose **Import**, and pick your `services.yaml`, `bookmarks.yaml`, `settings.yaml`, `widgets.yaml` and `docker.yaml`. Your tiles show up with status checks right away (see [Editing in the browser](#editing-in-the-browser)).
 
-`docker-compose.yml` runs the image CI publishes to `ghcr.io/darthenigme/dashboard` (amd64 and arm64): `:latest` follows `main`, and every release also gets its version tag (`:0.4.0`). To build from source instead, swap `image:` for `build: .` and run `docker compose up -d --build`.
+**The Docker socket** (mounted in `docker-compose.yml`) gives NanoDash full control of Docker: that's what start/stop actions, auto-discovery, image-update badges and one-click updates use, and it's as powerful as root on that machine. Leave the mount out and NanoDash still does everything else (tiles, checks, alerts, integrations over HTTP, the status page); you then update with `docker compose pull && docker compose up -d`. Env vars keep Homepage's `HOMEPAGE_*` names on purpose, so `{{HOMEPAGE_VAR_…}}` secrets in imported configs keep working.
+
+`docker-compose.yml` runs the image CI publishes to `ghcr.io/darthenigme/dashboard` (amd64 and arm64): `:latest` follows `main`, and every release also gets its version tag (`:0.6.0`). To build from source instead, swap `image:` for `build: .` and run `docker compose up -d --build`.
 
 ### Reaching services through WireGuard
 
@@ -81,7 +87,7 @@ Good to know:
   1. downloads the new image (progress is shown)
   2. starts a short-lived helper container from it
   3. the helper replaces the NanoDash container with the same name, volumes, ports, networks, env and labels, and waits until it is healthy
-  4. if the new version doesn't come up within two minutes, the old container is put back and started again
+  4. if the new version doesn't come up within four minutes, the old container is put back and started again
 
   Open pages notice the new version and offer a reload. Each attempt is listed under **History**.
 - **By hand:** `docker compose pull && docker compose up -d`, or for a source install `git pull && npm ci && npm run build`.
@@ -99,7 +105,7 @@ updates:
   image: ghcr.io/owner/page  # optional: defaults to the image the container runs
 ```
 
-The `:ro` flag on the socket mount doesn't limit what the Docker API allows, so the default mount is enough. Without the socket, NanoDash shows the manual steps instead. To publish a release, bump `version` in `package.json`, then push a matching tag (`v0.3.1`). The Docker workflow builds amd64 and arm64 on native runners, pushes the multi-arch image, and only then creates the GitHub release with generated notes. Running Pages never see a version whose image can't be pulled.
+The `:ro` flag on the socket mount doesn't limit what the Docker API allows, so the default mount is enough. Without the socket, NanoDash shows the manual steps instead. To publish a release, bump `version` in `package.json`, then push a matching tag (`v0.6.1`). The Docker workflow builds amd64 and arm64 on native runners, pushes the multi-arch image, and only then creates the GitHub release with generated notes. Running NanoDash instances never see a version whose image can't be pulled.
 
 ## Run locally
 
@@ -111,6 +117,7 @@ npm run dev      # http://localhost:3000
 npm test         # unit tests
 npm run build && npm run e2e   # end-to-end tests in Chromium against mock services (screenshots in test-results/shots)
 npm run mock     # fake homelab APIs on http://localhost:4010 for trying integrations
+npm run drill:rollback   # the real one-click update on Docker, with a release that fails on purpose: checks the rollback and the database restore (add -- --db <copy of a page.db> to use real data)
 ```
 
 The end-to-end tests need the browser once: `npx playwright install chromium`.
@@ -620,6 +627,8 @@ scrape_configs:
 ```
 
 **Grafana dashboard:** import [`grafana/nanodash.json`](grafana/nanodash.json) (Dashboards → New → Import) and pick your Prometheus data source. It shows service status over time, response times, 24-hour uptime, certificates, outages (also as annotations), inventory devices, recorded widget values, NanoDash's own backups, updates, memory and database size, its internals (widget fetches, alerts sent, checks, sign-ins, CPU) and, in a collapsed row, finance. It needs Grafana 10 or newer.
+
+For a panel on every exported metric, import [`grafana/nanodash-all-metrics.json`](grafana/nanodash-all-metrics.json) the same way. It adds service and device filters and covers what the main dashboard leaves out: maintenance and muted alerts, how long open outages have lasted, widget fetch errors, the backups kept on disk, the last update check and subscription costs.
 
 ## Actions
 

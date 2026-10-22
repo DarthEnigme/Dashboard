@@ -10,9 +10,10 @@ export async function register() {
     const { backupJob } = await import("./lib/backup");
     const { warrantyJob } = await import("./lib/inventory/store");
     const { watchSyncJob } = await import("./lib/watchlist/sync");
-    const { reconcilePendingUpdate } = await import("./lib/update/apply");
+    const { announceUpdateOutcome, reconcilePendingUpdate } = await import("./lib/update/apply");
     try {
-      reconcilePendingUpdate();
+      const outcome = reconcilePendingUpdate();
+      if (outcome) void announceUpdateOutcome(outcome).catch((e) => console.warn("[nanodash] could not send the update notice:", e));
     } catch (e) {
       console.warn("[nanodash] could not record the last update:", e);
     }
