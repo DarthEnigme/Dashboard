@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -12,7 +13,7 @@ import { audit } from "../auth/users";
 import type { Settings } from "../config/schema";
 import { buildInfo } from "../version";
 import type { UpdateStatus } from "./check";
-import { PENDING, RESTORED, type Pending, type RestoredDb } from "./records";
+import { clearJournal, LEGACY_PENDING, readJournal, writeJournal, type Journal, type RestoredDb } from "./journal";
 
 export type Phase = "idle" | "preparing" | "pulling" | "restarting" | "failed";
 
@@ -36,12 +37,15 @@ export interface HistoryEntry {
 
 const HISTORY = "update.history";
 /**
- * The helper stops this container within seconds of starting. If this process is still alive after
- * this long, the helper gave up before touching it (scripts/updater.mjs waits up to 240 s for health).
+ * Longer than the helper can take (scripts/updater.mjs waits up to 240 s for the new container to be
+ * healthy). The old process still alive after this: the helper gave up before stopping it. The new
+ * process alive after this: the helper kept it, so the update can be recorded as done.
  */
 const HANDOVER_TIMEOUT_MS = 5 * 60_000;
 
-const g = globalThis as typeof globalThis & { __pageUpdate?: { progress: Progress; events: EventEmitter } };
+const g = globalThis as typeof globalThis & { __pageUpdate?: { progress: Progress; events: EventEmitter }; __pageBootId?: string };
+/** This process, for the journal: a later process of the same build means the helper put this one back. */
+export const bootId = () => (g.__pageBootId ??= crypto.randomUUID());
 function state() {
   g.__pageUpdate ??= { progress: { phase: "idle" }, events: new EventEmitter() };
   g.__pageUpdate.events.setMaxListeners(0);
@@ -173,6 +177,7 @@ export async function applyUpdate(cfg: Settings["updates"], status: UpdateStatus
   if (!status.latest) throw new Error("No newer version known; check for updates first");
   const target = status.latest.version;
   setProgress({ phase: "preparing", target, startedAt: Date.now(), message: "Checking Docker…" });
+  let helper: Docker.Container | undefined;
   try {
     const pf = await preflight(cfg);
     if (!pf.canApply || !pf.self || !pf.docker) throw new Error(pf.reason ?? "Can't update here");
@@ -195,7 +200,7 @@ export async function applyUpdate(cfg: Settings["updates"], status: UpdateStatus
     const socket = self.Mounts.find((m) => m.Destination === "/var/run/docker.sock");
     const dockerHost = process.env.DOCKER_HOST;
     const network = Object.keys(self.NetworkSettings.Networks ?? {})[0];
-    const helper = await docker.createContainer({
+    helper = await docker.createContainer({
       name: `page-updater-${Date.now()}`,
       Image: ref,
       Cmd: ["node", "scripts/updater.mjs", self.Id, ref],
@@ -210,35 +215,48 @@ export async function applyUpdate(cfg: Settings["updates"], status: UpdateStatus
       },
     });
 
-    const pending: Pending = { from: status.current.version, fromBuild: status.current.buildId, to: target, image: ref, user, startedAt: Date.now() };
-    // Recorded before the copy too, so a restored copy still knows an update was attempted.
-    setAppMeta(PENDING, pending);
-    setAppMeta(PENDING, { ...pending, snapshot: snapshotDb(`pre-update-${status.current.version}-to-${target}`, db()) } satisfies Pending);
+    const journal: Journal = {
+      from: status.current.version,
+      fromBuild: status.current.buildId,
+      to: target,
+      image: ref,
+      user,
+      startedAt: Date.now(),
+      bootId: bootId(),
+      snapshot: snapshotDb(`pre-update-${status.current.version}-to-${target}`, db()),
+    };
+    writeJournal(journal);
     setProgress({ phase: "restarting", target, percent: 100, startedAt: Date.now(), message: "Restarting with the new version…" });
     await helper.start();
-    setTimeout(() => handoverTimedOut(pending), HANDOVER_TIMEOUT_MS).unref();
+    setTimeout(() => handoverTimedOut(journal), HANDOVER_TIMEOUT_MS).unref();
   } catch (e) {
     const message = (e as Error).message;
-    transaction(() => {
-      setAppMeta(PENDING, undefined);
-      audit(user, "update-failed", { to: target, error: message });
-      addHistory({ at: new Date().toISOString(), from: status.current.version, to: target, result: "failed", user, detail: message });
-    });
+    await helper?.remove({ force: true }).catch(() => undefined);
+    record({ at: new Date().toISOString(), from: status.current.version, to: target, result: "failed", user, detail: message }, "update-failed", { error: message });
     setProgress({ phase: "failed", target, message });
     throw e;
   }
 }
 
-/** Still running long after the handover: the helper failed before it stopped this container. */
-function handoverTimedOut(p: Pending) {
-  if (updateProgress().phase !== "restarting" || getAppMeta<Pending>(PENDING)?.startedAt !== p.startedAt) return;
-  const message = "The updater never replaced this container; NanoDash kept running the current version.";
+/**
+ * Add a history entry and its audit line in one transaction, then drop the update record (and the
+ * one 0.6.0 left in app_meta). In that order: a crash in between repeats an entry, never loses one.
+ */
+function record(entry: HistoryEntry, action: string, detail: Record<string, unknown> = {}) {
   transaction(() => {
-    addHistory({ at: new Date().toISOString(), from: p.from, to: p.to, result: "failed", user: p.user, detail: message });
-    audit(p.user, "update-failed", { to: p.to, error: message });
-    setAppMeta(PENDING, undefined);
+    addHistory(entry);
+    audit(entry.user, action, { from: entry.from, to: entry.to, ...detail });
+    setAppMeta(LEGACY_PENDING, undefined);
   });
-  setProgress({ phase: "failed", target: p.to, message });
+  clearJournal();
+}
+
+/** Still running long after the handover: the helper failed before it stopped this container. */
+function handoverTimedOut(j: Journal) {
+  if (updateProgress().phase !== "restarting" || readJournal()?.startedAt !== j.startedAt) return;
+  const message = "The updater never replaced this container; NanoDash kept running the current version.";
+  record({ at: new Date().toISOString(), from: j.from, to: j.to, result: "failed", user: j.user, detail: message }, "update-failed", { error: message });
+  setProgress({ phase: "failed", target: j.to, message });
 }
 
 /** What reconcilePendingUpdate recorded, for the caller to announce. */
@@ -249,38 +267,40 @@ export interface Reconciled {
 }
 
 /**
- * On startup: if an update was handed over, record how it went. A different build means the new
- * container is the one running; the same build in a process started after the handover means the
- * helper rolled back.
+ * On startup: if an update was handed over, record how it went.
+ * - A different build: this is the new version. The helper can still roll it back until its health
+ *   wait is over, and the old version then needs the record, so it is recorded as done only after that.
+ * - The same build in a later process: the helper put the old container back.
+ * - The same process: the handover is still going on.
  */
 export function reconcilePendingUpdate(): Reconciled | undefined {
-  const p = getAppMeta<Pending>(PENDING);
-  if (!p) return undefined;
+  const j = readJournal() ?? getAppMeta<Journal>(LEGACY_PENDING);
+  if (!j) return undefined;
   const now = buildInfo();
-  const at = new Date().toISOString();
-  if (now.buildId !== p.fromBuild) {
-    const entry: HistoryEntry = { at, from: p.from, to: now.version === p.from ? p.to : now.version, result: "updated", user: p.user };
-    transaction(() => {
-      addHistory(entry);
-      audit(p.user, "update-succeeded", { from: p.from, to: p.to });
-      setAppMeta(PENDING, undefined);
-    });
+  if (now.buildId !== j.fromBuild) {
+    const settleIn = HANDOVER_TIMEOUT_MS - process.uptime() * 1000;
+    if (settleIn > 0) {
+      setTimeout(() => {
+        try {
+          reconcilePendingUpdate();
+        } catch (e) {
+          console.warn("[nanodash] could not record the last update:", e);
+        }
+      }, settleIn).unref();
+      return undefined;
+    }
+    // The new version normally reports the version it was asked for; a different tag reports its own.
+    const entry: HistoryEntry = { at: new Date().toISOString(), from: j.from, to: now.version === j.from ? j.to : now.version, result: "updated", user: j.user };
+    record(entry, "update-succeeded");
     return { entry };
   }
-  // Same build, and this process started before the handover: the update hasn't finished yet.
-  if (Date.now() - process.uptime() * 1000 <= p.startedAt) return undefined;
-  // Same build, but this process started after the handover: the helper restored the old container.
-  const restored = getAppMeta<RestoredDb>(RESTORED);
+  if (j.bootId === bootId()) return undefined;
+  const { restored } = j;
   const detail = restored
-    ? `The new version didn't become healthy; the previous one was restored, with the database as it was before the update. Anything saved in ${p.to} meanwhile is only in data/${path.basename(restored.kept)}.`
+    ? `The new version didn't become healthy; the previous one was restored, with the database as it was before the update. Anything saved in ${j.to} meanwhile is only in data/${path.basename(restored.kept)}.`
     : "The new version didn't become healthy; the previous one was restored.";
-  const entry: HistoryEntry = { at, from: p.from, to: p.to, result: "rolled back", user: p.user, detail };
-  transaction(() => {
-    addHistory(entry);
-    audit(p.user, "update-rolled-back", { from: p.from, to: p.to, ...(restored && { restoredFrom: restored.snapshot, kept: restored.kept }) });
-    setAppMeta(PENDING, undefined);
-    setAppMeta(RESTORED, undefined);
-  });
+  const entry: HistoryEntry = { at: new Date().toISOString(), from: j.from, to: j.to, result: "rolled back", user: j.user, detail };
+  record(entry, "update-rolled-back", restored ? { restoredFrom: restored.snapshot, kept: restored.kept } : {});
   return { entry, restored };
 }
 

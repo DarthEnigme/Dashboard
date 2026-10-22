@@ -1,11 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DATA_DIR, SCHEMA_VERSION, db, getAppMeta, setAppMeta } from "@/lib/db";
 import { SNAPSHOT_DIR, finishRestore, listSnapshots, restoreSnapshot, snapshotDb, snapshotPath } from "@/lib/snapshots";
-import { reconcilePendingUpdate, updateHistory } from "@/lib/update/apply";
-import type { RestoredDb } from "@/lib/update/records";
+import { bootId, reconcilePendingUpdate, updateHistory } from "@/lib/update/apply";
+import { readJournal, writeJournal, type Journal } from "@/lib/update/journal";
 import { buildInfo } from "@/lib/version";
 
 const g = globalThis as typeof globalThis & { __pageDb?: DatabaseSync };
@@ -46,7 +46,25 @@ function legacyDb(file = FILE) {
 const columns = (table: string) => (db().prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
 const version = () => (db().prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
 
-afterEach(reset);
+afterEach(() => {
+  vi.restoreAllMocks();
+  reset();
+});
+
+/** The update record the old version leaves before the handover. */
+const journal = (over: Partial<Journal> = {}): Journal => ({ from: "0.6.0", fromBuild: buildInfo().buildId, to: "0.6.1", image: "img:0.6.1", user: "admin", startedAt: 1, bootId: "the-old-process", ...over });
+
+/** The newer version's leftovers: one more user, a newer schema, and (0.6.0 style) the record in app_meta. */
+function upgradedByNewerVersion(legacyPending?: Journal) {
+  g.__pageDb!.close();
+  g.__pageDb = undefined;
+  const d = new DatabaseSync(FILE);
+  d.exec(`INSERT INTO users (username, created_at) VALUES ('after-update', 2); PRAGMA user_version = ${SCHEMA_VERSION + 1};`);
+  if (legacyPending) d.prepare("INSERT OR REPLACE INTO app_meta (key, value) VALUES ('update.pending', ?)").run(JSON.stringify(legacyPending));
+  d.close();
+}
+
+const usernames = () => (db().prepare("SELECT username FROM users ORDER BY id").all() as { username: string }[]).map((u) => u.username);
 
 describe("schema migrations", () => {
   it("creates a fresh database at the current schema, without a snapshot", () => {
@@ -107,40 +125,74 @@ describe("schema migrations", () => {
     reset();
     // What the old version had just before the handover, copied as its snapshot.
     db().prepare("INSERT INTO users (username, created_at) VALUES ('before-update', 1)").run();
-    const snapshot = snapshotDb("pre-update-0.5.11-to-0.6.0", db());
-    g.__pageDb!.close();
-    g.__pageDb = undefined;
-    // What the newer version left behind: a newer schema, and the pending record pointing at the snapshot.
-    const d = new DatabaseSync(FILE);
-    d.exec(`
-      INSERT INTO users (username, created_at) VALUES ('after-update', 2);
-      INSERT OR REPLACE INTO app_meta (key, value) VALUES ('update.pending', '${JSON.stringify({ from: "0.5.11", to: "0.6.0", snapshot }).replace(/'/g, "''")}');
-      PRAGMA user_version = ${SCHEMA_VERSION + 1};
-    `);
-    d.close();
+    const snapshot = snapshotDb("pre-update-0.6.0-to-0.6.1", db());
+    writeJournal(journal({ snapshot }));
+    upgradedByNewerVersion();
 
     expect(version()).toBe(SCHEMA_VERSION);
-    expect((db().prepare("SELECT username FROM users ORDER BY id").all() as { username: string }[]).map((u) => u.username)).toEqual(["before-update"]);
+    expect(usernames()).toEqual(["before-update"]);
     // The upgraded database is kept, not deleted.
     const kept = fs.readdirSync(DATA_DIR).filter((f) => new RegExp(`^page\\.db\\.schema-v${SCHEMA_VERSION + 1}-\\d+$`).test(f));
     expect(kept).toHaveLength(1);
-    // Left for reconcilePendingUpdate, so the rollback says the database was put back.
-    expect(getAppMeta<RestoredDb>("update.restored")).toEqual({ snapshot, kept: path.join(DATA_DIR, kept[0]), at: expect.any(String) });
+    // Left in the journal for reconcilePendingUpdate, so the rollback says the database was put back.
+    expect(readJournal()?.restored).toEqual({ snapshot, kept: path.join(DATA_DIR, kept[0]), at: expect.any(String) });
+  });
+
+  it("still finds the snapshot of an update 0.6.0 started (record in app_meta)", () => {
+    reset();
+    db().prepare("INSERT INTO users (username, created_at) VALUES ('before-update', 1)").run();
+    const snapshot = snapshotDb("pre-update-0.6.0-to-0.6.1", db());
+    upgradedByNewerVersion(journal({ snapshot }));
+    expect(usernames()).toEqual(["before-update"]);
+  });
+
+  it("keeps the record while the new version could still be rolled back", () => {
+    reset();
+    writeJournal(journal({ fromBuild: "an-older-build" }));
+    vi.spyOn(process, "uptime").mockReturnValue(30);
+    expect(reconcilePendingUpdate()).toBeUndefined();
+    expect(updateHistory()).toEqual([]);
+    expect(readJournal()).toBeDefined();
+  });
+
+  it("records the update once the new version has outlived the helper's health wait", () => {
+    reset();
+    writeJournal(journal({ fromBuild: "an-older-build" }));
+    setAppMeta("update.pending", journal({ fromBuild: "an-older-build" }));
+    vi.spyOn(process, "uptime").mockReturnValue(10 * 60);
+    expect(reconcilePendingUpdate()?.entry).toMatchObject({ from: "0.6.0", result: "updated" });
+    expect(readJournal()).toBeUndefined();
+    expect(getAppMeta("update.pending")).toBeUndefined();
+  });
+
+  it("leaves an update alone in the process that handed it over", () => {
+    reset();
+    writeJournal(journal({ bootId: bootId() }));
+    expect(reconcilePendingUpdate()).toBeUndefined();
+    expect(readJournal()).toBeDefined();
   });
 
   it("records a rollback that restored the database in the update history", () => {
     reset();
-    // The old build again, started after the handover, with the database put back.
-    setAppMeta("update.pending", { from: "0.6.0", fromBuild: buildInfo().buildId, to: "0.6.1", image: "img:0.6.1", user: "admin", startedAt: 0 });
-    setAppMeta("update.restored", { snapshot: "/data/snapshots/pre-update.db", kept: "/data/page.db.schema-v2-1", at: "2026-10-19T00:00:00Z" });
+    // The old build again, in a later process, with the database put back.
+    writeJournal(journal({ restored: { snapshot: "/data/snapshots/pre-update.db", kept: "/data/page.db.schema-v2-1", at: "2026-10-19T00:00:00Z" } }));
     const outcome = reconcilePendingUpdate();
     const [entry] = updateHistory();
     expect(entry).toMatchObject({ from: "0.6.0", to: "0.6.1", result: "rolled back" });
     // A path the user can find from the host, not the container's.
     expect(entry.detail).toContain("only in data/page.db.schema-v2-1.");
     expect(outcome).toEqual({ entry, restored: expect.objectContaining({ kept: "/data/page.db.schema-v2-1" }) });
-    expect(getAppMeta("update.pending")).toBeUndefined();
-    expect(getAppMeta("update.restored")).toBeUndefined();
+    expect(readJournal()).toBeUndefined();
+  });
+
+  it("never prunes the snapshot an update in progress points to", () => {
+    reset();
+    const pinned = snapshotDb("pre-update", db());
+    fs.utimesSync(pinned, new Date(1000), new Date(1000));
+    writeJournal(journal({ snapshot: pinned }));
+    for (let i = 0; i < 8; i++) snapshotDb(`pre-migrate-${i}`, db());
+    expect(fs.existsSync(pinned)).toBe(true);
+    expect(listSnapshots()).toHaveLength(6);
   });
 
   it("lists snapshots newest first and only hands out files inside the snapshot folder", () => {

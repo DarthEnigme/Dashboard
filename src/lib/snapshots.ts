@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { DATA_DIR } from "./data-dir";
+import { DATA_DIR, syncDir } from "./data-dir";
+import { readJournal } from "./update/journal";
 
 // Safety copies of the database taken before migrations and updates (raw SQLite files), and the
 // file swap that puts one back. Every step writes to a side file first and renames it into place,
@@ -24,12 +25,17 @@ export function vacuumInto(d: DatabaseSync, out: string) {
   }
 }
 
-/** Take a snapshot of `d` and drop the oldest beyond KEEP_SNAPSHOTS; returns the file. */
+/**
+ * Take a snapshot of `d` and drop the oldest beyond KEEP_SNAPSHOTS; returns the file. The one an update
+ * in progress would put back is never dropped, however many restarts take a snapshot meanwhile.
+ */
 export function snapshotDb(label: string, d: DatabaseSync): string {
   fs.mkdirSync(SNAPSHOT_DIR, { recursive: true });
   const out = path.join(SNAPSHOT_DIR, `${label.replace(/[^\w.-]/g, "_")}-${new Date().toISOString().replace(/[:.]/g, "-")}.db`);
   vacuumInto(d, out);
-  for (const { name } of listSnapshots().slice(KEEP_SNAPSHOTS)) fs.rmSync(path.join(SNAPSHOT_DIR, name), { force: true });
+  const pinned = readJournal()?.snapshot;
+  const old = listSnapshots().filter((s) => !pinned || s.name !== path.basename(pinned));
+  for (const { name } of old.slice(KEEP_SNAPSHOTS)) fs.rmSync(path.join(SNAPSHOT_DIR, name), { force: true });
   return out;
 }
 
@@ -85,6 +91,7 @@ export function restoreSnapshot(snapshot: string, file: string, kept: string) {
   }
   for (const ext of ["-wal", "-shm", ""]) if (fs.existsSync(file + ext)) fs.renameSync(file + ext, kept + ext);
   fs.renameSync(restoring, file);
+  syncDir(path.dirname(file));
 }
 
 /** On start, before opening `file`: complete a restore that stopped between moving the old file out and the copy in. */

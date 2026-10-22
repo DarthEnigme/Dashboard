@@ -3,7 +3,7 @@ import path from "node:path";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { DATA_DIR } from "./data-dir";
 import { finishRestore, restoreSnapshot, snapshotDb, SNAPSHOT_DIR } from "./snapshots";
-import { PENDING, RESTORED, type Pending, type RestoredDb } from "./update/records";
+import { LEGACY_PENDING, readJournal, writeJournal, type Journal } from "./update/journal";
 
 export { DATA_DIR };
 
@@ -100,13 +100,19 @@ function migrate(d: DatabaseSync) {
  */
 function restoreAfterRollback(d: DatabaseSync, file: string): DatabaseSync {
   const v = schemaVersion(d);
-  let snapshot: string | undefined;
-  try {
-    const row = d.prepare("SELECT value FROM app_meta WHERE key = ?").get(PENDING) as { value: string } | undefined;
-    snapshot = row ? (JSON.parse(row.value) as Pending).snapshot : undefined;
-  } catch {
-    // no app_meta table or no readable record: nothing to restore
+  const journal = readJournal();
+  let snapshot = journal?.snapshot;
+  if (!snapshot) {
+    try {
+      // An update 0.6.0 started kept its record in app_meta.
+      const row = d.prepare("SELECT value FROM app_meta WHERE key = ?").get(LEGACY_PENDING) as { value: string } | undefined;
+      snapshot = row ? (JSON.parse(row.value) as Journal).snapshot : undefined;
+    } catch {
+      // no app_meta table or no readable record: nothing to restore
+    }
   }
+  // Fold the WAL into the file, so the copy kept aside is whole on its own.
+  d.exec("PRAGMA wal_checkpoint(TRUNCATE)");
   d.close();
   if (!snapshot || !fs.existsSync(snapshot)) {
     throw new Error(
@@ -123,9 +129,7 @@ function restoreAfterRollback(d: DatabaseSync, file: string): DatabaseSync {
     throw new Error(`The snapshot ${snapshot} is also newer than this NanoDash (schema ${SCHEMA_VERSION}).`);
   }
   // For reconcilePendingUpdate: whatever was saved in the newer version is only in the kept file now.
-  restored
-    .prepare("INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)")
-    .run(RESTORED, JSON.stringify({ snapshot, kept, at: new Date().toISOString() } satisfies RestoredDb));
+  if (journal) writeJournal({ ...journal, restored: { snapshot, kept, at: new Date().toISOString() } });
   return restored;
 }
 
