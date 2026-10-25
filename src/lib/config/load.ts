@@ -38,6 +38,23 @@ export function readRaw(file: ConfigFile): unknown {
 
 const cache = new Map<ConfigFile, { mtime: number; value: unknown; error?: string }>();
 
+/** The last version of each file that passed validation (kept across invalidate()). */
+const lastValid = new Map<ConfigFile, unknown>();
+
+/**
+ * What an invalid file runs on: its last valid version, so a typo in a hand edit changes nothing.
+ * With none seen since start, the defaults, but signed-in only: the broken settings.yaml may be the
+ * one that turned the public view off.
+ */
+function fallback(file: ConfigFile): { value: unknown; note: string } {
+  const kept = lastValid.get(file);
+  if (kept !== undefined) return { value: kept, note: " (still using the last valid version)" };
+  const value = configFiles[file].parse(undefined);
+  if (file !== "settings") return { value, note: " (using the defaults)" };
+  const s = value as Settings;
+  return { value: { ...s, auth: { ...s.auth, publicView: false } }, note: " (using the defaults, sign-in required)" };
+}
+
 function loadFile(file: ConfigFile): { value: unknown; error?: string } {
   ensureDefaults();
   const p = filePath(file);
@@ -57,14 +74,17 @@ function loadFile(file: ConfigFile): { value: unknown; error?: string } {
     const parsed = schema.safeParse(substituteEnv(raw));
     if (parsed.success) {
       entry = { mtime, value: parsed.data };
+      lastValid.set(file, parsed.data);
     } else {
       const issues = parsed.error.issues
         .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
         .join("; ");
-      entry = { mtime, value: schema.parse(undefined), error: `${file}.yaml: ${issues}` };
+      const { value, note } = fallback(file);
+      entry = { mtime, value, error: `${file}.yaml: ${issues}${note}` };
     }
   } catch (e) {
-    entry = { mtime, value: schema.parse(undefined), error: `${file}.yaml: ${(e as Error).message}` };
+    const { value, note } = fallback(file);
+    entry = { mtime, value, error: `${file}.yaml: ${(e as Error).message}${note}` };
   }
   cache.set(file, entry);
   return entry;
