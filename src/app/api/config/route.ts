@@ -25,7 +25,8 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  if (!(await canEdit()) || !sameOrigin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canEdit())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!sameOrigin(req)) return NextResponse.json({ error: "Cross-site request refused" }, { status: 403 });
   const body = (await req.json().catch(() => null)) as { file?: string; data?: unknown } | null;
   if (!body?.file || !(body.file in configFiles)) {
     return NextResponse.json({ error: "Unknown config file" }, { status: 400 });
