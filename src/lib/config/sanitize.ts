@@ -38,7 +38,11 @@ export interface ClientGroup {
   services: ClientService[];
 }
 
-export type ClientSettings = Omit<Settings, "alerts" | "docker" | "auth">;
+/** Settings only admins get: maintenance notes and schedules, where backups go, how updates run. */
+const ADMIN_SETTINGS = ["maintenance", "backup", "updates"] as const;
+type AdminSetting = (typeof ADMIN_SETTINGS)[number];
+
+export type ClientSettings = Omit<Settings, "alerts" | "docker" | "auth" | AdminSetting> & Partial<Pick<Settings, AdminSetting>>;
 
 export interface ClientInfoWidget {
   type: string;
@@ -75,7 +79,10 @@ export function sanitize(cfg: LoadedConfig, canSee: (v: Visibility) => boolean =
   // Ids come from the full config so they don't shift with what this viewer can see.
   const ids = serviceIds(cfg.services);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { alerts, docker, auth, ...settings } = cfg.settings;
+  const { alerts, docker, auth, ...all } = cfg.settings;
+  const admin = canSee("admins");
+  const settings: ClientSettings = admin ? all : Object.fromEntries(Object.entries(all).filter(([k]) => !(ADMIN_SETTINGS as readonly string[]).includes(k))) as ClientSettings;
+  if (!admin) settings.finance = { ...settings.finance, fireflyService: undefined };
   return {
     settings,
     bookmarks: cfg.bookmarks.filter((g) => canSee(g.visible ?? "public")),
@@ -83,7 +90,7 @@ export function sanitize(cfg: LoadedConfig, canSee: (v: Visibility) => boolean =
       .map((w, index) => ({ ...withoutSecrets(w), index }) as ClientInfoWidget)
       .filter((w) => canSee((w.visible as Visibility | undefined) ?? "public")),
     // Config errors can mention file contents: admins only.
-    errors: canSee("admins") ? cfg.errors : [],
+    errors: admin ? cfg.errors : [],
     services: cfg.services
       .map((g, gi) => ({
         g,
