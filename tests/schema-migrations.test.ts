@@ -101,6 +101,26 @@ describe("schema migrations", () => {
     snap.close();
   });
 
+  it("step 2 creates the API token and metrics tables, keeping those made on first use by 0.6.1", () => {
+    reset();
+    // 0.6.1: schema 1, with the tables that tokens.ts and metrics.ts created themselves.
+    const d = new DatabaseSync(FILE);
+    d.exec(`
+      CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'user', disabled INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
+      CREATE TABLE pings (service_id TEXT NOT NULL, ts INTEGER NOT NULL, up INTEGER NOT NULL, status INTEGER, latency_ms INTEGER, maint INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE metrics (service_id TEXT NOT NULL, key TEXT NOT NULL, ts INTEGER NOT NULL, value REAL NOT NULL);
+      INSERT INTO metrics VALUES ('s.a', 'CPU', 1, 42);
+      PRAGMA user_version = 1;
+    `);
+    d.close();
+    expect(version()).toBe(SCHEMA_VERSION);
+    expect(db().prepare("SELECT value FROM metrics").get()).toEqual({ value: 42 });
+    expect(columns("api_tokens")).toContain("token_hash");
+    expect(columns("metrics_hourly")).toContain("avg");
+    const indexes = (db().prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as { name: string }[]).map((i) => i.name);
+    expect(indexes).toEqual(expect.arrayContaining(["pings_ts", "metrics_by_key"]));
+  });
+
   it("doesn't migrate or snapshot again on the next start", () => {
     reset();
     legacyDb();
