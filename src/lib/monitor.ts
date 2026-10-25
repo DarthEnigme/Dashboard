@@ -22,6 +22,8 @@ interface MonitorState {
   lastMaintenance: number;
   /** Extra jobs run hourly (e.g. finance sync), registered by other modules. */
   hourly: (() => Promise<void>)[];
+  /** The hourly pass while it runs. */
+  maintaining?: Promise<void>;
   /** Latest certificate seen per service id (HTTPS checks). */
   certs: Map<string, CertInfo>;
   lastMetrics: number;
@@ -202,23 +204,37 @@ async function tick(state: MonitorState): Promise<number> {
   });
   await metrics;
 
-  if (Date.now() - state.lastMaintenance > HOUR) {
-    state.lastMaintenance = Date.now();
-    rollup();
-    pruneHistory(Date.now() - RAW_RETENTION, Date.now() - settings.history.retentionDays * 24 * HOUR);
-    try {
-      rollupMetrics();
-      pruneMetrics(Date.now() - RAW_RETENTION, Date.now() - settings.history.retentionDays * 24 * HOUR);
-    } catch (e) {
-      console.error("[nanodash] metrics maintenance failed:", e);
-    }
-    for (const job of state.hourly) await job().catch((e) => console.error("[nanodash] hourly job failed:", e));
-  }
+  void hourlyPass(state, settings.history.retentionDays);
   gauge("page_monitor_pass_duration_ms", {}, Date.now() - started);
   gauge("page_monitor_last_pass_timestamp_seconds", {}, Math.round(Date.now() / 1000));
   dropLabel("service", new Set(ids.flat()));
   // Checks start every pingInterval, however long this pass took.
   return Math.max(1000, settings.pingInterval * 1000 - (Date.now() - started));
+}
+
+/**
+ * Once an hour: roll up and prune the history, then run the registered jobs one after another.
+ * A tick starts it without waiting, so a slow job (a sync, a backup, an update) never holds up the
+ * checks; while a pass still runs, the next one waits for it to end.
+ */
+export function hourlyPass(state: Pick<MonitorState, "hourly" | "lastMaintenance" | "maintaining">, retentionDays: number, now = Date.now()): Promise<void> | undefined {
+  if (state.maintaining || now - state.lastMaintenance <= HOUR) return undefined;
+  state.lastMaintenance = now;
+  const run = async () => {
+    rollup();
+    pruneHistory(Date.now() - RAW_RETENTION, Date.now() - retentionDays * 24 * HOUR);
+    try {
+      rollupMetrics();
+      pruneMetrics(Date.now() - RAW_RETENTION, Date.now() - retentionDays * 24 * HOUR);
+    } catch (e) {
+      console.error("[nanodash] metrics maintenance failed:", e);
+    }
+    for (const job of state.hourly) await job().catch((e) => console.error("[nanodash] hourly job failed:", e));
+  };
+  state.maintaining = run()
+    .catch((e) => console.error("[nanodash] hourly maintenance failed:", e))
+    .finally(() => (state.maintaining = undefined));
+  return state.maintaining;
 }
 
 /** Register a job for the monitor's hourly maintenance pass. */
