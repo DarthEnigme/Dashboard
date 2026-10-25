@@ -3,28 +3,12 @@ import { db, getAppMeta, setAppMeta } from "./db";
 // Recorded widget numbers (opt-in per widget with `record: true`). Raw samples are kept 7 days,
 // hourly averages (with min and max) as long as the status history.
 
-let ready = false;
-function init() {
-  if (ready) return;
-  db().exec(`
-    CREATE TABLE IF NOT EXISTS metrics (service_id TEXT NOT NULL, key TEXT NOT NULL, ts INTEGER NOT NULL, value REAL NOT NULL);
-    CREATE INDEX IF NOT EXISTS metrics_by_key ON metrics (service_id, key, ts);
-    CREATE TABLE IF NOT EXISTS metrics_hourly (
-      service_id TEXT NOT NULL, key TEXT NOT NULL, hour INTEGER NOT NULL,
-      avg REAL NOT NULL, min REAL NOT NULL, max REAL NOT NULL, n INTEGER NOT NULL,
-      PRIMARY KEY (service_id, key, hour)
-    );
-  `);
-  ready = true;
-}
-
 export interface Sample {
   key: string;
   value: number;
 }
 
 export function insertMetrics(serviceId: string, ts: number, samples: Sample[]) {
-  init();
   const stmt = db().prepare("INSERT INTO metrics (service_id, key, ts, value) VALUES (?, ?, ?, ?)");
   db().exec("BEGIN");
   try {
@@ -38,7 +22,6 @@ export function insertMetrics(serviceId: string, ts: number, samples: Sample[]) 
 
 /** The newest value of every recorded field (newer than `since`), for the Prometheus export. */
 export function latestMetrics(since: number): { service_id: string; key: string; value: number }[] {
-  init();
   return db()
     .prepare(
       `SELECT m.service_id, m.key, m.value FROM metrics m
@@ -58,7 +41,6 @@ export interface Point {
 
 /** Raw points (≤ 7 days back) or hourly averages, per key. */
 export function metricSeries(serviceId: string, from: number, to: number, hourly: boolean): Map<string, Point[]> {
-  init();
   const out = new Map<string, Point[]>();
   const rows = hourly
     ? (db()
@@ -79,7 +61,6 @@ const HOUR = 3_600_000;
 
 /** Roll finished hours of raw samples into metrics_hourly (from where the last pass stopped). */
 export function rollupMetrics(now = Date.now()) {
-  init();
   const before = Math.floor(now / HOUR) * HOUR;
   const from = getAppMeta<number>("metrics.rolledUntil") ?? 0;
   if (from >= before) return;
@@ -95,7 +76,6 @@ export function rollupMetrics(now = Date.now()) {
 }
 
 export function pruneMetrics(rawBefore: number, hourlyBefore: number) {
-  init();
   db().prepare("DELETE FROM metrics WHERE ts < ?").run(rawBefore);
   db().prepare("DELETE FROM metrics_hourly WHERE hour < ?").run(hourlyBefore);
 }

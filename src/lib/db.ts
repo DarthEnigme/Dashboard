@@ -68,6 +68,29 @@ const schemaVersion = (d: DatabaseSync) => (d.prepare("PRAGMA user_version").get
 const MIGRATIONS: ((d: DatabaseSync) => void)[] = [
   // 1: everything up to 0.5.11. Idempotent, so databases made before versioning pass through it.
   baseline,
+  // 2: the tables that modules used to create on first use, and an index for the dashboard-wide queries.
+  (d) =>
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS api_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        prefix TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        last_used INTEGER
+      );
+      -- Recorded widget numbers (widgets with record: true): raw samples, and hourly averages.
+      CREATE TABLE IF NOT EXISTS metrics (service_id TEXT NOT NULL, key TEXT NOT NULL, ts INTEGER NOT NULL, value REAL NOT NULL);
+      CREATE INDEX IF NOT EXISTS metrics_by_key ON metrics (service_id, key, ts);
+      CREATE TABLE IF NOT EXISTS metrics_hourly (
+        service_id TEXT NOT NULL, key TEXT NOT NULL, hour INTEGER NOT NULL,
+        avg REAL NOT NULL, min REAL NOT NULL, max REAL NOT NULL, n INTEGER NOT NULL,
+        PRIMARY KEY (service_id, key, hour)
+      );
+      -- Every service's checks since a time (dashboard, monitoring panel, status page, pruning).
+      CREATE INDEX IF NOT EXISTS pings_ts ON pings (ts);
+    `),
 ];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
