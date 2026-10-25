@@ -112,14 +112,17 @@ function readCert(host: string, port = 443, timeoutMs = 5000): Promise<CertInfo 
 
 async function checkHttp(c: Extract<CheckSpec, { type: "http" }>): Promise<PingResult> {
   const url = c.url!;
-  const start = performance.now();
+  let start = performance.now();
   const at = Date.now();
   const needBody = !!(c.keyword || c.jsonPath);
+  const options = { insecure: c.insecure, timeoutMs: 5000, redirect: "manual" as const, maxBytes: 1_000_000, truncate: true };
   try {
-    let res = await http(url, { method: needBody ? "GET" : (c.method ?? "HEAD"), insecure: c.insecure, timeoutMs: 5000, redirect: "manual", maxBytes: 1_000_000, truncate: true });
+    let res = await http(url, { ...options, method: needBody ? "GET" : (c.method ?? "HEAD") });
     if (!needBody && (res.status === 405 || res.status === 501)) {
       await res.body?.cancel();
-      res = await http(url, { method: "GET", insecure: c.insecure, timeoutMs: 5000, redirect: "manual" });
+      // Report the reply the user waits for, not both round trips.
+      start = performance.now();
+      res = await http(url, { ...options, method: "GET" });
     }
     const latencyMs = Math.round(performance.now() - start);
     let up = c.expect?.length ? c.expect.includes(res.status) : res.status < 500;
