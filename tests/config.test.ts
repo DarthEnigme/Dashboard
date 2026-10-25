@@ -58,6 +58,21 @@ describe("sanitize", () => {
     expect(out.services[0].services[0]).toMatchObject({ id: "infra.proxmox", ping: true, widget: "proxmox" });
   });
 
+  it("keeps admin-only settings (maintenance notes, backup folder, updates) from other viewers", () => {
+    const settings = settingsSchema.parse({
+      maintenance: [{ from: "01:00", to: "02:00", note: "ADMIN-NOTE" }],
+      backup: { dir: "/mnt/NAS-PATH" },
+      finance: { fireflyService: "money.firefly" },
+    });
+    const cfg = { settings, services, bookmarks: [], widgets: [], errors: [] };
+    const anon = JSON.stringify(sanitize(cfg, (v) => v === "public"));
+    for (const s of ["ADMIN-NOTE", "NAS-PATH", "money.firefly", '"updates"']) expect(anon).not.toContain(s);
+    expect(sanitize(cfg, (v) => v === "public").settings.finance.currency).toBe("EUR");
+    const admin = sanitize(cfg);
+    expect(admin.settings.maintenance?.[0].note).toBe("ADMIN-NOTE");
+    expect(admin.settings.backup?.dir).toBe("/mnt/NAS-PATH");
+  });
+
   it("de-duplicates ids", () => {
     expect(serviceIds(services)).toEqual([["infra.proxmox", "infra.proxmox-2"]]);
   });
