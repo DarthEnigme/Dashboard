@@ -6,6 +6,7 @@ import { writeConfig } from "@/lib/config/write";
 import { configFiles, type ConfigFile } from "@/lib/config/schema";
 import { canEdit, sameOrigin, seeFilter, viewer } from "@/lib/auth";
 import { saveVersionBefore } from "@/lib/config/history";
+import { reconcileModules } from "@/lib/module-retention";
 
 export const dynamic = "force-dynamic";
 
@@ -34,5 +35,13 @@ export async function PUT(req: Request) {
   saveVersionBefore(body.file as ConfigFile, user?.username ?? null);
   const result = writeConfig(body.file as ConfigFile, body.data);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 422 });
+  if (body.file === "settings") {
+    // Archive an app just turned off now rather than at the next hourly run; the save stands either way.
+    try {
+      reconcileModules();
+    } catch (e) {
+      console.error("[nanodash] could not archive turned-off apps:", e);
+    }
+  }
   return NextResponse.json({ ok: true });
 }

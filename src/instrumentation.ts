@@ -10,6 +10,8 @@ export async function register() {
     const { backupJob } = await import("./lib/backup");
     const { warrantyJob } = await import("./lib/inventory/store");
     const { watchSyncJob } = await import("./lib/watchlist/sync");
+    const { whenEnabled } = await import("./lib/modules");
+    const { reconcileModules } = await import("./lib/module-retention");
     const { announceUpdateOutcome, reconcilePendingUpdate } = await import("./lib/update/apply");
     try {
       const outcome = reconcilePendingUpdate();
@@ -18,14 +20,16 @@ export async function register() {
       console.warn("[nanodash] could not record the last update:", e);
     }
     startMonitor();
-    onHourly(fireflyDailyJob);
-    onHourly(recurringJob);
-    onHourly(() => subscriptionReminderJob());
-    onHourly(budgetAlertJob);
+    // An app's jobs sleep while it is turned off.
+    onHourly(whenEnabled("finance", fireflyDailyJob));
+    onHourly(whenEnabled("finance", recurringJob));
+    onHourly(whenEnabled("finance", () => subscriptionReminderJob()));
+    onHourly(whenEnabled("finance", budgetAlertJob));
     onHourly(updateJob);
     onHourly(backupJob);
-    onHourly(warrantyJob);
-    onHourly(() => watchSyncJob());
+    onHourly(async () => reconcileModules());
+    onHourly(whenEnabled("inventory", () => warrantyJob()));
+    onHourly(whenEnabled("watchlist", () => watchSyncJob()));
     onHourly(async () => void pruneSessions());
     onHourly(async () => void pruneAudit());
   }

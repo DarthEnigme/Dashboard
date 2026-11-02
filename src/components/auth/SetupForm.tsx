@@ -3,12 +3,15 @@
 import { useState, type FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 import { sendJson } from "@/lib/fetcher";
+import { APP_SECTIONS } from "@/lib/sections";
 import { inputClass } from "../edit/FieldInput";
 import { useT } from "@/i18n/client";
 
 export function SetupForm({ title }: { title: string }) {
   const t = useT();
   const [form, setForm] = useState({ username: "admin", email: "", password: "", confirm: "" });
+  // The same two as a config written without setup (config/defaults.ts).
+  const [apps, setApps] = useState<string[]>(["notes", "inventory"]);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
@@ -19,7 +22,7 @@ export function SetupForm({ title }: { title: string }) {
     setBusy(true);
     setError(undefined);
     try {
-      await sendJson("/api/auth/setup", "POST", { username: form.username, email: form.email, password: form.password });
+      await sendJson("/api/auth/setup", "POST", { username: form.username, email: form.email, password: form.password, apps });
       window.location.href = "/";
     } catch (err) {
       setError((err as Error).message);
@@ -47,6 +50,24 @@ export function SetupForm({ title }: { title: string }) {
       {field(t("Email (optional, used to match SSO logins)"), "email", "email", "email")}
       {field(t("Password (8+ characters)"), "password", "password", "new-password")}
       {field(t("Confirm password"), "confirm", "password", "new-password")}
+      <fieldset className="mt-2 flex flex-col gap-1.5">
+        <legend className="mb-1.5 text-xs font-medium text-muted">{t("Apps")}</legend>
+        <div className="grid grid-cols-2 gap-1.5">
+          {APP_SECTIONS.map((s) => (
+            <label key={s.id} className="flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-chip px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                checked={apps.includes(s.permission)}
+                onChange={(e) => setApps(e.target.checked ? [...apps, s.permission] : apps.filter((a) => a !== s.permission))}
+                className="h-4 w-4 accent-[var(--accent)]"
+              />
+              <s.icon className="h-4 w-4 shrink-0 text-muted" />
+              {t(s.label)}
+            </label>
+          ))}
+        </div>
+        <p className="text-xs text-muted">{t("You can change this later in Settings.")}</p>
+      </fieldset>
       <button
         type="submit"
         disabled={busy}

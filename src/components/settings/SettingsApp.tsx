@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { mutate } from "swr";
 import { AlertTriangle, ArrowLeft, Check, Download, FileUp, Search, X } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import type { Settings } from "@/lib/config/schema";
@@ -25,6 +26,7 @@ import { TestAlertButton } from "./TestAlertButton";
 import { UpdatesPanel } from "./UpdatesPanel";
 import { ThemeEditor } from "./ThemeEditor";
 import { BackupsPanel } from "./BackupsPanel";
+import { ModulePicker, MODULES_URL } from "./ModulePicker";
 import { TokensPanel } from "./TokensPanel";
 import { applyTheme, GradientPicker, setFont, setGlow, StylePicker, ThemePicker } from "./LookPickers";
 import { changedFields, validateSettings } from "./validate";
@@ -145,6 +147,8 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
     try {
       await sendJson("/api/config", "PUT", { file: "settings", data: draft });
       setSaved(draft);
+      // Turning an app off or on changes what is waiting to be deleted.
+      void mutate(MODULES_URL);
       if (restore.current) {
         restore.current = {
           theme: preview.theme,
@@ -192,6 +196,8 @@ export function SettingsApp({ initial, fallback, version }: { initial: Obj; fall
           <ThemePicker value={(value as string) ?? "dark"} custom={preview.customThemes} onChange={onChange} />
         ) : f.key === "style" ? (
           <StylePicker value={(value as string) ?? "glass"} onChange={onChange} />
+        ) : f.key === "apps" ? (
+          <ModulePicker value={value} saved={getPath(saved, "apps")} onChange={onChange} />
         ) : f.key === "background.gradient" ? (
           <GradientPicker value={(value as string) ?? "aurora"} custom={preview.customThemes} onChange={onChange} />
         ) : (

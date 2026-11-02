@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { CONFIG_DIR, loadConfig } from "./config/load";
-import { configFiles, type Settings } from "./config/schema";
+import { APPS, configFiles, type Settings } from "./config/schema";
 import { DATA_DIR, db, getAppMeta, setAppMeta } from "./db";
 import { hasAlertChannel, sendNotice } from "./alerts";
 import { vacuumInto } from "./snapshots";
@@ -10,6 +10,9 @@ import { zipToFile } from "./zip";
 /** page-backup-2026-10-09-0300.zip */
 const NAME = /^page-backup-\d{4}-\d{2}-\d{2}-\d{4}(-\d+)?\.zip$/;
 export const isBackupName = (name: string) => NAME.test(name);
+/** page-module-finance-2026-10-09-0300.zip: an app's data kept after it was turned off (module-retention.ts). */
+const MODULE_ARCHIVE = new RegExp(String.raw`^page-module-(${APPS.join("|")})-\d{4}-\d{2}-\d{2}-\d{4}(-\d+)?\.zip$`);
+export const isModuleArchiveName = (name: string) => MODULE_ARCHIVE.test(name);
 
 export interface BackupInfo {
   name: string;
@@ -30,7 +33,7 @@ export interface BackupStatus {
 export const backupDir = (cfg: Settings["backup"] = loadConfig().settings.backup) => (cfg.dir ? path.resolve(cfg.dir) : path.join(DATA_DIR, "backups"));
 
 const pad = (n: number) => String(n).padStart(2, "0");
-const stamp = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+export const stamp = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
 
 /** Every file under `dir`, as paths relative to it (for data/uploads). */
 function walk(dir: string, base = dir): string[] {
@@ -103,9 +106,9 @@ export function prune(dir: string, keep: number, maxAgeDays?: number, now = Date
   for (const b of all.filter((b, i) => i >= keep || (i > 0 && tooOld(b)))) fs.rmSync(path.join(dir, b.name), { force: true });
 }
 
-/** The file for a backup name, or undefined when the name isn't one of ours (no path tricks). */
+/** The file for a backup or app archive name, or undefined when the name isn't one of ours (no path tricks). */
 export function backupPath(name: string): string | undefined {
-  if (!isBackupName(name)) return undefined;
+  if (!isBackupName(name) && !isModuleArchiveName(name)) return undefined;
   const p = path.join(backupDir(), name);
   return fs.existsSync(p) ? p : undefined;
 }

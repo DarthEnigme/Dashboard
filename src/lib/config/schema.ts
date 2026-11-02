@@ -56,6 +56,7 @@ export const PERMISSIONS = ["finance", "actions", "travel", "watchlist", "invent
 export type Permission = (typeof PERMISSIONS)[number];
 /** Sections beyond the dashboard that can be turned off for everyone (their permission then counts for no one). */
 export const APPS = ["finance", "travel", "watchlist", "inventory", "notes"] as const satisfies readonly Permission[];
+export type App = (typeof APPS)[number];
 
 const providerSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/, "lowercase letters, digits and dashes"),
@@ -184,6 +185,8 @@ export const settingsSchema = z
         maxAgeDays: z.number().int().min(1).max(3650).optional(),
         /** Folder for the zips (another disk or a network share); default data/backups. */
         dir: z.string().optional(),
+        /** An app turned off keeps its data this many days (archived in the backup folder), then it is deleted. */
+        moduleRetentionDays: z.number().int().min(1).max(3650).default(30),
       })
       .prefault({}),
     alerts: z

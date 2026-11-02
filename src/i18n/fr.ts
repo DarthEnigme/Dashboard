@@ -797,8 +797,17 @@ export const fr: Record<string, string> = {
   "TLS certificate expires in {n} d": "Le certificat TLS expire dans {n} j",
   Tab: "Onglet",
   "Tab order": "Ordre des onglets",
-  "Comma-separated: finance, travel, watchlist, inventory, notes. The others are hidden for everyone, admins included; their data is kept. Empty field = all of them.":
-    "Séparées par des virgules : finance, travel, watchlist, inventory, notes. Les autres sont masquées pour tout le monde, administrateurs compris ; leurs données sont conservées. Champ vide = toutes.",
+  "Finance, travel, watchlist, inventory, notes. A turned-off app keeps its data for a while, with a copy in the backup folder, then it is deleted.":
+    "Finance, voyages, watchlist, inventaire, notes. Une app désactivée garde ses données un temps, avec une copie dans le dossier des sauvegardes, puis elles sont supprimées.",
+  "Keep a turned-off app's data (days)": "Garder les données d’une app désactivée (jours)",
+  "Turn the app back on before then and nothing is lost. Meanwhile a copy waits in the backup folder; both are deleted at the end.":
+    "Réactivez l’app avant et rien n’est perdu. En attendant, une copie reste dans le dossier des sauvegardes ; les deux sont supprimées à la fin.",
+  "Its data is kept {n} days, with a copy in the backup folder, then deleted.": "Ses données sont gardées {n} jours, avec une copie dans le dossier des sauvegardes, puis supprimées.",
+  "Off — data deleted on {date}": "Désactivée — données supprimées le {date}",
+  Archive: "Archive",
+  "Turned back on when you save: nothing is deleted.": "Réactivée à l’enregistrement : rien n’est supprimé.",
+  "Unchecked apps are hidden for everyone, admins included.": "Les apps décochées sont masquées pour tout le monde, administrateurs compris.",
+  "You can change this later in Settings.": "Vous pourrez changer cela plus tard dans les paramètres.",
   Tabs: "Onglets",
   "Take money out of savings": "Retirer de l’argent de l’épargne",
   "Take out": "Retirer",

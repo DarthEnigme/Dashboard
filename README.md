@@ -37,7 +37,7 @@ A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Hom
   - full change history with one-click undo
   - import from gethomepage.dev
 - **Security:** API keys and webhook URLs stay on the server; the browser only ever sees service ids
-- **Optional apps** (turned on with [`apps:`](#settingsyaml); new installs start with notes and inventory):
+- **Optional apps**, picked on the first-run setup screen and changed any time under **Settings → General → Apps** (or [`apps:`](#settingsyaml)). An app turned off keeps its data for 30 days (see [Backups](#backups)):
   - notes with runbooks shown on service pages, and a device inventory with live status, Wake-on-LAN and warranty reminders
   - a finance tracker: spending, income and balance charts, a money-flow (Sankey) chart, budgets, subscriptions with renewal reminders, CSV bank import, Firefly III sync
   - a travel log, and a watchlist and reading list (with lists, tags and sync from Jellyfin or Plex)
@@ -740,7 +740,10 @@ backup:
   keep: 7            # the newest 7 stay; older ones are deleted
   maxAgeDays: 30     # optional: also delete backups older than this (the newest always stays)
   dir: /backups     # optional; default data/backups
+  moduleRetentionDays: 30  # how long a turned-off app keeps its data
 ```
+
+**Turned-off apps:** when an app that holds data is turned off (finance, travel, watchlist, inventory or notes), NanoDash writes `page-module-<app>-<date>.zip` to the backup folder, with one JSON file per table. The app's data stays in the database for `moduleRetentionDays`: turn the app back on before then and nothing is lost (the archive is removed). After that, the app's data and its archive are both deleted, and the deletion is in the audit log. Nightly pruning never touches these archives. While an app is off, its background jobs (Firefly sync, recurring transactions, reminders, warranty alerts, watchlist sync) don't run.
 
 Separately, `data/snapshots/` holds plain copies of the database taken before updates and database upgrades (see [Updating](#updating)). To use one: stop NanoDash, copy it over `data/page.db`, delete `page.db-wal` and `page.db-shm`, and start NanoDash again.
 
