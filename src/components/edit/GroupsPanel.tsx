@@ -5,21 +5,12 @@ import useSWR from "swr";
 import { Pencil, Plus } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import { PERMISSIONS, type Permission } from "@/lib/config/schema";
+import { PERMISSION_BLURBS } from "@/lib/sections";
 import type { Group } from "@/lib/auth/groups";
 import { Dialog } from "./Dialog";
 import { DeleteButton, IconButton } from "./controls";
 import { inputClass } from "./FieldInput";
-import { msg } from "@/i18n";
 import { useT } from "@/i18n/client";
-
-const LABELS: Record<Permission, string> = {
-  finance: msg("Use the finance tracker"),
-  actions: msg("Run widget actions (start, stop, restart)"),
-  travel: msg("Use the travel log"),
-  watchlist: msg("Use the watchlist and reading list"),
-  inventory: msg("See and edit the device inventory (and wake devices, with actions)"),
-  notes: msg("Read and write notes and runbooks"),
-};
 
 /** Groups: who sees items marked visible: [group], extra permissions, and SSO group mapping. */
 export function GroupsPanel() {
@@ -119,7 +110,7 @@ function GroupDialog({ group, onClose, onSaved }: { group?: Group; onClose: () =
                 setPerms(next);
               }}
             />
-            {t(LABELS[p])}
+            {t(PERMISSION_BLURBS[p])}
           </label>
         ))}
       </fieldset>

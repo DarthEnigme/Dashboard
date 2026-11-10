@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { guardPermission } from "@/lib/auth";
+import { attempt, body, guardFor } from "@/lib/api";
 import { audit } from "@/lib/auth/users";
 import { allServices } from "@/lib/config/lookup";
 import { createNote, listNotes } from "@/lib/notes/store";
 
 export const dynamic = "force-dynamic";
 
-const guard = (req?: Request) => guardPermission("notes", req, "notes");
+const guard = guardFor("notes", "notes");
 
 /** Every note (?q= searches), and the services they can link to (ids, names and groups only). */
 export async function GET(req: Request) {
@@ -21,11 +21,10 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const g = await guard(req);
   if ("error" in g) return g.error;
-  try {
-    const note = createNote(((await req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>, g.user.username);
+  const b = await body(req);
+  return attempt(() => {
+    const note = createNote(b, g.user.username);
     audit(g.user.username, "note-create", { id: note.id, title: note.title });
-    return NextResponse.json(note, { status: 201 });
-  } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
-  }
+    return note;
+  }, 201);
 }

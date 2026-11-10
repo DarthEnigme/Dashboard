@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { guardPermission, seeFilter } from "@/lib/auth";
+import { bad, guardFor } from "@/lib/api";
+import { seeFilter } from "@/lib/auth";
 import { findService } from "@/lib/config/lookup";
 import { getSync, mediaServices, setSync, syncUser } from "@/lib/watchlist/sync";
 import { listItems, tagsAndLists, watchStats } from "@/lib/watchlist/store";
 
 export const dynamic = "force-dynamic";
 
-const guard = (req?: Request) => guardPermission("watchlist", req, "the watchlist");
-const bad = (error: string, status = 400) => NextResponse.json({ error }, { status });
+const guard = guardFor("watchlist", "the watchlist");
 
 /** Jellyfin and Plex servers this viewer can see (ids and names only). */
 async function choices() {

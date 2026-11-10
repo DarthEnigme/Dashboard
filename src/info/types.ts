@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { Quote } from "@/lib/stocks/yahoo";
 
 /** A server-side data source for an info bar widget. */
 export interface InfoProvider<C extends z.ZodTypeAny = z.ZodTypeAny, D = unknown> {
@@ -27,13 +28,7 @@ export interface ResourcesData {
   uptime: number; // seconds
 }
 
-export interface Quote {
-  symbol: string;
-  name?: string;
-  price: number;
-  change: number | null; // percent
-  currency: string;
-}
+export type { Quote };
 
 export interface MarketsData {
   quotes: Quote[];

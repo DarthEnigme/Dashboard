@@ -1,22 +1,14 @@
-import { redirect } from "next/navigation";
-import { loadConfig } from "@/lib/config/load";
-import { clientAuth } from "@/lib/auth";
-import { personal } from "@/lib/userLook";
-import { Background } from "@/components/Background";
+import { appShell } from "@/lib/appPage";
 import { InventoryPage } from "@/components/inventory/InventoryPage";
 
 export const dynamic = "force-dynamic";
 
 export default async function Inventory() {
-  const auth = await clientAuth();
-  if (!auth.user) redirect(auth.needsSetup ? "/setup" : "/login");
-  if (!auth.user.permissions.includes("inventory")) redirect("/");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { alerts, docker, auth: _a, ...settings } = loadConfig().settings;
+  const { user, background } = await appShell("inventory");
   return (
     <>
-      <Background settings={await personal(settings)} />
-      <InventoryPage canWake={auth.user.permissions.includes("actions")} />
+      {background}
+      <InventoryPage canWake={user.permissions.includes("actions")} />
     </>
   );
 }

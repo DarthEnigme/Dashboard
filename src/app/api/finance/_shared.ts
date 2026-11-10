@@ -1,9 +1,7 @@
-import { NextResponse } from "next/server";
-import { guardPermission } from "@/lib/auth";
+import { guardFor } from "@/lib/api";
 
-export const bad = (error: string, status = 400) => NextResponse.json({ error }, { status });
+export { bad } from "@/lib/api";
+export { isDate } from "@/lib/clean";
 
 /** Finance is personal: every route needs a signed-in user with the finance permission; changes must also be same-origin. */
-export const guard = (req?: Request) => guardPermission("finance", req);
-
-export const isDate = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
+export const guard = guardFor("finance");

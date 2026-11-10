@@ -15,6 +15,7 @@ import {
   type SubscriptionFields,
 } from "@/lib/finance/recurring";
 import { bad, guard, isDate } from "../_shared";
+import { text } from "@/lib/clean";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,6 @@ export async function GET(req: Request) {
   return NextResponse.json(listRecurring().filter((r) => !subs || r.subscription).map(withNext));
 }
 
-const text = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
 const url = (v: unknown) => {
   const s = text(v, 500);
   return s && /^https?:\/\//i.test(s) ? s : null;

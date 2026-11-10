@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { guardPermission } from "@/lib/auth";
+import { guardFor } from "@/lib/api";
 import { audit } from "@/lib/auth/users";
 import { devicesCsv, importDevices } from "@/lib/inventory/store";
 import { localDay } from "@/lib/day";
 
 export const dynamic = "force-dynamic";
 
-const guard = (req?: Request) => guardPermission("inventory", req, "the inventory");
+const guard = guardFor("inventory", "the inventory");
 
 /** Every device as CSV (imports back as is). */
 export async function GET() {

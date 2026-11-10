@@ -1,21 +1,13 @@
-import { redirect } from "next/navigation";
-import { loadConfig } from "@/lib/config/load";
-import { clientAuth } from "@/lib/auth";
-import { personal } from "@/lib/userLook";
-import { Background } from "@/components/Background";
+import { appShell } from "@/lib/appPage";
 import { WatchlistPage } from "@/components/watchlist/WatchlistPage";
 
 export const dynamic = "force-dynamic";
 
 export default async function Watchlist() {
-  const auth = await clientAuth();
-  if (!auth.user) redirect(auth.needsSetup ? "/setup" : "/login");
-  if (!auth.user.permissions.includes("watchlist")) redirect("/");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { alerts, docker, auth: _a, ...settings } = loadConfig().settings;
+  const { background } = await appShell("watchlist");
   return (
     <>
-      <Background settings={await personal(settings)} />
+      {background}
       <WatchlistPage />
     </>
   );

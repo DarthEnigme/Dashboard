@@ -1,5 +1,8 @@
 import { db } from "../db";
 import { localDay } from "@/lib/day";
+import { cleanTags, day, int, parseTags, text } from "@/lib/clean";
+
+export { cleanTags };
 
 const WATCH_KINDS = ["book", "movie", "show", "game", "other"] as const;
 export const WATCH_STATUSES = ["planned", "active", "done", "dropped"] as const;
@@ -39,36 +42,8 @@ export interface WatchStats {
 }
 
 const today = () => localDay();
-const text = (s: unknown, max: number) => (typeof s === "string" && s.trim() ? s.trim().slice(0, max) : null);
-const int = (n: unknown, min: number, max: number) => {
-  const v = typeof n === "string" && n.trim() !== "" ? Number(n) : n;
-  return typeof v === "number" && Number.isInteger(v) && v >= min && v <= max ? v : null;
-};
-const day = (d: unknown) => (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null);
 /** Covers come from Open Library, or any http(s) image the person gives. */
 const coverUrl = (u: unknown) => (typeof u === "string" && /^https?:\/\/\S+$/.test(u) ? u.slice(0, 500) : null);
-
-/** Up to 20 tags of 40 characters, trimmed, without duplicates (ignoring case). */
-export function cleanTags(v: unknown): string[] {
-  const list = Array.isArray(v) ? v : typeof v === "string" ? v.split(",") : [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const t of list) {
-    const tag = typeof t === "string" ? t.trim().slice(0, 40) : "";
-    if (!tag || seen.has(tag.toLowerCase())) continue;
-    seen.add(tag.toLowerCase());
-    out.push(tag);
-  }
-  return out.slice(0, 20);
-}
-
-const parseTags = (json: string | null): string[] => {
-  try {
-    return cleanTags(JSON.parse(json ?? "[]"));
-  } catch {
-    return [];
-  }
-};
 
 export function listItems(userId: number): WatchItem[] {
   const rows = db()

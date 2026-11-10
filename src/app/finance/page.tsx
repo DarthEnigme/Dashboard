@@ -1,21 +1,13 @@
-import { redirect } from "next/navigation";
-import { loadConfig } from "@/lib/config/load";
-import { clientAuth } from "@/lib/auth";
-import { personal } from "@/lib/userLook";
-import { Background } from "@/components/Background";
+import { appShell } from "@/lib/appPage";
 import { FinancePage } from "@/components/finance/FinancePage";
 
 export const dynamic = "force-dynamic";
 
 export default async function Finance() {
-  const auth = await clientAuth();
-  if (!auth.user) redirect(auth.needsSetup ? "/setup" : "/login");
-  if (!auth.user.permissions.includes("finance")) redirect("/");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { alerts, docker, auth: _a, ...settings } = loadConfig().settings;
+  const { settings, background } = await appShell("finance");
   return (
     <>
-      <Background settings={await personal(settings)} />
+      {background}
       <FinancePage currency={settings.finance.currency} />
     </>
   );

@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { guardPermission } from "@/lib/auth";
+import { bad, body, guardFor } from "@/lib/api";
 import { audit } from "@/lib/auth/users";
 import { addDevice, deleteDevice, listDevices, updateDevice } from "@/lib/inventory/store";
 
 export const dynamic = "force-dynamic";
 
-const guard = (req?: Request) => guardPermission("inventory", req, "the inventory");
-const bad = (error: string) => NextResponse.json({ error }, { status: 400 });
-const body = async (req: Request) => ((await req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
+const guard = guardFor("inventory", "the inventory");
 
 /** Every device (the inventory is shared by everyone with the inventory permission). */
 export async function GET() {

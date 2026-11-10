@@ -10,7 +10,8 @@ import { defaultFiles } from "@/lib/config/defaults";
 import { accentFromPixels, serverAccent } from "@/lib/theme";
 import { pickDisks } from "@/info/resources";
 import { parseOpenMeteo } from "@/info/weather";
-import { parseCoinGecko, parseYahoo } from "@/info/markets";
+import { parseCoinGecko } from "@/info/markets";
+import { parseYahoo } from "@/lib/stocks/yahoo";
 import { parseFrankfurter } from "@/info/currency";
 
 describe("alert state machine", () => {

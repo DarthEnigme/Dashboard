@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { httpJson } from "@/lib/http";
+import { fetchQuote } from "@/lib/stocks/yahoo";
 import type { InfoProvider, MarketsData, Quote } from "./types";
 
 const schema = z.object({
@@ -10,30 +11,6 @@ const schema = z.object({
   /** Quote currency for crypto */
   currency: z.string().default("usd"),
 });
-
-// Yahoo rejects requests without a browser-like user agent.
-// (It also rate-limits some UA strings, e.g. Linux Chrome, so this one is deliberate.)
-const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
-
-export interface YahooChart {
-  chart: {
-    result: { meta: { symbol: string; shortName?: string; currency: string; regularMarketPrice: number; chartPreviousClose?: number; previousClose?: number } }[] | null;
-    error: { description: string } | null;
-  };
-}
-
-export function parseYahoo(r: YahooChart): Quote {
-  const meta = r.chart.result?.[0]?.meta;
-  if (!meta) throw new Error(r.chart.error?.description ?? "No data");
-  const prev = meta.chartPreviousClose ?? meta.previousClose;
-  return {
-    symbol: meta.symbol,
-    name: meta.shortName,
-    price: meta.regularMarketPrice,
-    change: prev ? ((meta.regularMarketPrice - prev) / prev) * 100 : null,
-    currency: meta.currency,
-  };
-}
 
 export function parseCoinGecko(r: Record<string, Record<string, number>>, ids: string[], currency: string): Quote[] {
   const cur = currency.toLowerCase();
@@ -56,11 +33,7 @@ export const markets: InfoProvider<typeof schema, MarketsData> = {
     const stocks = await Promise.all(
       cfg.symbols.map(async (sym) => {
         try {
-          const r = await httpJson<YahooChart>(
-            `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d`,
-            { headers: { "User-Agent": UA } },
-          );
-          return parseYahoo(r);
+          return await fetchQuote(sym);
         } catch (e) {
           errors.push(`${sym}: ${(e as Error).message}`);
           return null;

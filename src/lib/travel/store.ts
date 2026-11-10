@@ -1,3 +1,4 @@
+import { text } from "@/lib/clean";
 import { db } from "../db";
 import { COUNTRIES, countryIndex, UN_COUNT } from "./geo";
 import { localDay } from "@/lib/day";
@@ -62,7 +63,6 @@ const date = (d: unknown, what: string) => {
 };
 const optDate = (d: unknown, what: string) => (d === undefined || d === null || d === "" ? null : date(d, what));
 const coord = (n: unknown, max: number) => (typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= max ? n : null);
-const text = (s: unknown, max: number) => (typeof s === "string" && s.trim() ? s.trim().slice(0, max) : null);
 
 // ---------- places ----------
 

@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { guardPermission } from "@/lib/auth";
+import { bad, body, guardFor } from "@/lib/api";
 import { addItem, deleteItem, listItems, tagsAndLists, updateItem, watchStats } from "@/lib/watchlist/store";
 
 export const dynamic = "force-dynamic";
 
-const guard = (req?: Request) => guardPermission("watchlist", req, "the watchlist");
-const bad = (error: string) => NextResponse.json({ error }, { status: 400 });
-const body = async (req: Request) => ((await req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
+const guard = guardFor("watchlist", "the watchlist");
 const reply = (items: ReturnType<typeof listItems>, status = 200) => NextResponse.json({ items, stats: watchStats(items), ...tagsAndLists(items) }, { status });
 
 /** Your watchlist and reading list (private to you), with this year's stats. */
