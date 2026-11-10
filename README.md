@@ -41,6 +41,7 @@ A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Hom
   - notes with runbooks shown on service pages, and a device inventory with live status, Wake-on-LAN and warranty reminders
   - a finance tracker: spending, income and balance charts, a money-flow (Sankey) chart, budgets, subscriptions with renewal reminders, CSV bank import, Firefly III sync
   - a travel log, and a watchlist and reading list (with lists, tags and sync from Jellyfin or Plex)
+  - task boards (kanban and list views), and a stock portfolio with dividends, performance against an index and a research page per company
 
 ## Run with Docker
 
@@ -151,7 +152,7 @@ editing: true          # set false to disable the browser editor
 refreshInterval: 20    # seconds between integration refreshes
 pingInterval: 30       # seconds between status checks
 liveReload: true       # refresh open dashboards when a config file changes
-apps: [notes, inventory]   # apps in the Apps menu: finance, travel, watchlist, inventory, notes
+apps: [notes, inventory]   # apps in the Apps menu: finance, travel, watchlist, inventory, notes, tasks, stocks
                        # (all of them when left out; new installs start with notes and inventory)
 tabs: [Home, Media]    # optional tab order (see "Tabs")
 history:
@@ -743,7 +744,7 @@ backup:
   moduleRetentionDays: 30  # how long a turned-off app keeps its data
 ```
 
-**Turned-off apps:** when an app that holds data is turned off (finance, travel, watchlist, inventory or notes), NanoDash writes `page-module-<app>-<date>.zip` to the backup folder, with one JSON file per table. The app's data stays in the database for `moduleRetentionDays`: turn the app back on before then and nothing is lost (the archive is removed). After that, the app's data and its archive are both deleted, and the deletion is in the audit log. Nightly pruning never touches these archives. While an app is off, its background jobs (Firefly sync, recurring transactions, reminders, warranty alerts, watchlist sync) don't run.
+**Turned-off apps:** when an app that holds data is turned off (finance, travel, watchlist, inventory, notes, tasks or stocks), NanoDash writes `page-module-<app>-<date>.zip` to the backup folder, with one JSON file per table. The app's data stays in the database for `moduleRetentionDays`: turn the app back on before then and nothing is lost (the archive is removed). After that, the app's data and its archive are both deleted, and the deletion is in the audit log. Nightly pruning never touches these archives. While an app is off, its background jobs (Firefly sync, recurring transactions, reminders, warranty alerts, watchlist sync) don't run.
 
 Separately, `data/snapshots/` holds plain copies of the database taken before updates and database upgrades (see [Updating](#updating)). To use one: stop NanoDash, copy it over `data/page.db`, delete `page.db-wal` and `page.db-shm`, and start NanoDash again.
 
@@ -827,6 +828,8 @@ Create groups under **Settings → Accounts & sign-in → Groups**:
   - `travel`, `watchlist`: those apps.
   - `inventory`: the device inventory.
   - `notes`: reading and writing notes and runbooks.
+  - `tasks`: the task boards (each person's boards are their own).
+  - `stocks`: the stock portfolio and research pages (each person's portfolios are their own).
   - `actions`: start, stop and restart buttons on services the person can see.
 - Admins have every permission and see everything.
 
@@ -936,6 +939,28 @@ Each person's list is private. It needs the `watchlist` permission, which signed
 Services can be woken too: give one `wol: { mac: AA:BB:CC:DD:EE:FF, broadcast: 192.168.1.255 }` (or just `wol: AA:BB:…`) and its ⋯ menu gets **Wake**.
 
 In Docker, a broadcast only reaches your LAN with `network_mode: host`; on a bridge network, give the subnet's broadcast address of a network the container can route to.
+
+## Tasks
+
+**Tasks** (in the Apps menu) is a kanban board for everyone with the `tasks` permission. Boards are private to the person who made them.
+- A first board comes with **To do**, **In progress** and **Done**. Add, rename, reorder and delete columns from each column's ⋯ menu (a column must be empty to be deleted). Any column can be marked as holding finished tasks.
+- **Tasks** have a title, Markdown notes, a priority, a due date and labels. Type in a column's box and press Enter to add one; click a task to edit it.
+- **Drag** a task within its column or to another one (or focus it and use Space and the arrow keys). A task that reaches a "finished" column is struck through and no longer counts as open; overdue tasks show in red.
+- **List view** shows every task of the board in one table: sort by a heading, and change a task's column in place.
+- Filter by text, label or priority. Dragging is paused while a filter is on, since only some tasks are showing.
+- Keep several boards (the **+** next to the board's name); deleting a board deletes its tasks.
+
+## Stocks
+
+**Stocks** (in the Apps menu) tracks share portfolios and looks companies up, for everyone with the `stocks` permission. Portfolios are private to the person who made them. Prices, dividends and company figures come from Yahoo Finance, without an account or a key.
+- **Transactions:** record each buy and sell (symbol, date, shares, price in the share's own currency, fees). Everything else is worked out from them.
+- **Portfolio:** value, cost, unrealised and realised gains (average-cost method), today's change, value over time against the money invested, time-weighted performance against an index (S&P 500, Nasdaq 100, CAC 40, Euro Stoxx 50 or MSCI World), holdings, and allocation by holding, sector or currency. Shares quoted in another currency are converted at each day's rate; splits are applied automatically.
+- **Dividends:** received per year and per payment, worked out from the shares held on each ex-dividend day (before tax, so your broker's figure may differ a little).
+- **Several portfolios** (a PEA and a brokerage account, say), each shown in its own currency, or all of them together.
+- **Watched:** symbols to follow without owning them.
+- **Research page** (search a company, or click a holding): price over 1 month to all time, market value, P/E, P/S, P/B, free-cash-flow and dividend yields, net debt, and charts of revenue, net income, earnings per share, free cash flow, margins, EBITDA, cash and debt, share count, return on equity and dividend per share, by year or by quarter where Yahoo has quarters. Funds and indexes show their price only.
+
+Yahoo's endpoints are unofficial: NanoDash keeps the last answer to every request in its database and shows it when Yahoo doesn't respond, and a symbol Yahoo no longer knows is valued at the last price you paid, with a notice. Prices are kept for 15 minutes, company figures for 12 hours.
 
 ## Keyboard
 

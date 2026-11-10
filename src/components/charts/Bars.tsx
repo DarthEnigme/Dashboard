@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { compact as fmt, Legend, niceTicks, Tooltip, useWidth } from "./common";
+import { compact as fmt, Legend, niceRange, Tooltip, useWidth } from "./common";
 
 export interface BarGroup {
   label: string;
@@ -20,30 +20,34 @@ interface Props {
 const PAD = { top: 8, right: 4, bottom: 20, left: 40 };
 
 /**
- * Grouped columns: <= 24px wide, 2px gap between neighbours, 4px rounded tops and square at the
- * baseline, one y-axis, per-group hover tooltip.
+ * Grouped columns: <= 24px wide, 2px gap between neighbours, 4px rounded ends and square at the
+ * baseline, one y-axis, per-group hover tooltip. Negative values hang below the zero line.
  */
 export function Bars({ groups, series, height = 180, format, ariaLabel }: Props) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number>();
-  const max = Math.max(1, ...groups.flatMap((g) => g.values));
-  const ticks = niceTicks(max * 1.05);
+  const values = groups.flatMap((g) => g.values);
+  const hi = Math.max(0, ...values);
+  const lo = Math.min(0, ...values);
+  const ticks = niceRange(lo * 1.05, (hi || (lo ? 0 : 1)) * 1.05);
   const top = ticks[ticks.length - 1];
+  const bottom = ticks[0];
   const w = Math.max(width - PAD.left - PAD.right, 10);
   const h = height - PAD.top - PAD.bottom;
   const slot = w / Math.max(groups.length, 1);
   const barW = Math.min(24, Math.max(2, (slot * 0.7 - 2 * (series.length - 1)) / series.length));
   const groupW = barW * series.length + 2 * (series.length - 1);
-  const y = (v: number) => PAD.top + h - (v / top) * h;
+  const y = (v: number) => PAD.top + h - ((v - bottom) / (top - bottom || 1)) * h;
   const showLabel = (i: number) => groups.length <= 6 || i % 2 === (groups.length - 1) % 2;
 
-  // Column with a 4px rounded data-end and a square base.
+  // Column with a 4px rounded data-end and a square base on the zero line (the end is below it for a negative value).
   const column = (x: number, v: number) => {
     const yy = y(v);
-    const hh = PAD.top + h - yy;
+    const base = y(0);
+    const hh = Math.abs(base - yy);
     if (hh <= 0) return "";
-    const rr = Math.min(4, barW / 2, hh);
-    return `M${x},${PAD.top + h} V${yy + rr} Q${x},${yy} ${x + rr},${yy} H${x + barW - rr} Q${x + barW},${yy} ${x + barW},${yy + rr} V${PAD.top + h} Z`;
+    const rr = Math.min(4, barW / 2, hh) * (v < 0 ? -1 : 1);
+    return `M${x},${base} V${yy + rr} Q${x},${yy} ${x + Math.abs(rr)},${yy} H${x + barW - Math.abs(rr)} Q${x + barW},${yy} ${x + barW},${yy + rr} V${base} Z`;
   };
 
   return (

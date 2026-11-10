@@ -32,6 +32,8 @@ const child = spawn(process.execPath, [path.join(root, "node_modules", "next", "
     // Book search for the watchlist.
     PAGE_OPENLIBRARY_URL: "http://localhost:4010/ol",
     PAGE_OPENLIBRARY_COVERS_URL: "http://localhost:4010/ol-covers",
+    // Prices and company figures for the Stocks app.
+    PAGE_YAHOO_URL: "http://localhost:4010/yahoo",
   },
 });
 const stop = () => child.kill();

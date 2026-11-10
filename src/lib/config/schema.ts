@@ -52,10 +52,10 @@ export type Visibility = (typeof visibilities)[number] | string[];
 const visible = z.union([z.enum(visibilities), z.array(z.string().min(1)).min(1)]).optional();
 
 /** What a signed-in user may do beyond seeing things; admins may do everything. */
-export const PERMISSIONS = ["finance", "actions", "travel", "watchlist", "inventory", "notes"] as const;
+export const PERMISSIONS = ["finance", "actions", "travel", "watchlist", "inventory", "notes", "tasks", "stocks"] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 /** Sections beyond the dashboard that can be turned off for everyone (their permission then counts for no one). */
-export const APPS = ["finance", "travel", "watchlist", "inventory", "notes"] as const satisfies readonly Permission[];
+export const APPS = ["finance", "travel", "watchlist", "inventory", "notes", "tasks", "stocks"] as const satisfies readonly Permission[];
 export type App = (typeof APPS)[number];
 
 const providerSchema = z.object({

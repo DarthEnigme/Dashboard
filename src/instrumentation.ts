@@ -10,6 +10,7 @@ export async function register() {
     const { backupJob } = await import("./lib/backup");
     const { warrantyJob } = await import("./lib/inventory/store");
     const { watchSyncJob } = await import("./lib/watchlist/sync");
+    const { pruneStockCache } = await import("./lib/stocks/cache");
     const { whenEnabled } = await import("./lib/modules");
     const { reconcileModules } = await import("./lib/module-retention");
     const { announceUpdateOutcome, reconcilePendingUpdate } = await import("./lib/update/apply");
@@ -30,6 +31,7 @@ export async function register() {
     onHourly(async () => reconcileModules());
     onHourly(whenEnabled("inventory", () => warrantyJob()));
     onHourly(whenEnabled("watchlist", () => watchSyncJob()));
+    onHourly(whenEnabled("stocks", () => pruneStockCache()));
     onHourly(async () => void pruneSessions());
     onHourly(async () => void pruneAudit());
   }

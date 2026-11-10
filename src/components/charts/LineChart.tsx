@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useT } from "@/i18n/client";
-import { compact, Legend, niceRange, Tooltip, useWidth } from "./common";
+import { compact, fitTicks, Legend, niceRange, Tooltip, useWidth } from "./common";
 
 export interface LineSeries {
   name: string;
@@ -20,13 +20,17 @@ interface Props {
   formatX: (t: number) => string;
   /** Wash under a single series. */
   area?: boolean;
+  /** Fit the y-axis to the values instead of starting it at zero (prices, not amounts). */
+  fit?: boolean;
+  /** How the tooltip writes a value (default: compact, then the unit). */
+  format?: (v: number) => string;
   ariaLabel: string;
 }
 
 const PAD = { top: 10, right: 12, bottom: 22, left: 44 };
 
 /** Time-series line chart: one y-axis, 2px lines, crosshair + tooltip on hover. */
-export function LineChart({ x, series, height = 220, unit = "", formatX, area, ariaLabel }: Props) {
+export function LineChart({ x, series, height = 220, unit = "", formatX, area, fit, format, ariaLabel }: Props) {
   const t = useT();
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number>();
@@ -34,7 +38,7 @@ export function LineChart({ x, series, height = 220, unit = "", formatX, area, a
   // A little headroom so peaks never touch the edges; below zero only when a value is.
   const hi = all.length ? Math.max(...all) : 1;
   const lo = all.length ? Math.min(...all) : 0;
-  const ticks = niceRange(lo < 0 ? lo * 1.08 : 0, hi > 0 ? hi * 1.08 : 0.01);
+  const ticks = fit ? fitTicks(lo, hi) : niceRange(lo < 0 ? lo * 1.08 : 0, hi > 0 ? hi * 1.08 : 0.01);
   const min = ticks[0];
   const max = ticks[ticks.length - 1];
   const w = Math.max(width - PAD.left - PAD.right, 10);
@@ -65,7 +69,7 @@ export function LineChart({ x, series, height = 220, unit = "", formatX, area, a
           <svg width={width} height={height} role="img" aria-label={ariaLabel}>
             {ticks.map((t) => (
               <g key={t}>
-                <line x1={PAD.left} x2={PAD.left + w} y1={py(t)} y2={py(t)} stroke={t ? "var(--grid)" : "var(--axis)"} strokeWidth={1} />
+                <line x1={PAD.left} x2={PAD.left + w} y1={py(t)} y2={py(t)} stroke={t === (fit ? min : 0) ? "var(--axis)" : "var(--grid)"} strokeWidth={1} />
                 <text x={PAD.left - 8} y={py(t)} dy="0.32em" textAnchor="end" className="fill-muted text-[10px] tabular-nums">
                   {compact(t)}
                   {t === max ? unit : ""}
@@ -85,7 +89,7 @@ export function LineChart({ x, series, height = 220, unit = "", formatX, area, a
             ))}
             {area && series[0] && (
               <path
-                d={`${path(series[0].values)} V${py(Math.max(min, 0))} H${px(series[0].values.findIndex((v) => v !== null))} Z`}
+                d={`${path(series[0].values)} V${py(fit ? min : Math.max(min, 0))} H${px(series[0].values.findIndex((v) => v !== null))} Z`}
                 fill={series[0].color}
                 opacity={0.1}
               />
@@ -131,7 +135,7 @@ export function LineChart({ x, series, height = 220, unit = "", formatX, area, a
                   <span className="h-0.5 w-3 rounded-full" style={{ background: s.color }} />
                   {s.name}
                 </span>
-                <span className="font-medium tabular-nums">{s.values[hover] === null ? "no data" : `${compact(s.values[hover]!)}${unit}`}</span>
+                <span className="font-medium tabular-nums">{s.values[hover] === null ? "no data" : format ? format(s.values[hover]!) : `${compact(s.values[hover]!)}${unit}`}</span>
               </div>
             ))}
           </Tooltip>

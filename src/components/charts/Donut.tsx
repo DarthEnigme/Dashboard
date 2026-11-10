@@ -24,6 +24,8 @@ export function Donut({
   total,
   size = 132,
   compact,
+  centerLabel,
+  empty,
   ariaLabel,
 }: {
   slices: DonutSlice[];
@@ -31,6 +33,9 @@ export function Donut({
   size?: number;
   /** Fewer legend rows (small spaces). */
   compact?: boolean;
+  /** Under the total in the middle (default: "spent"), and what shows when there is nothing to draw. */
+  centerLabel?: string;
+  empty?: string;
   ariaLabel: string;
 }) {
   const t = useT();
@@ -52,7 +57,7 @@ export function Donut({
   const focus = hover !== undefined ? slices[hover] : undefined;
   const legend = compact ? slices.slice(0, 4) : slices;
 
-  if (!sum) return <p className="py-4 text-center text-sm text-muted">{t("No spending in this period.")}</p>;
+  if (!sum) return <p className="py-4 text-center text-sm text-muted">{empty ?? t("No spending in this period.")}</p>;
 
   return (
     <div className="flex flex-wrap items-center gap-4">
@@ -81,7 +86,7 @@ export function Donut({
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
           <div>
             <div className="text-sm leading-tight font-semibold">{focus ? focus.label : total}</div>
-            <div className="max-w-20 truncate text-[10px] text-muted">{focus ? (focus.name === "Other" ? t("Other") : focus.name) : t("spent")}</div>
+            <div className="max-w-20 truncate text-[10px] text-muted">{focus ? (focus.name === "Other" ? t("Other") : focus.name) : (centerLabel ?? t("spent"))}</div>
           </div>
         </div>
       </div>

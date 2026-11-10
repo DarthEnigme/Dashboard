@@ -162,7 +162,7 @@ export const sections: Section[] = [
         key: "apps",
         label: msg("Apps"),
         kind: "list",
-        help: msg("Finance, travel, watchlist, inventory, notes. A turned-off app keeps its data for a while, with a copy in the backup folder, then it is deleted."),
+        help: msg("A turned-off app keeps its data for a while, with a copy in the backup folder, then it is deleted."),
       },
     ],
   },
@@ -274,7 +274,7 @@ export const sections: Section[] = [
         label: msg("Every signed-in user may"),
         kind: "list",
         placeholder: msg("finance, travel, watchlist"),
-        help: msg("Comma-separated: finance, travel, watchlist (those sections), inventory (the device list), notes (notes and runbooks), actions (start/stop buttons and switches). Empty field = finance, travel, watchlist. Groups below can add more."),
+        help: msg("Comma-separated: an app's name in lowercase (finance, travel, watchlist, inventory, notes, tasks, stocks), or actions (start/stop buttons and switches). Empty field = finance, travel, watchlist. Groups below can add more."),
       },
       { key: "auth.baseUrl", label: msg("Public URL (for SSO redirects)"), placeholder: "https://home.example.com" },
       {

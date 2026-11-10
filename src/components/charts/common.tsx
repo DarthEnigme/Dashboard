@@ -42,6 +42,18 @@ export function niceRange(min: number, max: number, target = 4): number[] {
   return ticks;
 }
 
+/** Ticks hugging [min, max] on nice steps, for values far from zero (a share price): the axis doesn't start at 0. */
+export function fitTicks(min: number, max: number, target = 4): number[] {
+  const span = max - min;
+  if (!(span > 0)) return niceRange(Math.min(min, 0), Math.max(max, 0), target);
+  const raw = span / target;
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s >= raw) ?? 10 * pow;
+  const ticks: number[] = [];
+  for (let v = Math.floor(min / step) * step; v < max + step * 0.999; v += step) ticks.push(Number(v.toFixed(10)));
+  return ticks;
+}
+
 /** Thousands-comma'd, compact past 10k: 1,234 / 12.9K / 4.2M / 5.4G. */
 export function compact(n: number): string {
   const a = Math.abs(n);

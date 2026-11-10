@@ -1,4 +1,4 @@
-import { Clapperboard, Network, NotebookText, Plane, Wallet, type LucideIcon } from "lucide-react";
+import { Clapperboard, ListTodo, Network, NotebookText, Plane, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
 import type { App, Permission } from "./config/schema";
 import { msg } from "@/i18n";
 
@@ -23,6 +23,8 @@ const APP_DEFS: Record<App, Omit<AppSection, "id" | "href" | "permission">> = {
   finance: { label: msg("Finance"), icon: Wallet, keywords: "money budget spending accounts", blurb: msg("Use the finance tracker") },
   travel: { label: msg("Travel"), icon: Plane, keywords: "trips countries map globe voyage", blurb: msg("Use the travel log") },
   watchlist: { label: msg("Watchlist"), icon: Clapperboard, keywords: "books reading movies shows games films livres", blurb: msg("Use the watchlist and reading list") },
+  stocks: { label: msg("Stocks"), icon: TrendingUp, keywords: "portfolio shares etf dividends bourse actions investing market", blurb: msg("Use the stock portfolio and research pages") },
+  tasks: { label: msg("Tasks"), icon: ListTodo, keywords: "kanban board todo to-do list projects tâches", blurb: msg("Use the task boards") },
   notes: { label: msg("Notes"), icon: NotebookText, keywords: "runbook wiki docs how-to markdown procedures", blurb: msg("Read and write notes and runbooks") },
   inventory: { label: msg("Inventory"), icon: Network, keywords: "devices network ip mac warranty wake inventaire", blurb: msg("See and edit the device inventory (and wake devices, with actions)") },
 };

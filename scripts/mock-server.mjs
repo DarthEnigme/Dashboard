@@ -62,7 +62,75 @@ const readBody = (req) =>
     req.on("end", () => resolve(data));
   });
 
+// Yahoo Finance (Stocks app, PAGE_YAHOO_URL=http://localhost:4010/yahoo): a few symbols with steady, made-up prices.
+const yahooSymbols = {
+  "MC.PA": { name: "LVMH Moët Hennessy", currency: "EUR", exchange: "Paris", base: 600, sector: "Consumer Cyclical", industry: "Luxury Goods", dividend: 6.5 },
+  AAPL: { name: "Apple Inc.", currency: "USD", exchange: "NasdaqGS", base: 200, sector: "Technology", industry: "Consumer Electronics", dividend: 0.5 },
+  "^GSPC": { name: "S&P 500", currency: "USD", exchange: "SNP", base: 5000 },
+  "USDEUR=X": { name: "USD/EUR", currency: "EUR", exchange: "CCY", base: 0.9, flat: true },
+};
+const yahooChart = (symbol, period1) => {
+  const s = yahooSymbols[symbol];
+  const DAY = 86_400;
+  const now = Math.floor(Date.now() / 1000);
+  const start = Math.max(Number(period1) || 0, now - 800 * DAY);
+  const timestamp = [];
+  const close = [];
+  // Weekdays only; the price climbs a little every day so gains are positive and predictable.
+  for (let t = start - (start % DAY) + 12 * 3600, i = 0; t <= now; t += DAY) {
+    const weekday = new Date(t * 1000).getUTCDay();
+    if (weekday === 0 || weekday === 6) continue;
+    timestamp.push(t);
+    close.push(s.flat ? s.base : Number((s.base * (1 + i++ * 0.001)).toFixed(4)));
+  }
+  const dividends = s.dividend && timestamp.length > 40 ? { [timestamp[20]]: { amount: s.dividend, date: timestamp[20] } } : undefined;
+  return {
+    chart: {
+      result: [
+        {
+          meta: { symbol, longName: s.name, shortName: s.name, currency: s.currency, fullExchangeName: s.exchange, regularMarketPrice: close[close.length - 1], fiftyTwoWeekHigh: s.base * 2, fiftyTwoWeekLow: s.base },
+          timestamp,
+          events: dividends ? { dividends } : undefined,
+          indicators: { quote: [{ close }] },
+        },
+      ],
+      error: null,
+    },
+  };
+};
+const yahooFigures = (symbol) => {
+  const point = (year, raw) => ({ asOfDate: `${year}-12-31`, periodType: "12M", currencyCode: yahooSymbols[symbol].currency, reportedValue: { raw } });
+  const series = (type, values) => ({ meta: { symbol: [symbol], type: [type] }, [type]: values });
+  const years = [2022, 2023, 2024, 2025];
+  const annual = (name, first, step) => series(`annual${name}`, years.map((y, i) => point(y, first + i * step)));
+  return {
+    timeseries: {
+      result: [
+        annual("TotalRevenue", 70e9, 5e9),
+        annual("GrossProfit", 48e9, 3e9),
+        annual("OperatingIncome", 18e9, 1e9),
+        annual("NetIncome", 12e9, 1e9),
+        annual("DilutedEPS", 24, 2),
+        annual("FreeCashFlow", 9e9, 1e9),
+        annual("TotalDebt", 30e9, 1e9),
+        annual("CashAndCashEquivalents", 8e9, 5e8),
+        series("trailingMarketCap", [point(2025, 300e9)]),
+        series("trailingPeRatio", [{ asOfDate: "2025-12-31", periodType: "TTM", reportedValue: { raw: 21.5 } }]),
+        series("trailingFreeCashFlow", [point(2025, 12e9)]),
+      ],
+      error: null,
+    },
+  };
+};
+
 const routes = {
+  "GET /yahoo/v1/finance/search": (req, res) => {
+    const q = (new URL(req.url, "http://x").searchParams.get("q") ?? "").toLowerCase();
+    const quotes = Object.entries(yahooSymbols)
+      .filter(([symbol, s]) => !symbol.includes("=") && (symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)))
+      .map(([symbol, s]) => ({ symbol, shortname: s.name, longname: s.name, exchDisp: s.exchange, quoteType: symbol.startsWith("^") ? "INDEX" : "EQUITY", sector: s.sector, industry: s.industry }));
+    json(res, 200, { quotes });
+  },
   // GitHub API for the update checker (PAGE_UPDATE_FEED=http://localhost:4010/gh).
   "GET /gh/repos/test/page/releases": (_q, res) =>
     json(res, 200, [
@@ -439,6 +507,24 @@ const routes = {
 
 // Parameterised routes: [method, regex, handler(req, res, match)].
 const patterns = [
+  [
+    "GET",
+    /^\/yahoo\/v8\/finance\/chart\/([^/]+)$/,
+    (req, res, m) => {
+      const symbol = decodeURIComponent(m[1]);
+      if (!yahooSymbols[symbol]) return json(res, 404, { chart: { result: null, error: { code: "Not Found", description: "No data found, symbol may be delisted" } } });
+      json(res, 200, yahooChart(symbol, new URL(req.url, "http://x").searchParams.get("period1")));
+    },
+  ],
+  [
+    "GET",
+    /^\/yahoo\/ws\/fundamentals-timeseries\/v1\/finance\/timeseries\/([^/]+)$/,
+    (_req, res, m) => {
+      const symbol = decodeURIComponent(m[1]);
+      // Only companies report figures.
+      json(res, 200, yahooSymbols[symbol]?.sector ? yahooFigures(symbol) : { timeseries: { result: [], error: null } });
+    },
+  ],
   [
     "GET",
     /^\/pve\/api2\/json\/nodes\/([^/]+)\/(qemu|lxc)\/(\d+)\/rrddata$/,

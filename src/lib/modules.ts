@@ -12,6 +12,8 @@ export const MODULE_TABLES = {
   watchlist: ["watch_items", "watch_sync"],
   inventory: ["devices"],
   notes: ["note_services", "notes"],
+  tasks: ["tasks", "task_columns", "task_boards"],
+  stocks: ["stock_transactions", "stock_portfolios", "stock_watch", "stock_cache"],
 } as const satisfies Record<App, readonly string[]>;
 
 export const appEnabled = (app: App) => loadConfig().settings.apps.includes(app);
