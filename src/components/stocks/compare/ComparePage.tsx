@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Download } from "lucide-react";
 import { fetcher } from "@/lib/fetcher";
-import { RANGES, type CompareData, type Range } from "@/lib/stocks/types";
+import { RANGES, type CompareData, type PortfolioList, type Range } from "@/lib/stocks/types";
 import type { Period } from "@/lib/stocks/metrics";
 import { msg } from "@/i18n";
 import { useT } from "@/i18n/client";
@@ -55,8 +55,8 @@ export function ComparePage() {
 
   const api = new URLSearchParams({ symbols: symbols.join(","), range, ...(q.get("bm") ? { benchmark: q.get("bm")! } : {}), ...(view === "market" || view === "ratio" ? { portfolio: "1" } : {}) });
   const { data, error, isLoading } = useSWR<CompareData>(symbols.length || view === "market" ? `/api/stocks/compare?${api}` : null, fetcher, { keepPreviousData: true });
-  // Holdings, to add them in one click (cheap: the portfolio page's data is usually cached).
-  const { data: held } = useSWR<{ positions: { symbol: string }[] }>("/api/stocks", fetcher);
+  // Holdings, to add them in one click (from the trades alone: no prices needed).
+  const { data: held } = useSWR<PortfolioList>("/api/stocks/portfolios", fetcher);
   const exportHref = (format: string) => `/api/stocks/export?${new URLSearchParams({ what: "figures", format, symbols: symbols.join(","), measures: measures.join(","), period })}`;
 
   return (
@@ -81,7 +81,7 @@ export function ComparePage() {
         onMeasures={(m) => set({ m: m.join(",") || "-" })}
         period={period}
         onPeriod={(p) => set({ p: p === "annual" ? null : p })}
-        holdings={held?.positions.map((p) => p.symbol)}
+        holdings={held?.held}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-2">

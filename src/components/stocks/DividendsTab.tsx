@@ -7,6 +7,7 @@ import { useT } from "@/i18n/client";
 import { Bars } from "../charts/Bars";
 import { asLocal } from "@/lib/day";
 import { cash, percent, stockHref } from "./format";
+import { daysBefore, localDay } from "@/lib/day";
 import { Card, Stat } from "./parts";
 
 /** Dividends received, worked out from the shares held on each ex-dividend day. */
@@ -15,7 +16,7 @@ export function DividendsTab({ data }: { data: StocksData }) {
   const { currency } = data;
   const year = String(new Date().getFullYear());
   const thisYear = data.dividendYears.find((y) => y.year === year)?.amount ?? 0;
-  const yearAgo = new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10);
+  const yearAgo = daysBefore(localDay(), 365);
   const lastTwelveMonths = data.dividendList.filter((d) => d.day > yearAgo).reduce((s, d) => s + d.amount, 0);
   const yieldOnCost = data.cost > 0 ? (lastTwelveMonths / data.cost) * 100 : null;
   return (

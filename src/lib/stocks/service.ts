@@ -1,10 +1,10 @@
 import { errorReason } from "../cache";
-import { localDay } from "../day";
+import { daysBefore, localDay } from "../day";
 import { remembered } from "./cache";
 import { dividendsByYear, makeFx, summarize, thin, thinIndexes, toTrades, type Market, type Series } from "./portfolio";
 import { listTransactions, listWatched } from "./store";
 import type { SymbolFacts } from "./metrics";
-import { BENCHMARKS, type Portfolio, type Range, type Research, type StocksData, type SymbolHit, type Transaction, type WatchQuote } from "./types";
+import { BENCHMARKS, rangeStart, type Portfolio, type Range, type Research, type StocksData, type SymbolHit, type Transaction, type WatchQuote } from "./types";
 import { fetchFundamentals, fetchHistory, fetchSummary, searchSymbols, type Company, type Fundamentals, type History } from "./yahoo";
 
 /** What the Stocks pages show: the person's trades put together with what Yahoo knows. */
@@ -12,11 +12,27 @@ import { fetchFundamentals, fetchHistory, fetchSummary, searchSymbols, type Comp
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 86_400_000;
+/** How far back the shorter of the two histories kept per symbol goes: what quotes, alerts and a year's charts need. */
+const RECENT_DAYS = 400;
 
-const daysBefore = (day: string, n: number) => new Date(Date.parse(day) - n * DAY).toISOString().slice(0, 10);
+/** The part of a history from `from` on. */
+export function since(h: History, from: string): History {
+  const start = h.days.findIndex((d) => d >= from);
+  const cut = start === -1 ? h.days.length : start;
+  return { ...h, days: h.days.slice(cut), closes: h.closes.slice(cut), dividends: h.dividends.filter((d) => d.day >= from), splits: h.splits.filter((s) => s.day >= from) };
+}
 
-/** Daily closes since `from` (all of them without it). Prices move during the day, so this is kept for a quarter of an hour. */
-export const history = (symbol: string, from?: string) => remembered<History>(`history:${symbol}:${from ?? "all"}`, 15 * MINUTE, () => fetchHistory(symbol, from));
+/**
+ * Daily closes since `from` (all of them without it). Each symbol keeps two histories, its recent
+ * one and its whole one, and every caller's window is cut from one of them: one request serves them
+ * all. Prices move during the day, so they are kept for a quarter of an hour.
+ */
+export async function history(symbol: string, from?: string): Promise<History> {
+  const recentFrom = daysBefore(localDay(), RECENT_DAYS);
+  const recent = !!from && from >= recentFrom;
+  const h = await remembered<History>(`history:${symbol}:${recent ? "recent" : "all"}`, 15 * MINUTE, () => fetchHistory(symbol, recent ? recentFrom : undefined));
+  return from ? since(h, from) : h;
+}
 
 /** Company figures. Funds, indexes and currencies have none; that isn't an error. */
 export const fundamentalsOf = (symbol: string) => remembered<Fundamentals>(`fundamentals:${symbol}`, 12 * HOUR, () => fetchFundamentals(symbol)).catch(() => null);
@@ -106,7 +122,6 @@ export async function loadWatchlist(userId: number): Promise<WatchQuote[]> {
   );
 }
 
-const RANGE_DAYS: Record<Exclude<Range, "ytd" | "max">, number> = { "1m": 31, "6m": 183, "1y": 366, "5y": 5 * 366 };
 
 /** The position in one symbol across someone's portfolios, in its quote currency. */
 function holdingOf(transactions: Transaction[], market: Market, today: string): Research["holding"] {
@@ -120,9 +135,7 @@ function holdingOf(transactions: Transaction[], market: Market, today: string): 
 export async function loadResearch(userId: number, symbol: string, range: Range): Promise<Research> {
   const today = localDay();
   const [h, info, fundamentals, company] = await Promise.all([history(symbol), profile(symbol), fundamentalsOf(symbol), companyOf(symbol)]);
-  const from = range === "max" ? "" : range === "ytd" ? `${today.slice(0, 4)}-01-01` : daysBefore(today, RANGE_DAYS[range]);
-  const start = h.days.findIndex((d) => d >= from);
-  const chart = thin({ days: h.days.slice(Math.max(start, 0)), closes: h.closes.slice(Math.max(start, 0)) }, 500);
+  const chart = thin(since(h, rangeStart(range, today)), 500);
   const lastYear = h.dividends.filter((d) => d.day > daysBefore(today, 365)).reduce((s, d) => s + d.amount, 0);
   const hasFigures = fundamentals && (Object.keys(fundamentals.annual).length > 0 || Object.keys(fundamentals.trailing).length > 0);
   return {

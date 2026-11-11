@@ -1,4 +1,5 @@
 import { httpJson, trimSlash } from "../../http";
+import { localDay } from "../../day";
 import type { ImportedTrade } from "../import/presets";
 import type { Broker } from "./types";
 
@@ -28,6 +29,12 @@ type Item = Record<string, unknown> & { order?: Record<string, unknown>; fill?: 
 const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v.trim() ? Number(v) : NaN);
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
 
+/** The day of a time the API gives in UTC, as it was here (a trade late in the evening isn't dated tomorrow). */
+const dayOf = (s: string) => {
+  const t = s.length > 10 ? Date.parse(s) : NaN;
+  return Number.isNaN(t) ? s.slice(0, 10) : localDay(new Date(t));
+};
+
 /** A filled order as a trade; anything else (cancelled, unfilled) is null. */
 export function tradeOf(item: Item, instruments: Map<string, Instrument>, line: number): ImportedTrade | null {
   const order = item.order ?? item;
@@ -37,7 +44,7 @@ export function tradeOf(item: Item, instruments: Map<string, Instrument>, line: 
   const instrument = (order.instrument as Instrument | undefined) ?? instruments.get(str(order.ticker));
   const signed = num(fill.quantity ?? order.filledQuantity);
   const price = num(fill.price ?? order.fillPrice);
-  const day = str(fill.filledAt ?? order.dateExecuted ?? order.dateModified ?? order.dateCreated).slice(0, 10);
+  const day = dayOf(str(fill.filledAt ?? order.dateExecuted ?? order.dateModified ?? order.dateCreated));
   if (!Number.isFinite(signed) || !signed || !Number.isFinite(price) || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
   const side = str(order.side).toUpperCase();
   const taxes = (((fill.walletImpact as Record<string, unknown> | undefined)?.taxes ?? order.taxes ?? []) as { quantity?: number }[]).reduce((s, t) => s + Math.abs(num(t.quantity) || 0), 0);
@@ -51,14 +58,13 @@ export function tradeOf(item: Item, instruments: Map<string, Instrument>, line: 
     price,
     fees: taxes,
     currency: instrument?.currencyCode ?? null,
-    externalId: `trading212:${str(fill.id ?? order.id)}`,
+    externalId: `trading212:${str(fill.id ?? order.id) || `${day}:${str(order.ticker)}:${signed}:${price}`}`,
     line,
   };
 }
 
 export const trading212: Broker = {
   kind: "t212",
-  label: "Trading 212",
   async trades(secret) {
     const headers = { Authorization: auth(secret) };
     const instruments = new Map((await httpJson<Instrument[]>(`${base()}/api/v0/equity/metadata/instruments`, { headers, timeoutMs: 20_000 })).map((i) => [i.ticker, i]));

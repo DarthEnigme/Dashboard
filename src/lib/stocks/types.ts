@@ -1,4 +1,5 @@
 /** The shapes of the Stocks app, shared by the server and the pages (nothing here touches the database or the network). */
+import { daysBefore } from "../day";
 import type { Company, Fundamentals } from "./yahoo";
 
 export type { Company, Fundamentals, Metric, Point, Recommendations, SymbolHit } from "./yahoo";
@@ -111,6 +112,18 @@ export interface WatchQuote {
 
 export const RANGES = ["1m", "6m", "ytd", "1y", "5y", "max"] as const;
 export type Range = (typeof RANGES)[number];
+
+/** The light answer about someone's portfolios: the list, and the symbols held in them. */
+export interface PortfolioList {
+  portfolios: Portfolio[];
+  held: string[];
+}
+
+/** How many days back each fixed range starts (ytd starts on January 1st, max at the beginning). */
+const RANGE_DAYS: Record<Exclude<Range, "ytd" | "max">, number> = { "1m": 31, "6m": 183, "1y": 366, "5y": 5 * 366 };
+
+/** The first day a range shows, as of `today` ("" for everything). */
+export const rangeStart = (range: Range, today: string) => (range === "max" ? "" : range === "ytd" ? `${today.slice(0, 4)}-01-01` : daysBefore(today, RANGE_DAYS[range]));
 
 export interface Research {
   symbol: string;

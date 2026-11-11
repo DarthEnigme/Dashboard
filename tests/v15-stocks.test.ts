@@ -8,19 +8,20 @@ import { forget } from "@/lib/cache";
 import { CONFIG_DIR } from "@/lib/config/load";
 import { configuredChannels, onlyChannels } from "@/lib/alerts";
 import { decide, read, type AlertContext, type AlertRule } from "@/lib/stocks/alerts";
-import { addAlert, listAlerts, updateAlert } from "@/lib/stocks/alertStore";
+import { addAlert, listAlerts, markFired, updateAlert } from "@/lib/stocks/alertStore";
 import { stockAlertJob } from "@/lib/stocks/alertJob";
 import { cagr, divideSeries, latestOf, seriesOf, type SymbolFacts } from "@/lib/stocks/metrics";
 import { betaAndCorrelation, pairedReturns, rebased } from "@/lib/stocks/stats";
 import { composition } from "@/lib/stocks/composition";
 import { dayOf, kindOf, numberOf, readTrades } from "@/lib/stocks/import/presets";
-import { prepareImport, rowsOf, saveTrades } from "@/lib/stocks/import";
+import { prepareImport, resolveTrades, rowsOf, saveTrades } from "@/lib/stocks/import";
 import { tradeRows } from "@/lib/stocks/brokers/ibkr";
 import { tradeOf } from "@/lib/stocks/brokers/trading212";
 import { addConnection, listConnections, startSync } from "@/lib/stocks/brokers/sync";
 import { transactionsTable } from "@/lib/stocks/exports";
 import { addTransaction, ensurePortfolios, listTransactions } from "@/lib/stocks/store";
 import * as yahoo from "@/lib/stocks/yahoo";
+import * as service from "@/lib/stocks/service";
 import { parseSummary, type History } from "@/lib/stocks/yahoo";
 import { writeXlsx, colName } from "@/lib/xlsxWrite";
 import { readXlsx } from "@/lib/finance/xlsx";
@@ -170,7 +171,7 @@ describe("alert rules", () => {
     const step = (price: number) => {
       const d = decide(r, read(r, ctx(price)));
       r = { ...r, fired_key: d.key };
-      return d.fire;
+      return !!d.send;
     };
     expect([step(140), step(155), step(160), step(149), step(151)]).toEqual([false, true, false, false, true]);
   });
@@ -185,7 +186,7 @@ describe("alert rules", () => {
     expect(read(rule({ kind: "event", op: "earnings", value: 10 }), ctx(100, { company: () => company }))).toMatchObject({ holds: true, key: "event:earnings:10:2026-11-20" });
     expect(read(rule({ kind: "event", op: "earnings", value: 5 }), ctx(100, { company: () => company }))?.holds).toBe(false);
     // Missing data: nothing is decided, the rule keeps its state.
-    expect(decide(rule({ fired_key: "x" }), read(rule({}), ctx(100, { quote: () => undefined })))).toEqual({ fire: false, key: "x" });
+    expect(decide(rule({ fired_key: "x" }), read(rule({}), ctx(100, { quote: () => undefined })))).toEqual({ key: "x" });
   });
 
   it("keeps rules private and checks them", () => {
@@ -195,6 +196,26 @@ describe("alert rules", () => {
     expect(() => addAlert(me, { kind: "price", op: "sideways", value: 1, symbol: "AAPL" })).toThrow(/condition/);
     expect(() => addAlert(me, { kind: "price", op: "above", value: 1, symbol: "AAPL", channels: ["carrier pigeon"] })).toThrow(/channel/);
     expect(() => updateAlert(user("other"), { id: a.id, kind: "price", op: "below", value: 1, symbol: "AAPL" })).toThrow(/No such alert/);
+  });
+
+  it("keeps what a rule fired on when it is paused and resumed, not when its condition changes", () => {
+    addAlert(me, { kind: "price", op: "above", value: 150, symbol: "AAPL" });
+    const [a] = listAlerts(me);
+    markFired(a, "price:above:150", true);
+    const body = { ...a, portfolio: a.portfolio_id };
+    updateAlert(me, { ...body, active: false });
+    updateAlert(me, { ...body, active: true, note: "sell some" });
+    expect(listAlerts(me)[0]).toMatchObject({ fired_key: "price:above:150", note: "sell some" });
+    updateAlert(me, { ...body, value: 160 });
+    expect(listAlerts(me)[0]).toMatchObject({ fired_key: null, fired_at: null });
+  });
+
+  it("doesn't mark a rule fired when it was edited while the job ran", () => {
+    addAlert(me, { kind: "price", op: "above", value: 150, symbol: "AAPL" });
+    const [seen] = listAlerts(me);
+    updateAlert(me, { ...seen, portfolio: seen.portfolio_id, value: 170 });
+    markFired(seen, "price:above:150", true);
+    expect(listAlerts(me)[0].fired_key).toBeNull();
   });
 
   it("sends only to the channels a rule names", () => {
@@ -319,6 +340,35 @@ describe("importing trades", () => {
   });
 });
 
+describe("price histories", () => {
+  it("serves every recent window from one request, cut to what was asked", async () => {
+    const days = ["2026-10-01", "2026-11-02", "2026-11-09"];
+    const fetch = vi.spyOn(yahoo, "fetchHistory").mockResolvedValue(history("AAPL", "USD", 200, { days, closes: [1, 2, 3], dividends: [{ day: "2026-10-01", amount: 1 }] }));
+    const month = await service.history("AAPL", "2026-11-01");
+    const week = await service.history("AAPL", "2026-11-05");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect([month.days, month.closes, month.dividends]).toEqual([["2026-11-02", "2026-11-09"], [2, 3], []]);
+    expect(week.closes).toEqual([3]);
+  });
+});
+
+describe("resolving and saving trades", () => {
+  const trade = (extra: Record<string, unknown> = {}) => ({ symbol: "VOD.L", isin: null, name: "Vodafone", kind: "buy" as const, date: "2024-05-02", quantity: 10, price: 0.7, fees: 0.05, currency: "GBP", externalId: "x:1", line: 1, ...extra });
+
+  it("moves the fees to pence with the price when Yahoo quotes London in pence", async () => {
+    vi.spyOn(yahoo, "fetchHistory").mockResolvedValue(history("VOD.L", "GBp", 70));
+    const [t] = await resolveTrades([trade()]);
+    expect(t).toMatchObject({ yahoo: "VOD.L", quoted: "GBp", price: 70, fees: 5 });
+  });
+
+  it("leaves out a trade dated after today instead of refusing them all", async () => {
+    vi.spyOn(yahoo, "fetchHistory").mockResolvedValue(history("VOD.L", "GBp", 70));
+    const [p] = ensurePortfolios(me, "Main", "EUR");
+    const resolved = await resolveTrades([trade(), trade({ date: "2999-01-01", externalId: "x:2" })]);
+    expect(saveTrades(me, p.id, resolved, "Test")).toEqual({ added: 1, skipped: 0, unresolved: 1 });
+  });
+});
+
 describe("brokers", () => {
   it("reads Trading 212 orders in both of its shapes", () => {
     const instruments = new Map([["AAPL_US_EQ", { ticker: "AAPL_US_EQ", isin: "US0378331005", currencyCode: "USD", name: "Apple" }]]);
@@ -338,6 +388,10 @@ describe("brokers", () => {
       externalId: "trading212:99",
     });
     expect(tradeOf({ id: 9, status: "CANCELLED" }, instruments, 3)).toBeNull();
+    // Without an id, two different trades still get different ids (else the second is taken for the first).
+    const noId = (quantity: number) => tradeOf({ ticker: "AAPL_US_EQ", status: "FILLED", filledQuantity: quantity, fillPrice: 190, dateExecuted: "2024-05-02T10:00:00Z" }, instruments, 1)!.externalId;
+    expect(noId(1)).not.toBe(noId(2));
+    expect(noId(1)).not.toBe("trading212:");
   });
 
   it("reads an Interactive Brokers Flex statement like its CSV", () => {

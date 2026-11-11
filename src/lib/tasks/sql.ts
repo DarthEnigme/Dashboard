@@ -1,11 +1,10 @@
 import { db } from "../db";
+import { fail } from "../clean";
 
 /** What every part of the task store shares: query helpers, ownership checks and ordering. */
 type Arg = string | number | null;
 
-export const fail = (message: string): never => {
-  throw new Error(message);
-};
+export { fail };
 export const run = (sql: string, ...args: Arg[]) => db().prepare(sql).run(...args);
 export const one = <T>(sql: string, ...args: Arg[]) => db().prepare(sql).get(...args) as T | undefined;
 export const all = <T>(sql: string, ...args: Arg[]) => db().prepare(sql).all(...args) as unknown as T[];

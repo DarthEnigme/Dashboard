@@ -1,12 +1,13 @@
 import { db } from "../../db";
-import { text } from "../../clean";
+import { fail, text } from "../../clean";
 import { errorReason } from "../../cache";
 import { openSecret, sealSecret } from "../../auth/totp";
 import { resolveTrades, saveTrades } from "../import";
+import { ownPortfolio } from "../store";
 import type { BrokerInput } from "../types";
 import { ibkr } from "./ibkr";
 import { trading212 } from "./trading212";
-import type { Broker } from "./types";
+import { BROKER_INFO, type Broker, type BrokerKind } from "./types";
 
 /**
  * Connections to brokers: each one feeds a portfolio. A sync reads the broker's trades and adds
@@ -14,15 +15,12 @@ import type { Broker } from "./types";
  * hours are synced again.
  */
 
-export const BROKERS: Record<Broker["kind"], Broker> = { t212: trading212, ibkr };
+const BROKERS: Record<BrokerKind, Broker> = { t212: trading212, ibkr };
 const SIX_HOURS = 6 * 3_600_000;
-const fail = (message: string): never => {
-  throw new Error(message);
-};
 
 export interface Connection {
   id: number;
-  kind: Broker["kind"];
+  kind: BrokerKind;
   label: string;
   portfolio_id: number;
   account: string | null;
@@ -45,7 +43,7 @@ export const listConnections = (userId: number): Connection[] =>
   rows("owner_id = ?", userId).map((r) => ({
     id: r.id,
     kind: r.kind,
-    label: BROKERS[r.kind]?.label ?? r.kind,
+    label: BROKER_INFO[r.kind]?.label ?? r.kind,
     portfolio_id: r.portfolio_id,
     account: r.account,
     synced_at: r.synced_at,
@@ -56,11 +54,11 @@ export const listConnections = (userId: number): Connection[] =>
 
 /** { kind: t212 | ibkr, portfolio, secret, account? } */
 export function addConnection(userId: number, b: BrokerInput) {
-  const kind = Object.hasOwn(BROKERS, String(b.kind)) ? (b.kind as Broker["kind"]) : fail("Pick a broker");
-  const portfolio = (db().prepare("SELECT id FROM stock_portfolios WHERE id = ? AND owner_id = ?").get(Number(b.portfolio), userId) as { id: number } | undefined)?.id ?? fail("No such portfolio");
-  const secret = text(b.secret, 500) ?? fail(kind === "ibkr" ? "The Flex token is required" : "The API key is required");
-  const account = text(b.account, 40);
-  if (kind === "ibkr" && !account) fail("The Flex query id is required");
+  const kind = Object.hasOwn(BROKER_INFO, String(b.kind)) ? (b.kind as BrokerKind) : fail("Pick a broker");
+  const info = BROKER_INFO[kind];
+  const portfolio = ownPortfolio(userId, Number(b.portfolio));
+  const secret = text(b.secret, 500) ?? fail(info.secretMissing);
+  const account = info.account ? (text(b.account, 40) ?? fail(info.account.missing)) : null;
   if (rows("owner_id = ?", userId).length >= 10) fail("A person can connect up to 10 brokers");
   return Number(db().prepare("INSERT INTO stock_brokers (owner_id, portfolio_id, kind, secret, account, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(userId, portfolio, kind, sealSecret(secret), account, Date.now()).lastInsertRowid);
 }
@@ -77,7 +75,7 @@ async function sync(row: Row): Promise<void> {
     const secret = openSecret(row.secret) ?? fail("The key can't be read any more (the instance's secret key changed): connect again");
     const broker = BROKERS[row.kind] ?? fail(`Unknown broker ${row.kind}`);
     const resolved = await resolveTrades(await broker.trades(secret, row.account));
-    const { added } = saveTrades(row.owner_id, row.portfolio_id, resolved, broker.label);
+    const { added } = saveTrades(row.owner_id, row.portfolio_id, resolved, BROKER_INFO[broker.kind].label);
     lastAdded.set(row.id, added);
     db().prepare("UPDATE stock_brokers SET synced_at = ?, error = ? WHERE id = ?").run(Date.now(), null, row.id);
   } catch (e) {
@@ -94,7 +92,7 @@ export function startSync(userId: number, id: number): Promise<void> {
   return sync(row);
 }
 
-/** Hourly: sync the connections that haven't been for six hours. */
+/** Hourly: sync the connections that haven't been for six hours, side by side (each broker's limits are per key). */
 export async function brokerSyncJob(now = Date.now()) {
-  for (const row of rows("synced_at IS NULL OR synced_at < ?", now - SIX_HOURS)) await sync(row);
+  await Promise.all(rows("synced_at IS NULL OR synced_at < ?", now - SIX_HOURS).map(sync));
 }

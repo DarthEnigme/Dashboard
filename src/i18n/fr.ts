@@ -1406,7 +1406,7 @@ export const fr: Record<string, string> = {
   "publishes results within": "publie ses résultats d’ici",
   "rises by": "monte de",
   "rises in a day by": "monte sur la journée de",
-  "{added} added, {skipped} already there, {unresolved} without a symbol.": "{added} ajoutées, {skipped} déjà là, {unresolved} sans symbole.",
+  "{added} added, {skipped} already there, {unresolved} left out.": "{added} ajoutées, {skipped} déjà là, {unresolved} laissées de côté.",
   "{n} figure": "{n} chiffre",
   "{n} figures": "{n} chiffres",
   "{n} line couldn't be read": "{n} ligne illisible",

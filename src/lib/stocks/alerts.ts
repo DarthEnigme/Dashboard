@@ -1,3 +1,4 @@
+import { msg } from "@/i18n";
 import type { Company } from "./yahoo";
 
 /**
@@ -10,20 +11,76 @@ import type { Company } from "./yahoo";
  * a coming event) fire once for that day or that date.
  */
 
+/** What a threshold is counted in: the symbol's or portfolio's currency, percent, or days. */
+export type AlertUnit = "amount" | "%" | "days";
+interface KindSpec {
+  label: string;
+  /** What the job fetches to read it: a quote, a portfolio summary, or the company's calendar. */
+  needs: "quote" | "portfolio" | "company";
+  /** It is about one symbol (else about a portfolio). */
+  symbol: boolean;
+  /** The lowest threshold allowed. */
+  min: number;
+  /** Its conditions, in the order offered, with what their threshold counts. */
+  ops: Record<string, { label: string; unit: AlertUnit }>;
+}
+
+/** Every kind of rule, its conditions and what they need: the one description the store, the job and the page share. */
 export const ALERT_RULES = {
   /** The price crosses `value` (in the symbol's quote currency). */
-  price: ["above", "below"],
+  price: {
+    label: msg("Price"),
+    needs: "quote",
+    symbol: true,
+    min: 0,
+    ops: { above: { label: msg("goes above"), unit: "amount" }, below: { label: msg("goes below"), unit: "amount" } },
+  },
   /** Today's change reaches ± `value` percent. */
-  move: ["up", "down", "either"],
+  move: {
+    label: msg("Daily move"),
+    needs: "quote",
+    symbol: true,
+    min: 0.01,
+    ops: { up: { label: msg("rises by"), unit: "%" }, down: { label: msg("falls by"), unit: "%" }, either: { label: msg("moves by"), unit: "%" } },
+  },
   /** What is held of the symbol is up `value` percent (a target), or down `value` percent (a stop). */
-  position: ["gain", "loss"],
+  position: {
+    label: msg("Position"),
+    needs: "portfolio",
+    symbol: true,
+    min: 0.01,
+    ops: { gain: { label: msg("gains (target)"), unit: "%" }, loss: { label: msg("loses (stop)"), unit: "%" } },
+  },
   /** A portfolio's value crosses `value` (its currency), or its day reaches ± `value` percent. */
-  portfolio: ["above", "below", "dayUp", "dayDown"],
+  portfolio: {
+    label: msg("Portfolio"),
+    needs: "portfolio",
+    symbol: false,
+    min: 0,
+    ops: {
+      above: { label: msg("goes above"), unit: "amount" },
+      below: { label: msg("goes below"), unit: "amount" },
+      dayUp: { label: msg("rises in a day by"), unit: "%" },
+      dayDown: { label: msg("falls in a day by"), unit: "%" },
+    },
+  },
   /** Results, or an ex-dividend day, within `value` days. */
-  event: ["earnings", "exDividend"],
-} as const;
+  event: {
+    label: msg("Event"),
+    needs: "company",
+    symbol: true,
+    min: 0.01,
+    ops: { earnings: { label: msg("publishes results within"), unit: "days" }, exDividend: { label: msg("goes ex-dividend within"), unit: "days" } },
+  },
+} as const satisfies Record<string, KindSpec>;
 export type AlertKind = keyof typeof ALERT_RULES;
 export const ALERT_KINDS = Object.keys(ALERT_RULES) as AlertKind[];
+
+const opsOf = (kind: AlertKind): KindSpec["ops"] => ALERT_RULES[kind].ops;
+/** A kind's conditions, in the order offered. */
+export const alertOps = (kind: AlertKind) => Object.keys(opsOf(kind));
+/** One condition of a kind; undefined when the kind has no such condition. */
+export const alertOp = (kind: AlertKind, op: string) => (Object.hasOwn(opsOf(kind), op) ? opsOf(kind)[op] : undefined);
 
 export interface AlertRule {
   id: number;
@@ -110,9 +167,9 @@ export function read(rule: AlertRule, ctx: AlertContext): Reading | undefined {
   }
 }
 
-/** What to do with a reading: send it or not, and the key to remember. */
-export function decide(rule: AlertRule, reading: Reading | undefined): { fire: boolean; key: string | null } {
-  if (!reading) return { fire: false, key: rule.fired_key };
-  if (reading.holds) return { fire: reading.key !== rule.fired_key, key: reading.key };
-  return { fire: false, key: reading.dated ? rule.fired_key : null };
+/** What to do with a reading: the reading to send (only when it fires), and the key to remember. */
+export function decide(rule: AlertRule, reading: Reading | undefined): { send?: Reading; key: string | null } {
+  if (!reading) return { key: rule.fired_key };
+  if (reading.holds) return reading.key !== rule.fired_key ? { send: reading, key: reading.key } : { key: reading.key };
+  return { key: reading.dated ? rule.fired_key : null };
 }

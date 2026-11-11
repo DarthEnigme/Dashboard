@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { BENCHMARKS, type Position, type StocksData } from "@/lib/stocks/types";
+import { BENCHMARKS, rangeStart, type Position, type Range, type StocksData } from "@/lib/stocks/types";
+import { localDay } from "@/lib/day";
 import { msg } from "@/i18n";
 import { dateOnly } from "@/i18n/format";
 import { useT } from "@/i18n/client";
@@ -16,11 +17,11 @@ import { Card, Choice, Stat } from "./parts";
 import { SymbolIcon } from "./SymbolIcon";
 
 const PERIODS = [
-  { id: "1m", label: msg("1M"), days: 31 },
-  { id: "6m", label: msg("6M"), days: 183 },
-  { id: "1y", label: msg("1Y"), days: 366 },
-  { id: "all", label: msg("All"), days: Infinity },
-] as const;
+  { id: "1m", label: msg("1M") },
+  { id: "6m", label: msg("6M") },
+  { id: "1y", label: msg("1Y") },
+  { id: "max", label: msg("All") },
+] as const satisfies { id: Range; label: string }[];
 type Period = (typeof PERIODS)[number]["id"];
 
 const SPLITS = [
@@ -34,10 +35,9 @@ type Split = (typeof SPLITS)[number]["id"];
 function History({ data, onBenchmark }: { data: StocksData; onBenchmark: (symbol: string) => void }) {
   const t = useT();
   const [mode, setMode] = useState<"value" | "performance">("value");
-  const [period, setPeriod] = useState<Period>("all");
+  const [period, setPeriod] = useState<Period>("max");
   const { series, currency } = data;
-  const span = PERIODS.find((p) => p.id === period)!.days;
-  const cutoff = Number.isFinite(span) ? new Date(Date.now() - span * 86_400_000).toISOString().slice(0, 10) : "";
+  const cutoff = rangeStart(period, localDay());
   const from = Math.max(series.days.findIndex((d) => d >= cutoff), 0);
   const cut = <T,>(xs: T[]) => xs.slice(from);
   // A return over part of the history starts again from zero at its first day.

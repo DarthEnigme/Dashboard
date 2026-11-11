@@ -34,7 +34,6 @@ const refusal = (r: Xml) => {
 
 export const ibkr: Broker = {
   kind: "ibkr",
-  label: "Interactive Brokers",
   async trades(token, queryId) {
     if (!queryId) throw new Error("The Flex query id is missing");
     const t = encodeURIComponent(token);

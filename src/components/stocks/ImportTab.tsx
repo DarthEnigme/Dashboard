@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import useSWR from "swr";
 import { Download, PlugZap, RefreshCw, Upload } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import type { Prepared } from "@/lib/stocks/import";
 import type { Connection } from "@/lib/stocks/brokers/sync";
+import { BROKER_INFO, BROKER_KINDS, type BrokerKind } from "@/lib/stocks/brokers/types";
 import type { Portfolio } from "@/lib/stocks/types";
 import { msg } from "@/i18n";
 import { dateOnly } from "@/i18n/format";
@@ -29,7 +30,8 @@ const EXPORTS = [
 export function ImportTab({ portfolios, portfolio, onImported }: { portfolios: Portfolio[]; portfolio: number | null; onImported: () => void }) {
   return (
     <div className="grid gap-6 xl:grid-cols-2">
-      <ImportCard portfolios={portfolios} start={portfolio ?? portfolios[0].id} onImported={onImported} />
+      {/* Keyed by the page's portfolio: choosing another one there starts the import on it. */}
+      <ImportCard key={portfolio ?? 0} portfolios={portfolios} start={portfolio ?? portfolios[0].id} onImported={onImported} />
       <div className="flex flex-col gap-6">
         <BrokersCard portfolios={portfolios} onSynced={onImported} />
         <ExportCard portfolio={portfolio} />
@@ -79,7 +81,7 @@ function ImportCard({ portfolios, start, onImported }: { portfolios: Portfolio[]
     setError(undefined);
     try {
       const r = await post<{ added: number; skipped: number; unresolved: number }>(file, preset, "save");
-      setResult(t("{added} added, {skipped} already there, {unresolved} without a symbol.", r));
+      setResult(t("{added} added, {skipped} already there, {unresolved} left out.", r));
       setPreview(undefined);
       setFile(undefined);
       onImported();
@@ -88,7 +90,7 @@ function ImportCard({ portfolios, start, onImported }: { portfolios: Portfolio[]
     }
     setBusy(false);
   };
-  const ready = preview?.trades.filter((x) => x.yahoo && !x.duplicate).length ?? 0;
+  const ready = preview?.trades.filter((x) => x.addable && !x.duplicate).length ?? 0;
 
   return (
     <Card title={t("Import trades")}>
@@ -173,13 +175,22 @@ function ImportCard({ portfolios, start, onImported }: { portfolios: Portfolio[]
 
 function BrokersCard({ portfolios, onSynced }: { portfolios: Portfolio[]; onSynced: () => void }) {
   const t = useT();
-  // While a sync runs, look again every few seconds.
-  const { data, mutate } = useSWR<Connection[]>(BROKERS_URL, fetcher, { refreshInterval: (d) => (d?.some((c) => c.syncing) ? 3000 : 0), onSuccess: (d) => d.some((c) => c.added) && onSynced() });
+  // While a sync runs, look again every few seconds; when one ends having added trades, the portfolio loads again.
+  const syncing = useRef(new Set<number>());
+  const { data, mutate } = useSWR<Connection[]>(BROKERS_URL, fetcher, {
+    refreshInterval: (d) => (d?.some((c) => c.syncing) ? 3000 : 0),
+    onSuccess: (d) => {
+      if (d.some((c) => syncing.current.has(c.id) && !c.syncing && c.added)) onSynced();
+      syncing.current = new Set(d.filter((c) => c.syncing).map((c) => c.id));
+    },
+  });
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string>();
   const act = (work: Promise<Connection[]>) => {
     setError(undefined);
-    void mutate(work, { revalidate: false }).catch((e: Error) => setError(e.message));
+    void mutate(work, { revalidate: false })
+      .then((d) => d?.forEach((c) => c.syncing && syncing.current.add(c.id)))
+      .catch((e: Error) => setError(e.message));
   };
   const name = (id: number) => portfolios.find((p) => p.id === id)?.name ?? "";
 
@@ -223,7 +234,8 @@ const field = "flex flex-col gap-1.5 text-xs font-medium text-muted";
 
 function ConnectDialog({ portfolios, onSave, onClose }: { portfolios: Portfolio[]; onSave: (body: unknown) => Promise<void>; onClose: () => void }) {
   const t = useT();
-  const [kind, setKind] = useState<"t212" | "ibkr">("t212");
+  const [kind, setKind] = useState<BrokerKind>("t212");
+  const info = BROKER_INFO[kind];
   const [portfolio, setPortfolio] = useState(portfolios[0].id);
   const [secret, setSecret] = useState("");
   const [account, setAccount] = useState("");
@@ -243,9 +255,12 @@ function ConnectDialog({ portfolios, onSave, onClose }: { portfolios: Portfolio[
     <Dialog title={t("Connect a broker")} onClose={onClose} onSubmit={save} error={error} busy={busy}>
       <label className={field}>
         {t("Broker")}
-        <select value={kind} onChange={(e) => setKind(e.target.value as "t212" | "ibkr")} className={inputClass}>
-          <option value="t212">Trading 212</option>
-          <option value="ibkr">Interactive Brokers</option>
+        <select value={kind} onChange={(e) => setKind(e.target.value as BrokerKind)} className={inputClass}>
+          {BROKER_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {BROKER_INFO[k].label}
+            </option>
+          ))}
         </select>
       </label>
       <label className={field}>
@@ -259,19 +274,17 @@ function ConnectDialog({ portfolios, onSave, onClose }: { portfolios: Portfolio[
         </select>
       </label>
       <label className={field}>
-        {kind === "t212" ? t("API key (or key:secret)") : t("Flex Web Service token")}
+        {t(info.secretLabel)}
         <input required type="password" autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} className={inputClass} />
       </label>
-      {kind === "ibkr" && (
+      {info.account && (
         <label className={field}>
-          {t("Flex query id")}
-          <input required value={account} onChange={(e) => setAccount(e.target.value)} placeholder="123456" className={inputClass} />
+          {t(info.account.label)}
+          <input required value={account} onChange={(e) => setAccount(e.target.value)} placeholder={info.account.placeholder} className={inputClass} />
         </label>
       )}
       <p className="text-xs text-muted">
-        {kind === "t212"
-          ? t("In Trading 212: Settings → API (Beta) → generate a key with permission to read history. Read-only is enough.")
-          : t("In the IBKR Client Portal: Performance & Reports → Flex Queries → a Trade Confirmation or Activity query with Trades, then Flex Web Service → token.")}{" "}
+        {t(info.help)}{" "}
         {t("The key is stored encrypted and never shown again.")}
       </p>
     </Dialog>

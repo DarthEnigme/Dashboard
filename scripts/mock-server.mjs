@@ -83,7 +83,9 @@ const yahooChart = (symbol, period1) => {
     timestamp.push(t);
     close.push(s.flat ? s.base : Number((s.base * (1 + i++ * 0.001)).toFixed(4)));
   }
-  const dividends = s.dividend && timestamp.length > 40 ? { [timestamp[20]]: { amount: s.dividend, date: timestamp[20] } } : undefined;
+  // Quarterly, on the same days whatever window is asked for (as Yahoo's real dates are).
+  const paid = s.dividend ? [1, 2, 3, 4, 5, 6, 7, 8].map((k) => now - k * 91 * DAY).map((day) => timestamp.find((t) => t >= day && t < day + 5 * DAY)).filter((t) => t !== undefined) : [];
+  const dividends = paid.length ? Object.fromEntries(paid.map((t) => [t, { amount: s.dividend, date: t }])) : undefined;
   return {
     chart: {
       result: [

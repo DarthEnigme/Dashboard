@@ -1,7 +1,7 @@
 import { loadConfig } from "../config/load";
 import { hasAlertChannel, onlyChannels, sendNotice } from "../alerts";
-import { localDay } from "../day";
-import { decide, read, type AlertContext, type AlertRule } from "./alerts";
+import { daysBefore, localDay } from "../day";
+import { ALERT_RULES, decide, read, type AlertContext, type AlertRule } from "./alerts";
 import { activeAlerts, markFired } from "./alertStore";
 import { companyOf, history, loadStocks } from "./service";
 import { listPortfolios } from "./store";
@@ -12,16 +12,18 @@ import type { Company, StocksData } from "./types";
  * reads each rule, sends what fires to its channels and remembers it.
  */
 
-const DAY = 86_400_000;
 type Quote = ReturnType<AlertContext["quote"]>;
+type AlertNeed = (typeof ALERT_RULES)[keyof typeof ALERT_RULES]["needs"];
 
 /** What one person's rules need, fetched up front so `read` stays synchronous. */
 async function contextFor(userId: number, rules: AlertRule[], today: string): Promise<AlertContext> {
-  const symbols = [...new Set(rules.flatMap((r) => (r.symbol && (r.kind === "price" || r.kind === "move") ? [r.symbol] : [])))];
-  const events = [...new Set(rules.flatMap((r) => (r.symbol && r.kind === "event" ? [r.symbol] : [])))];
+  const needing = (need: AlertNeed) => rules.filter((r) => ALERT_RULES[r.kind].needs === need);
+  const symbolsOf = (list: AlertRule[]) => [...new Set(list.flatMap((r) => (r.symbol ? [r.symbol] : [])))];
+  const symbols = symbolsOf(needing("quote"));
+  const events = symbolsOf(needing("company"));
   // Position and portfolio rules read a portfolio summary (null: all of them together).
-  const views = [...new Set(rules.filter((r) => r.kind === "position" || r.kind === "portfolio").map((r) => r.portfolio_id))];
-  const from = new Date(Date.parse(today) - 10 * DAY).toISOString().slice(0, 10);
+  const views = [...new Set(needing("portfolio").map((r) => r.portfolio_id))];
+  const from = daysBefore(today, 10);
   const portfolios = views.length ? listPortfolios(userId) : [];
 
   const [quotes, companies, summaries] = await Promise.all([
@@ -59,18 +61,19 @@ export async function stockAlertJob(now = new Date()) {
 
   for (const [owner, rules] of byOwner) {
     const ctx = await contextFor(owner, rules, today);
-    for (const rule of rules) {
-      const reading = read(rule, ctx);
-      const { fire, key } = decide(rule, reading);
-      if (!fire) {
-        if (key !== rule.fired_key) markFired(rule.id, key, false);
-        continue;
-      }
-      const message = rule.note ? `${reading!.message}\n${rule.note}` : reading!.message;
-      const url = rule.symbol ? `/stocks/${encodeURIComponent(rule.symbol)}` : "/stocks";
-      const errors = await sendNotice(onlyChannels(settings.alerts, rule.channels), { kind: "stock", level: reading!.level, message, url, symbol: rule.symbol ?? "" });
-      // Not sent: try again next time.
-      if (!errors.length) markFired(rule.id, key, true);
-    }
+    await Promise.all(
+      rules.map(async (rule) => {
+        const { send, key } = decide(rule, read(rule, ctx));
+        if (!send) {
+          if (key !== rule.fired_key) markFired(rule, key, false);
+          return;
+        }
+        const message = rule.note ? `${send.message}\n${rule.note}` : send.message;
+        const url = rule.symbol ? `/stocks/${encodeURIComponent(rule.symbol)}` : "/stocks";
+        const errors = await sendNotice(onlyChannels(settings.alerts, rule.channels), { kind: "stock", level: send.level, message, url, symbol: rule.symbol ?? "" });
+        // Not sent: try again next time.
+        if (!errors.length) markFired(rule, key, true);
+      }),
+    );
   }
 }

@@ -4,9 +4,9 @@ import { useState } from "react";
 import useSWR from "swr";
 import { BellOff, BellRing, Pencil, Plus, X } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
-import { ALERT_RULES, ALERT_KINDS, type AlertKind, type AlertRule } from "@/lib/stocks/alerts";
+import { ALERT_RULES, ALERT_KINDS, alertOp, alertOps, type AlertKind, type AlertRule } from "@/lib/stocks/alerts";
+import { alertChannels } from "../settings/sections";
 import type { Portfolio } from "@/lib/stocks/types";
-import { msg } from "@/i18n";
 import { number } from "@/i18n/format";
 import { useT } from "@/i18n/client";
 import { Dialog } from "../edit/Dialog";
@@ -22,23 +22,9 @@ interface AlertsData {
   channels: string[];
 }
 
-const KIND_LABELS: Record<AlertKind, string> = { price: msg("Price"), move: msg("Daily move"), position: msg("Position"), portfolio: msg("Portfolio"), event: msg("Event") };
-const OP_LABELS: Record<string, string> = {
-  above: msg("goes above"),
-  below: msg("goes below"),
-  up: msg("rises by"),
-  down: msg("falls by"),
-  either: msg("moves by"),
-  gain: msg("gains (target)"),
-  loss: msg("loses (stop)"),
-  dayUp: msg("rises in a day by"),
-  dayDown: msg("falls in a day by"),
-  earnings: msg("publishes results within"),
-  exDividend: msg("goes ex-dividend within"),
-};
 /** What the threshold is counted in. */
-const unit = (kind: AlertKind, op: string) => (kind === "event" ? "days" : kind === "move" || kind === "position" || op === "dayUp" || op === "dayDown" ? "%" : "amount");
-const CHANNEL_NAMES: Record<string, string> = { discord: "Discord", webhook: "Webhook", gotify: "Gotify", ntfy: "ntfy", slack: "Slack", telegram: "Telegram", email: "Email", pushover: "Pushover", matrix: "Matrix" };
+const unit = (kind: AlertKind, op: string) => alertOp(kind, op)?.unit ?? "amount";
+const CHANNEL_NAMES: Record<string, string> = Object.fromEntries(alertChannels.map((c) => [c.id, c.label]));
 
 /** A rule in words, in the reader's language. */
 function Sentence({ rule, portfolios }: { rule: AlertRule; portfolios: Portfolio[] }) {
@@ -48,7 +34,7 @@ function Sentence({ rule, portfolios }: { rule: AlertRule; portfolios: Portfolio
   const subject = rule.kind === "portfolio" ? (portfolios.find((p) => p.id === rule.portfolio_id)?.name ?? t("All portfolios")) : rule.kind === "position" ? t("{symbol} position", { symbol: rule.symbol ?? "" }) : rule.symbol;
   return (
     <span>
-      <span className="font-semibold">{subject}</span> {t(OP_LABELS[rule.op] ?? rule.op)} <span className="tabular-nums">{value}</span>
+      <span className="font-semibold">{subject}</span> {t(alertOp(rule.kind, rule.op)?.label ?? rule.op)} <span className="tabular-nums">{value}</span>
     </span>
   );
 }
@@ -92,7 +78,7 @@ export function AlertsTab({ portfolios, preset }: { portfolios: Portfolio[]; pre
               <div className="min-w-0 flex-1 text-sm">
                 <Sentence rule={a} portfolios={portfolios} />
                 <div className="text-xs text-muted">
-                  {t(KIND_LABELS[a.kind])} · {a.channels.length ? a.channels.map((c) => CHANNEL_NAMES[c] ?? c).join(", ") : t("all channels")}
+                  {t(ALERT_RULES[a.kind].label)} · {a.channels.length ? a.channels.map((c) => CHANNEL_NAMES[c] ?? c).join(", ") : t("all channels")}
                   {a.fired_at && ` · ${t("last sent {date}", { date: new Date(a.fired_at).toLocaleString() })}`}
                   {a.note && ` · ${a.note}`}
                 </div>
@@ -119,7 +105,7 @@ function AlertDialog({ rule, portfolios, channels, onSave, onClose }: { rule: Al
   const t = useT();
   const existing = "id" in rule ? rule : undefined;
   const [kind, setKind] = useState<AlertKind>(existing?.kind ?? "price");
-  const [op, setOp] = useState<string>(existing?.op ?? ALERT_RULES[existing?.kind ?? "price"][0]);
+  const [op, setOp] = useState<string>(existing?.op ?? alertOps(existing?.kind ?? "price")[0]);
   const [symbol, setSymbol] = useState(rule.symbol ?? "");
   const [portfolio, setPortfolio] = useState<number | null>(existing?.portfolio_id ?? null);
   const [value, setValue] = useState(existing ? String(existing.value) : "");
@@ -151,13 +137,13 @@ function AlertDialog({ rule, portfolios, channels, onSave, onClose }: { rule: Al
             onChange={(e) => {
               const k = e.target.value as AlertKind;
               setKind(k);
-              setOp(ALERT_RULES[k][0]);
+              setOp(alertOps(k)[0]);
             }}
             className={inputClass}
           >
             {ALERT_KINDS.map((k) => (
               <option key={k} value={k}>
-                {t(KIND_LABELS[k])}
+                {t(ALERT_RULES[k].label)}
               </option>
             ))}
           </select>
@@ -165,15 +151,15 @@ function AlertDialog({ rule, portfolios, channels, onSave, onClose }: { rule: Al
         <label className={field}>
           {t("When it")}
           <select value={op} onChange={(e) => setOp(e.target.value)} className={inputClass}>
-            {ALERT_RULES[kind].map((o) => (
+            {alertOps(kind).map((o) => (
               <option key={o} value={o}>
-                {t(OP_LABELS[o])}
+                {t(alertOp(kind, o)?.label ?? o)}
               </option>
             ))}
           </select>
         </label>
       </div>
-      {kind !== "portfolio" && (
+      {ALERT_RULES[kind].symbol && (
         <div className={field}>
           {t("Symbol")}
           {symbol ? (
@@ -189,7 +175,7 @@ function AlertDialog({ rule, portfolios, channels, onSave, onClose }: { rule: Al
           )}
         </div>
       )}
-      {(kind === "portfolio" || kind === "position") && (
+      {ALERT_RULES[kind].needs === "portfolio" && (
         <label className={field}>
           {t("Portfolio")}
           <select value={portfolio ?? ""} onChange={(e) => setPortfolio(Number(e.target.value) || null)} className={inputClass}>

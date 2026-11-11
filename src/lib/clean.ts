@@ -1,5 +1,10 @@
 /** Cleaners for what people send to the apps' stores: each returns null for anything unusable. */
 
+/** Refuse a change: the stores throw this, and the routes answer 400 with its message. */
+export const fail = (message: string): never => {
+  throw new Error(message);
+};
+
 /** Trimmed text of at most `max` characters; null when empty or not text. */
 export const text = (s: unknown, max: number) => (typeof s === "string" && s.trim() ? s.trim().slice(0, max) : null);
 

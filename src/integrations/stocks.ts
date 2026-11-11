@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { history } from "@/lib/stocks/service";
 import { SYMBOL } from "@/lib/stocks/types";
-import { localDay } from "@/lib/day";
+import { daysBefore, localDay } from "@/lib/day";
 import type { Integration, WidgetField, WidgetSpark } from "./types";
 
 const schema = z.object({
@@ -20,7 +20,7 @@ export const stocks: Integration<typeof schema> = {
   type: "stocks",
   schema,
   async fetch(cfg) {
-    const from = new Date(Date.parse(localDay()) - 31 * 86_400_000).toISOString().slice(0, 10);
+    const from = daysBefore(localDay(), 31);
     const quotes = await Promise.all(cfg.symbols.slice(0, 12).map((s) => history(s, from).then((h) => ({ s, h })).catch(() => ({ s, h: undefined }))));
     const fields: WidgetField[] = quotes.map(({ s, h }) =>
       h ? { label: s, value: `${price(h.price, h.currency)} · ${pct(h.change)}`, status: h.change === null || h.change >= 0 ? "ok" : "error", raw: h.price, href: `/stocks/${encodeURIComponent(s)}` } : { label: s, value: "no data", status: "warn" },

@@ -1,15 +1,11 @@
 import { db, transaction } from "../db";
-import { isDate, num, oneOf, text } from "../clean";
+import { fail, isDate, num, oneOf, text } from "../clean";
 import { localDay } from "../day";
 import { SYMBOL, TRADE_KINDS, type Portfolio, type PortfolioInput, type Transaction, type TransactionInput } from "./types";
 
 /** Portfolios, their buys and sells, and the symbols someone watches: all private to their owner. */
 
 const MAX_PORTFOLIOS = 20;
-
-const fail = (message: string): never => {
-  throw new Error(message);
-};
 
 /** A Yahoo symbol in capitals, or an error. */
 export const cleanSymbol = (v: unknown): string => {
@@ -31,7 +27,8 @@ export function ensurePortfolios(userId: number, name: string, currency: string)
   return listPortfolios(userId);
 }
 
-const ownPortfolio = (userId: number, id: number) =>
+/** The id of one of this person's portfolios, or an error. */
+export const ownPortfolio = (userId: number, id: number) =>
   (db().prepare("SELECT id FROM stock_portfolios WHERE id = ? AND owner_id = ?").get(id, userId) as { id: number } | undefined)?.id ?? fail("No such portfolio");
 
 export function addPortfolio(userId: number, b: PortfolioInput) {
@@ -53,6 +50,17 @@ export function deletePortfolio(userId: number, id: number) {
   if (listPortfolios(userId).length <= 1) fail("Keep at least one portfolio");
   db().prepare("DELETE FROM stock_portfolios WHERE id = ?").run(own);
 }
+
+/** The symbols this person still holds some of, across their portfolios (from the trades alone: no prices needed). */
+export const heldSymbols = (userId: number) =>
+  (
+    db()
+      .prepare(
+        `SELECT t.symbol FROM stock_transactions t JOIN stock_portfolios p ON p.id = t.portfolio_id WHERE p.owner_id = ?
+         GROUP BY t.symbol HAVING SUM(CASE t.kind WHEN 'sell' THEN -t.quantity ELSE t.quantity END) > 1e-9 ORDER BY t.symbol`,
+      )
+      .all(userId) as { symbol: string }[]
+  ).map((r) => r.symbol);
 
 // ---------- transactions ----------
 

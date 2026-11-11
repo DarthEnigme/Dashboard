@@ -1,6 +1,7 @@
 import { parseCsv } from "../../finance/csv";
 import { readXlsx } from "../../finance/xlsx";
 import { errorReason } from "../../cache";
+import { localDay } from "../../day";
 import { quoteCurrency, search } from "../service";
 import { addImported, knownIds } from "../store";
 import { SYMBOL } from "../types";
@@ -20,7 +21,11 @@ export interface PreparedTrade extends ImportedTrade {
   duplicate: boolean;
   /** Why it can't be added, or what to check. */
   problem: string | null;
+  /** It will be added (it has a symbol and isn't dated after today). */
+  addable: boolean;
 }
+/** A trade with its symbol found, before it is checked against the portfolio. */
+export type ResolvedTrade = Omit<PreparedTrade, "duplicate" | "addable">;
 
 export interface Prepared {
   preset: string;
@@ -48,7 +53,7 @@ async function yahooSymbol(t: Pick<ImportedTrade, "isin" | "symbol">): Promise<s
 }
 
 /** Each trade with its Yahoo symbol and quote currency, looked up once per instrument. Prices in pence get written in pounds' hundredths as Yahoo quotes them. */
-export async function resolveTrades(trades: ImportedTrade[]): Promise<Omit<PreparedTrade, "duplicate">[]> {
+export async function resolveTrades(trades: ImportedTrade[]): Promise<ResolvedTrade[]> {
   const keys = [...new Set(trades.map((t) => t.isin ?? t.symbol ?? ""))];
   type Found = { symbol: string; quoted: string } | string;
   const found = new Map<string, Found>(
@@ -70,7 +75,9 @@ export async function resolveTrades(trades: ImportedTrade[]): Promise<Omit<Prepa
     // Yahoo quotes London in pence (GBp) when brokers write pounds.
     const pence = r.quoted !== r.quoted.toUpperCase() && t.currency === r.quoted.toUpperCase();
     const mismatch = t.currency && !pence && t.currency !== r.quoted.toUpperCase();
-    return { ...t, price: pence ? t.price * 100 : t.price, yahoo: r.symbol, quoted: r.quoted, problem: mismatch ? `traded in ${t.currency}, quoted in ${r.quoted}: check the price` : null };
+    // The fees are kept in the quote currency too, so they move to pence with the price.
+    const scaled = pence ? { price: t.price * 100, fees: t.fees * 100 } : {};
+    return { ...t, ...scaled, yahoo: r.symbol, quoted: r.quoted, problem: mismatch ? `traded in ${t.currency}, quoted in ${r.quoted}: check the price` : null };
   });
 }
 
@@ -79,17 +86,27 @@ export async function prepareImport(userId: number, portfolio: number, rows: str
   const { preset, trades, errors } = readTrades(rows, presetId);
   const resolved = await resolveTrades(trades);
   const known = knownIds(userId, portfolio, resolved.map((t) => t.externalId));
+  const today = localDay();
   return {
     preset: preset.id,
     presets: PRESETS.map((p) => ({ id: p.id, label: p.label })),
-    trades: resolved.map((t) => ({ ...t, duplicate: known.has(t.externalId) })),
+    trades: resolved.map((t) => ({
+      ...t,
+      problem: t.problem ?? (t.date > today ? "dated after today: it will be left out" : null),
+      duplicate: known.has(t.externalId),
+      addable: recordable(t, today),
+    })),
     errors,
   };
 }
 
-/** Add the trades that have a symbol (and aren't there yet); answers with what happened. */
-export function saveTrades(userId: number, portfolio: number, trades: Omit<PreparedTrade, "duplicate">[], source: string) {
-  const ready = trades.filter((t) => t.yahoo && t.quoted);
+/** A trade that can be recorded: its symbol is known, and it isn't dated after today. */
+const recordable = (t: ResolvedTrade, today: string) => !!(t.yahoo && t.quoted) && t.date <= today;
+
+/** Add the trades that can be recorded (and aren't there yet); the others are counted, not refused all together. */
+export function saveTrades(userId: number, portfolio: number, trades: ResolvedTrade[], source: string) {
+  const today = localDay();
+  const ready = trades.filter((t) => recordable(t, today));
   const { added, skipped } = addImported(
     userId,
     portfolio,

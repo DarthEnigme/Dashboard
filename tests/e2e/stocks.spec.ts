@@ -121,7 +121,7 @@ test.describe.serial("stocks", () => {
     await page.getByLabel("Choose a file").setInputFiles({ name: "trades.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
     await expect(page.getByRole("cell", { name: /AAPL/ })).toBeVisible();
     await page.getByRole("button", { name: "Add 1 trade" }).click();
-    await expect(page.getByText("1 added, 0 already there, 0 without a symbol.")).toBeVisible();
+    await expect(page.getByText("1 added, 0 already there, 0 left out.")).toBeVisible();
     await page.getByLabel("Choose a file").setInputFiles({ name: "trades.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
     await expect(page.getByText("already there")).toBeVisible();
 
