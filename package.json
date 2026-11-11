@@ -1,6 +1,6 @@
 {
   "name": "nanodash",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -27,7 +27,7 @@
     "ldapts": "^8.2.0",
     "lucide-react": "^0.540.0",
     "net-snmp": "^3.29.1",
-    "next": "^16.4.0",
+    "next": "^16.4.6",
     "node-ical": "^0.27.3",
     "nodemailer": "^10.0.16",
     "openid-client": "^6.8.8",
