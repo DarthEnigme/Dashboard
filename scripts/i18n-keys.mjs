@@ -46,8 +46,13 @@ if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1])))
   const keys = collectKeys();
   let out = keys;
   if (process.argv.includes("--missing")) {
-    const src = ts.transpileModule(fs.readFileSync(path.join(root, "src", "i18n", "fr.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText;
-    const { fr } = await import(`data:text/javascript;base64,${Buffer.from(src).toString("base64")}`);
+    // One dictionary per app in src/i18n/fr/ (index.ts only gathers them).
+    const dir = path.join(root, "src", "i18n", "fr");
+    const fr = {};
+    for (const file of fs.readdirSync(dir).filter((f) => f.endsWith(".ts") && f !== "index.ts")) {
+      const src = ts.transpileModule(fs.readFileSync(path.join(dir, file), "utf8"), { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText;
+      Object.assign(fr, ...Object.values(await import(`data:text/javascript;base64,${Buffer.from(src).toString("base64")}`)));
+    }
     out = keys.filter((k) => !(k in fr));
   }
   console.log(JSON.stringify(out, null, 1));

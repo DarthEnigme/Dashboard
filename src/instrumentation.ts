@@ -18,6 +18,7 @@ export async function register() {
     const { whenEnabled } = await import("./lib/modules");
     const { reconcileModules } = await import("./lib/module-retention");
     const { announceUpdateOutcome, reconcilePendingUpdate } = await import("./lib/update/apply");
+    type App = import("./lib/config/schema").App;
     try {
       const outcome = reconcilePendingUpdate();
       if (outcome) void announceUpdateOutcome(outcome).catch((e) => console.warn("[nanodash] could not send the update notice:", e));
@@ -25,20 +26,30 @@ export async function register() {
       console.warn("[nanodash] could not record the last update:", e);
     }
     startMonitor();
+
+    /** Each app's background jobs: hourly, unless `every` says how often (in ms, read each time). */
+    type Job = { run: () => Promise<unknown>; every?: () => number };
+    const APP_JOBS: Record<App, Job[]> = {
+      finance: [{ run: fireflyDailyJob }, { run: recurringJob }, { run: () => subscriptionReminderJob() }, { run: budgetAlertJob }],
+      travel: [],
+      watchlist: [{ run: () => watchSyncJob() }],
+      inventory: [{ run: () => warrantyJob() }],
+      notes: [],
+      tasks: [{ run: () => taskReminderJob() }],
+      stocks: [{ run: () => pruneStockCache() }, { run: () => brokerSyncJob() }, { run: () => stockAlertJob(), every: () => loadConfig().settings.stocks.alertMinutes * 60_000 }],
+    };
     // An app's jobs sleep while it is turned off.
-    onHourly(whenEnabled("finance", fireflyDailyJob));
-    onHourly(whenEnabled("finance", recurringJob));
-    onHourly(whenEnabled("finance", () => subscriptionReminderJob()));
-    onHourly(whenEnabled("finance", budgetAlertJob));
+    for (const [app, jobs] of Object.entries(APP_JOBS) as [App, Job[]][]) {
+      for (const job of jobs) {
+        const run = whenEnabled(app, job.run);
+        if (job.every) onEvery(job.every, run);
+        else onHourly(run);
+      }
+    }
+
     onHourly(updateJob);
     onHourly(backupJob);
     onHourly(async () => reconcileModules());
-    onHourly(whenEnabled("inventory", () => warrantyJob()));
-    onHourly(whenEnabled("tasks", () => taskReminderJob()));
-    onHourly(whenEnabled("watchlist", () => watchSyncJob()));
-    onHourly(whenEnabled("stocks", () => pruneStockCache()));
-    onHourly(whenEnabled("stocks", () => brokerSyncJob()));
-    onEvery(() => loadConfig().settings.stocks.alertMinutes * 60_000, whenEnabled("stocks", () => stockAlertJob()));
     onHourly(async () => void pruneSessions());
     onHourly(async () => void pruneAudit());
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { collectKeys } from "../scripts/i18n-keys.mjs";
-import { fr } from "@/i18n/fr";
+import { FR_PARTS, fr } from "@/i18n/fr";
 import { pickLocale, translator } from "@/i18n";
 
 /** Code, YAML samples and example values that read the same in every language. */
@@ -28,6 +28,18 @@ describe("French translation", () => {
     expect(keys.length).toBeGreaterThan(800);
     const missing = keys.filter((k) => !(k in fr) && !isTechnical(k));
     expect(missing).toEqual([]);
+  });
+
+  it("keeps each key in one app's dictionary only", () => {
+    const seen = new Map<string, string>();
+    const twice = Object.entries(FR_PARTS).flatMap(([part, dict]) =>
+      Object.keys(dict).flatMap((k) => {
+        const other = seen.get(k);
+        seen.set(k, part);
+        return other ? [`${k} (${other}, ${part})`] : [];
+      }),
+    );
+    expect(twice).toEqual([]);
   });
 
   it("keeps every {placeholder}", () => {

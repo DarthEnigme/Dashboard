@@ -3,7 +3,7 @@
   "version": "0.6.2",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3001",
+    "dev": "next dev",
     "build": "next build",
     "postbuild": "node -e \"for (const d of ['data', 'config', 'tests', 'src']) require('node:fs').rmSync('.next/standalone/' + d, { recursive: true, force: true })\"",
     "start": "next start",

@@ -3,21 +3,16 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Activity, CandlestickChart, Clock, ListTodo, Plane, Wallet } from "lucide-react";
+import { Activity, Clock, Plane, Wallet } from "lucide-react";
 import { fetcher } from "@/lib/fetcher";
 import type { StatusRow } from "@/app/api/status/route";
 import type { Trip } from "@/lib/travel/store";
-import { taskHref } from "@/lib/tasks/links";
-import type { StocksSummary } from "@/lib/stocks/types";
-import { SymbolIcon } from "./stocks/SymbolIcon";
-import { cash, percent, tone } from "./stocks/format";
-import { useTasksSummary } from "./tasks/useTasksSummary";
 import { nextTrip } from "@/lib/travel/nextTrip";
 import { parseZones } from "@/info/zones";
 import type { Summary } from "@/lib/finance/aggregate";
 import { money } from "@/lib/finance/format";
-import { dateOnly, formatLocale } from "@/i18n/format";
-import { asLocal } from "@/lib/day";
+import { formatLocale } from "@/i18n/format";
+import { localDay } from "@/lib/day";
 import { useT } from "@/i18n/client";
 
 export function Chip({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -55,67 +50,6 @@ export function ClockWidget({ hour12, timezone, zones, seconds }: { hour12: bool
         </div>
       ))}
     </Chip>
-  );
-}
-
-const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-/** Open and overdue tasks, and the next one due. Personal: shows nothing without the tasks permission. */
-export function TasksWidget({ label }: { label?: string }) {
-  const t = useT();
-  const { data, error } = useTasksSummary();
-  if (error || !data) return null;
-  const next = data.due[0];
-  return (
-    <Link href={next ? taskHref(next) : "/tasks"} className="glass glass-interactive flex min-h-16 items-center gap-4 rounded-2xl px-4 py-3">
-      <ListTodo className="h-6 w-6 text-accent" />
-      <div className="min-w-0">
-        <div className="text-sm text-muted">
-          {label || t("Tasks")}
-          {" · "}
-          {t("{n} open", { n: data.open })}
-          {data.overdue > 0 && <span className="font-medium text-[var(--err)]"> · {t("{n} overdue", { n: data.overdue })}</span>}
-        </div>
-        {next ? (
-          <div className="flex items-baseline gap-2">
-            <span className="max-w-48 truncate font-semibold">{next.title}</span>
-            <span className={`text-sm tabular-nums ${next.overdue ? "text-[var(--err)]" : "text-muted"}`}>{next.overdue ? t("Overdue") : next.due === localDay() ? t("today") : dateOnly(asLocal(next.due))}</span>
-          </div>
-        ) : (
-          <div className="text-sm">{t("Nothing due soon.")}</div>
-        )}
-      </div>
-    </Link>
-  );
-}
-
-/** All of one's portfolios: value, today's change, and the best and worst mover. Personal: shows nothing without the stocks permission. */
-export function StocksWidget({ label }: { label?: string }) {
-  const t = useT();
-  const { data, error } = useSWR<StocksSummary>("/api/stocks/summary", fetcher, { refreshInterval: 900_000, shouldRetryOnError: false });
-  if (error || !data || !data.holdings) return null;
-  const mover = (m: StocksSummary["best"]) =>
-    m && (
-      <span className="flex items-center gap-1 text-xs">
-        <SymbolIcon symbol={m.symbol} size={16} />
-        {m.symbol} <span className={`tabular-nums ${tone(m.change)}`}>{percent(m.change)}</span>
-      </span>
-    );
-  return (
-    <Link href="/stocks" className="glass glass-interactive flex min-h-16 items-center gap-4 rounded-2xl px-4 py-3">
-      <CandlestickChart className="h-6 w-6 text-accent" />
-      <div>
-        <div className="text-sm text-muted">{label || t("Portfolio")}</div>
-        <div className="flex items-baseline gap-2">
-          <span className="font-semibold tabular-nums">{cash(data.value, data.currency)}</span>
-          <span className={`text-sm tabular-nums ${tone(data.dayChange)}`}>{percent(data.dayChangePct)}</span>
-        </div>
-      </div>
-      <div className="flex flex-col gap-0.5">
-        {mover(data.best)}
-        {mover(data.worst)}
-      </div>
-    </Link>
   );
 }
 

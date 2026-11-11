@@ -29,7 +29,9 @@ import { bytes, duration } from "@/integrations/format";
 import { msg } from "@/i18n";
 import { formatLocale } from "@/i18n/format";
 import { useT } from "@/i18n/client";
-import { Chip, ClockWidget, FinanceWidget, StatusWidget, StocksWidget, TasksWidget, TripWidget } from "./InfoWidgets";
+import { Chip, ClockWidget, FinanceWidget, StatusWidget, TripWidget } from "./InfoWidgets";
+import { StocksWidget } from "./stocks/StocksWidget";
+import { TasksWidget } from "./tasks/TasksWidget";
 
 export function InfoBar({ widgets, refreshSeconds }: { widgets: ClientInfoWidget[]; refreshSeconds: number }) {
   const t = useT();
