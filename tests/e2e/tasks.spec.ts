@@ -41,7 +41,11 @@ test.describe.serial("tasks", () => {
     await page.mouse.down();
     await page.mouse.move(from.x + from.width / 2 + 20, from.y + from.height / 2, { steps: 4 });
     await page.mouse.move(to.x + to.width / 2, to.y - 20, { steps: 12 });
+    // The board shows the move at once, then redraws with the server's answer: wait for it, so the
+    // next click doesn't land on a card being replaced.
+    const saved = page.waitForResponse((r) => r.url().includes("/api/tasks/items") && r.request().method() === "PATCH");
     await page.mouse.up();
+    await saved;
     await expect(column("In progress").getByRole("button", { name: "Renew the certificate" })).toBeVisible();
     await expect(column("To do").getByRole("button", { name: "Renew the certificate" })).toHaveCount(0);
 
