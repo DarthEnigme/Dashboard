@@ -76,6 +76,31 @@ describe("project boards", () => {
     expect(() => updateTask(me, { id: task("A").id, blocked_by: [task("C").id] })).toThrow(/waits for/);
   });
 
+  it("still lets a finished task be edited after what it waits for opens again", () => {
+    const done = () => board().columns[2].id;
+    add("Design");
+    add("Build", { blocked_by: [task("Design").id] });
+    updateTask(me, { id: task("Design").id, column: done() });
+    updateTask(me, { id: task("Build").id, column: done() });
+    // Design goes back to work; Build stays finished and can still be renamed, with the same blockers sent.
+    updateTask(me, { id: task("Design").id, column: board().columns[0].id });
+    updateTask(me, { id: task("Build").id, title: "Build v2", blocked_by: [task("Design").id] });
+    expect(task("Build v2").completed_at).not.toBeNull();
+    // Moving it to another lane in its column is not finishing it again either.
+    addLane(me, { board: board().id, name: "Later" });
+    updateTask(me, { id: task("Build v2").id, lane: board().lanes[0].id });
+  });
+
+  it("finishes a column's tasks together when they wait on each other there, whatever their order", () => {
+    add("Build");
+    add("Design");
+    updateTask(me, { id: task("Build").id, blocked_by: [task("Design").id] });
+    updateColumn(me, { id: board().columns[0].id, done: true });
+    expect(board().columns[0].tasks.every((t) => t.completed_at !== null)).toBe(true);
+    updateColumn(me, { id: board().columns[0].id, done: false });
+    expect(board().columns[0].tasks.every((t) => t.completed_at === null)).toBe(true);
+  });
+
   it("keeps a task's place when it is saved in the same column", () => {
     for (const title of ["one", "two", "three"]) add(title);
     updateTask(me, { id: task("one").id, column: board().columns[0].id, title: "first" });

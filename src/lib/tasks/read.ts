@@ -1,8 +1,8 @@
 import { parseTags } from "../clean";
 import { localDay } from "../day";
 import { ensureBoards } from "./boards";
-import { boardWaits } from "./items";
-import { all, one } from "./sql";
+import { boardWaits } from "./rules";
+import { all, flag, one } from "./sql";
 import type { BoardNames, DueTask, Task, TasksData, TasksSummary } from "./types";
 
 /**
@@ -12,7 +12,7 @@ import type { BoardNames, DueTask, Task, TasksData, TasksSummary } from "./types
 export function loadBoard(userId: number, boardId: number | undefined, names: BoardNames): Omit<TasksData, "alerts"> {
   const boards = ensureBoards(userId, names);
   const summary = boards.find((b) => b.id === boardId) ?? boards[0];
-  const flags = one<{ project: number; notify: number }>("SELECT project, notify FROM task_boards WHERE id = ?", summary.id)!;
+  const flags = one<{ project: number; notify: number }>("SELECT project, notify FROM task_boards WHERE id = ?", summary.id)!; // the row exists: it was just listed
   const lanes = all<{ id: number; name: string; collapsed: number }>("SELECT id, name, collapsed FROM task_lanes WHERE board_id = ? ORDER BY ord, id", summary.id);
   const columns = all<{ id: number; name: string; done: number }>("SELECT id, name, done FROM task_columns WHERE board_id = ? ORDER BY ord, id", summary.id);
   const rows = all<Omit<Task, "labels" | "blocked_by" | "blocked"> & { labels: string | null }>(
@@ -31,10 +31,10 @@ export function loadBoard(userId: number, boardId: number | undefined, names: Bo
     boards,
     board: {
       ...summary,
-      project: flags.project === 1,
-      notify: flags.notify === 1,
-      lanes: lanes.map((l) => ({ id: l.id, name: l.name, collapsed: l.collapsed === 1 })),
-      columns: columns.map((c) => ({ id: c.id, name: c.name, done: c.done === 1, tasks: tasks.filter((t) => t.column_id === c.id) })),
+      project: flag(flags.project),
+      notify: flag(flags.notify),
+      lanes: lanes.map((l) => ({ id: l.id, name: l.name, collapsed: flag(l.collapsed) })),
+      columns: columns.map((c) => ({ id: c.id, name: c.name, done: flag(c.done), tasks: tasks.filter((t) => t.column_id === c.id) })),
     },
     labels,
   };

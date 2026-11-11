@@ -630,9 +630,13 @@ export function getAppMeta<T>(key: string): T | undefined {
   }
 }
 
-/** Run `fn` in one write transaction: all of its changes land, or none do. */
+let txDepth = 0;
+
+/** Run `fn` in one write transaction: all of its changes land, or none do. Called inside one, it joins it. */
 export function transaction<T>(fn: () => T): T {
+  if (txDepth > 0) return fn();
   db().exec("BEGIN IMMEDIATE");
+  txDepth++;
   try {
     const out = fn();
     db().exec("COMMIT");
@@ -640,6 +644,8 @@ export function transaction<T>(fn: () => T): T {
   } catch (e) {
     db().exec("ROLLBACK");
     throw e;
+  } finally {
+    txDepth--;
   }
 }
 

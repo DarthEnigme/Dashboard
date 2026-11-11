@@ -5,7 +5,7 @@ import { msg } from "@/i18n";
 import { useT } from "@/i18n/client";
 import { Dialog } from "../edit/Dialog";
 import { inputClass } from "../edit/FieldInput";
-import type { Naming } from "./useTaskBoard";
+import type { Naming } from "./model";
 
 const TITLES: Record<Naming["what"], [create: string, rename: string]> = {
   board: [msg("New board"), msg("Rename board")],

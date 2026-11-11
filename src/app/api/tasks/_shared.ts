@@ -14,19 +14,8 @@ export async function names(): Promise<BoardNames> {
 }
 
 /** The board as it is now, and whether reminders can go anywhere: what every tasks route answers with. */
-const board = async (userId: number, boardId?: number) => ({ ...loadBoard(userId, boardId, await names()), alerts: hasAlertChannel(loadConfig().settings.alerts) });
+export const board = async (userId: number, boardId?: number) => ({ ...loadBoard(userId, boardId, await names()), alerts: hasAlertChannel(loadConfig().settings.alerts) });
 export const reply = async (userId: number, boardId?: number) => NextResponse.json(await board(userId, boardId));
 
-type Change<A> = (userId: number, arg: A, names: BoardNames) => number | undefined;
-
-/** The handlers of a part of a board (the board itself, a column, a lane, a task): each answers with the board it touched. */
-export const partRoutes = (store: { create: Change<Record<string, unknown>>; update: Change<Record<string, unknown>>; remove: Change<number> }) =>
-  crudRoutes(
-    guard,
-    {
-      create: async (u, b) => store.create(u, b, await names()),
-      update: async (u, b) => store.update(u, b, await names()),
-      remove: async (u, id) => store.remove(u, id, await names()),
-    },
-    board,
-  );
+/** The handlers of a part of a board (a column, a lane, a task): each answers with the board it touched. */
+export const partRoutes = (store: Parameters<typeof crudRoutes<number>>[1]) => crudRoutes(guard, store, board);

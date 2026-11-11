@@ -9,7 +9,8 @@ import type { Column, Lane, Task } from "@/lib/tasks/types";
 import { useT } from "@/i18n/client";
 import { inputClass } from "../edit/FieldInput";
 import { cellKey, cellOf, dropResult, inCell, moveToCell, rowsOf, type Cell } from "./cells";
-import { ColumnMenu, PartMenu, type PartChange } from "./PartMenu";
+import type { PartChange } from "./model";
+import { ColumnMenu, PartMenu } from "./PartMenu";
 import { TaskCard } from "./TaskCard";
 
 interface Props {

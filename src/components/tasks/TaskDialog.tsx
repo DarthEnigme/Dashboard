@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PRIORITIES, type Board, type Priority, type Task } from "@/lib/tasks/types";
+import type { NewTask, TaskDraft } from "./model";
 import { useT } from "@/i18n/client";
 import { Dialog } from "../edit/Dialog";
 import { DeleteButton } from "../edit/controls";
@@ -9,21 +10,6 @@ import { inputClass } from "../edit/FieldInput";
 import { Markdown } from "../settings/Markdown";
 import { PRIORITY_LABELS } from "./meta";
 import { TaskTitle } from "./TaskCard";
-
-export interface TaskDraft {
-  id?: number;
-  column: number;
-  lane: number | null;
-  title: string;
-  body: string;
-  priority: Priority;
-  due: string | null;
-  labels: string[];
-  blocked_by: number[];
-}
-
-/** Where a new task starts. */
-export type NewTask = Pick<Task, "column_id" | "lane_id">;
 
 interface Props {
   /** The task to edit, or where a new one starts. */
@@ -77,7 +63,7 @@ export function TaskDialog({ task, board, labels, onSave, onDelete, onClose }: P
         body: draft.body,
         priority: draft.priority,
         due: draft.due || null,
-        labels: draft.labels.split(",").map((l) => l.trim()).filter(Boolean),
+        labels: draft.labels,
         blocked_by: draft.blocked_by,
       }),
     );

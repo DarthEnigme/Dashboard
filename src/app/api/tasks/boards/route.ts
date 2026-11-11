@@ -1,5 +1,5 @@
 import { createBoard, deleteBoard, updateBoard } from "@/lib/tasks/store";
-import { partRoutes } from "../_shared";
+import { names, partRoutes } from "../_shared";
 
 export const dynamic = "force-dynamic";
 
@@ -8,4 +8,4 @@ export const dynamic = "force-dynamic";
  * PATCH { id, name?, project?, notify? }.
  * DELETE ?id=: the board goes with its lanes, columns and tasks; the answer shows another board.
  */
-export const { POST, PATCH, DELETE } = partRoutes({ create: createBoard, update: updateBoard, remove: deleteBoard });
+export const { POST, PATCH, DELETE } = partRoutes({ create: async (u, b) => createBoard(u, b, await names()), update: updateBoard, remove: deleteBoard });

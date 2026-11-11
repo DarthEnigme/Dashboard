@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Plus, Rows3 } from "lucide-react";
 import type { Task } from "@/lib/tasks/types";
+import { oneOf } from "@/lib/clean";
+import { useRemembered } from "@/lib/useRemembered";
 import { useT } from "@/i18n/client";
 import { AppHeader } from "../AppHeader";
 import { Board } from "./Board";
 import { ListView } from "./ListView";
 import { NameDialog } from "./NameDialog";
 import { Reminders } from "./Reminders";
-import { TaskDialog, type NewTask } from "./TaskDialog";
-import { Toolbar, viewsFor, type View } from "./Toolbar";
+import { TaskDialog } from "./TaskDialog";
+import { Toolbar, VIEW_IDS, viewsFor, type View } from "./Toolbar";
 import { applyFilter, filtering, overdue, type Filter } from "./meta";
-import { recall, remember, useTaskBoard, type Naming } from "./useTaskBoard";
+import type { Naming, NewTask } from "./model";
+import { useTaskBoard } from "./useTaskBoard";
 import { Progress, WorkflowView } from "./WorkflowView";
 
 const VIEW_KEY = "page.tasks.view";
@@ -22,15 +25,11 @@ export function TasksPage() {
   const t = useT();
   const tasks = useTaskBoard();
   const { data, board, columns } = tasks;
-  const [view, setView] = useState<View>("board");
+  const [savedView, showView] = useRemembered(VIEW_KEY);
+  const view = oneOf<View>(savedView, VIEW_IDS, "board");
   const [filter, setFilter] = useState<Filter>({ text: "" });
   const [open, setOpen] = useState<Task | NewTask>();
   const [naming, setNaming] = useState<Naming>();
-
-  useEffect(() => {
-    const v = recall(VIEW_KEY);
-    if (v === "list" || v === "workflow") setView(v);
-  }, []);
 
   const shown = applyFilter(columns, filter);
   const all = columns.flatMap((c) => c.tasks);
@@ -48,10 +47,6 @@ export function TasksPage() {
   const showBoard = (id: number) => {
     tasks.showBoard(id);
     setFilter({ text: "" });
-  };
-  const showView = (v: View) => {
-    setView(v);
-    remember(VIEW_KEY, v);
   };
 
   return (
@@ -96,8 +91,8 @@ export function TasksPage() {
                 onOpen={setOpen}
                 onAdd={tasks.addTask}
                 onMove={tasks.moveTask}
-                onColumn={(id, change) => ("rename" in change ? setNaming({ what: "column", id, name: columns.find((c) => c.id === id)!.name }) : tasks.changeColumn(id, change))}
-                onLane={(id, change) => ("rename" in change ? setNaming({ what: "lane", id, name: board.lanes.find((l) => l.id === id)!.name }) : tasks.changeLane(id, change))}
+                onColumn={(id, change) => ("rename" in change ? setNaming(tasks.renaming("column", id)) : tasks.changeColumn(id, change))}
+                onLane={(id, change) => ("rename" in change ? setNaming(tasks.renaming("lane", id)) : tasks.changeLane(id, change))}
               />
               <div className="flex flex-wrap gap-1">
                 <button type="button" onClick={() => setNaming({ what: "column", name: "" })} className="flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-muted hover:bg-hover hover:text-fg">

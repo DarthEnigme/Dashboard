@@ -8,7 +8,7 @@ import { DeleteButton, IconButton } from "../edit/controls";
 import { inputBase } from "../edit/FieldInput";
 import { Menu, menuItem } from "../edit/Menu";
 import { PRIORITY_LABELS, type Filter } from "./meta";
-import type { Naming } from "./useTaskBoard";
+import type { Naming } from "./model";
 
 export type View = "board" | "list" | "workflow";
 
@@ -18,6 +18,7 @@ const VIEWS: { id: View; icon: LucideIcon; label: string; project?: true }[] = [
   { id: "list", icon: List, label: msg("List") },
   { id: "workflow", icon: Workflow, label: msg("Workflow"), project: true },
 ];
+export const VIEW_IDS = VIEWS.map((v) => v.id);
 export const viewsFor = (board: Pick<Board, "project">) => VIEWS.filter((v) => !v.project || board.project).map((v) => v.id);
 
 interface Props {

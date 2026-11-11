@@ -1,35 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import type { Board, Column, TasksData } from "@/lib/tasks/types";
+import { useRemembered } from "@/lib/useRemembered";
 import type { Cell } from "./cells";
-import type { PartChange } from "./PartMenu";
-import type { TaskDraft } from "./TaskDialog";
+import type { Naming, PartMove, TaskDraft } from "./model";
 import { refreshTasksSummary } from "./useTasksSummary";
 
-/** What the one-field dialog is naming (no id: a new one). */
-export type Naming = { what: "board" | "column" | "lane"; id?: number; name: string };
-/** A change made from a column's or a lane's menu (renaming goes through the dialog). */
-export type PartMove = Exclude<PartChange, { rename: true }>;
-
 const BOARD_KEY = "page.tasks.board";
-export const remember = (key: string, value: string) => {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // private windows: the choice just isn't kept
-  }
-};
-export const recall = (key: string) => {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-};
+const PATHS = { board: "boards", column: "columns", lane: "lanes" } as const;
+const boardUrl = (id?: number) => (id ? `/api/tasks?board=${id}` : "/api/tasks");
 
 /**
  * One board and every change to it. The address says which board (`?board=`) and which task to open
@@ -40,43 +23,57 @@ export const recall = (key: string) => {
 export function useTaskBoard() {
   const params = useSearchParams();
   const router = useRouter();
-  const [remembered, setRemembered] = useState<number>();
-  useEffect(() => setRemembered(Number(recall(BOARD_KEY)) || undefined), []);
-  const boardId = Number(params.get("board")) || remembered;
-
-  const { data, mutate, error } = useSWR<TasksData>(boardId ? `/api/tasks?board=${boardId}` : "/api/tasks", fetcher, { keepPreviousData: true });
+  const { mutate: mutateKey } = useSWRConfig();
+  const [remembered, remember] = useRemembered(BOARD_KEY);
+  const asked = Number(params.get("board")) || undefined;
+  const boardId = asked ?? (Number(remembered) || undefined);
+  // Without a board in the address, wait for the one of last time rather than load the first one too.
+  const { data, mutate, error } = useSWR<TasksData>(asked || remembered !== undefined ? boardUrl(boardId) : null, fetcher, { keepPreviousData: true });
   const [failure, setFailure] = useState<string>();
   const board = data?.board;
   const columns = board?.columns ?? [];
 
   const go = (id: number, task?: number) => {
-    remember(BOARD_KEY, String(id));
+    remember(String(id));
     router.replace(`/tasks?board=${id}${task ? `&task=${task}` : ""}`, { scroll: false });
   };
 
-  /** Send a change; the answer is the board as saved. Meanwhile the page can already show `optimistic`. */
-  const send = async (path: string, method: string, body?: unknown, optimistic?: Partial<Board>) => {
+  /** Run a change, keeping its failure for `problem` and the reminders bell up to date. */
+  const attempt = async <T>(work: () => Promise<T>): Promise<T> => {
     setFailure(undefined);
     try {
-      await mutate(sendJson<TasksData>(`/api/tasks/${path}`, method, body), {
-        optimisticData: optimistic && data ? { ...data, board: { ...data.board, ...optimistic } } : undefined,
-        rollbackOnError: true,
-        revalidate: false,
-      });
+      const out = await work();
       refreshTasksSummary();
+      return out;
     } catch (e) {
       setFailure((e as Error).message);
       throw e;
     }
   };
+  /** Send a change to this board; the answer is the board as saved. Meanwhile the page can already show `optimistic`. */
+  const send = (path: string, method: string, body?: unknown, optimistic?: Partial<Board>) =>
+    attempt(() =>
+      mutate(sendJson<TasksData>(`/api/tasks/${path}`, method, body), {
+        optimisticData: optimistic && data ? { ...data, board: { ...data.board, ...optimistic } } : undefined,
+        rollbackOnError: true,
+        revalidate: false,
+      }),
+    );
+  /** Send a change that answers with another board (a new one, or the one left after a delete), and go there. */
+  const sendAndGo = (path: string, method: string, body?: unknown) =>
+    attempt(async () => {
+      const next = await sendJson<TasksData>(`/api/tasks/${path}`, method, body);
+      await mutateKey(boardUrl(next.board.id), next, { revalidate: false });
+      go(next.board.id);
+    });
   /** The same, for changes made outside a dialog: the failure shows above the board. */
-  const quiet = (...args: Parameters<typeof send>) => void send(...args).catch(() => {});
+  const quiet = (work: Promise<unknown>) => void work.catch(() => {});
 
   /** Move, delete or change a column or a lane from its menu. */
   const part = (kind: "columns" | "lanes", siblings: { id: number }[], id: number, change: PartMove | { collapsed: boolean }, optimistic?: Partial<Board>) => {
-    if ("remove" in change) quiet(`${kind}?id=${id}`, "DELETE");
-    else if ("shift" in change) quiet(kind, "PATCH", { id, index: siblings.findIndex((x) => x.id === id) + change.shift });
-    else quiet(kind, "PATCH", { id, ...change }, optimistic);
+    if ("remove" in change) quiet(send(`${kind}?id=${id}`, "DELETE"));
+    else if ("shift" in change) quiet(send(kind, "PATCH", { id, index: siblings.findIndex((x) => x.id === id) + change.shift }));
+    else quiet(send(kind, "PATCH", { id, ...change }, optimistic));
   };
 
   return {
@@ -91,34 +88,31 @@ export function useTaskBoard() {
     },
     showBoard: (id: number) => go(id),
 
-    saveTask: (d: TaskDraft) => send("items", d.id === undefined ? "POST" : "PATCH", d),
-    deleteTask: (id: number) => send(`items?id=${id}`, "DELETE"),
-    addTask: (cell: Cell, title: string) => quiet("items", "POST", { column: cell.column, lane: cell.lane, title }),
+    saveTask: (d: TaskDraft) => send("items", d.id === undefined ? "POST" : "PATCH", d).then(() => {}),
+    deleteTask: (id: number) => send(`items?id=${id}`, "DELETE").then(() => {}),
+    addTask: (cell: Cell, title: string) => quiet(send("items", "POST", { column: cell.column, lane: cell.lane, title })),
     moveTask: (task: number, cell: Cell, index?: number, optimistic?: Column[]) =>
-      quiet("items", "PATCH", { id: task, column: cell.column, lane: cell.lane, index }, optimistic && { columns: optimistic }),
+      quiet(send("items", "PATCH", { id: task, column: cell.column, lane: cell.lane, index }, optimistic && { columns: optimistic })),
 
     changeColumn: (id: number, change: PartMove) => part("columns", columns, id, change),
     changeLane: (id: number, change: PartMove | { collapsed: boolean }) =>
       part("lanes", board?.lanes ?? [], id, change, "collapsed" in change ? { lanes: board?.lanes.map((l) => (l.id === id ? { ...l, ...change } : l)) } : undefined),
     changeBoard: (patch: Partial<Pick<Board, "project" | "notify">>) => {
-      if (board) quiet("boards", "PATCH", { id: board.id, ...patch }, patch);
+      if (board) quiet(send("boards", "PATCH", { id: board.id, ...patch }, patch));
     },
 
-    saveName: async (n: Naming) => {
-      if (n.what === "board" && n.id === undefined) {
-        // A new board answers with itself: go to it.
-        go((await sendJson<TasksData>("/api/tasks/boards", "POST", { name: n.name })).board.id);
-        return;
-      }
-      const kind = { board: "boards", column: "columns", lane: "lanes" }[n.what];
-      await send(kind, n.id === undefined ? "POST" : "PATCH", n.id === undefined ? { board: board!.id, name: n.name } : { id: n.id, name: n.name });
+    /** What the name dialog starts with to rename a column or a lane. */
+    renaming: (what: "column" | "lane", id: number): Naming | undefined => {
+      const found = (what === "column" ? columns : (board?.lanes ?? [])).find((x) => x.id === id);
+      return found && { what, id, name: found.name };
     },
-    deleteBoard: async () => {
-      try {
-        go((await sendJson<TasksData>(`/api/tasks/boards?id=${board!.id}`, "DELETE")).board.id);
-      } catch (e) {
-        setFailure((e as Error).message);
-      }
+    saveName: async (n: Naming) => {
+      if (n.what === "board" && n.id === undefined) return sendAndGo("boards", "POST", { name: n.name });
+      if (n.id !== undefined) await send(PATHS[n.what], "PATCH", { id: n.id, name: n.name });
+      else if (board) await send(PATHS[n.what], "POST", { board: board.id, name: n.name });
+    },
+    deleteBoard: () => {
+      if (board) quiet(sendAndGo(`boards?id=${board.id}`, "DELETE"));
     },
   };
 }

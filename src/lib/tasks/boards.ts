@@ -1,6 +1,6 @@
 import { transaction } from "../db";
 import { text } from "../clean";
-import { all, fail, ownBoard, run } from "./sql";
+import { all, bool, fail, ownBoard, patch, run } from "./sql";
 import type { BoardInput, BoardNames, BoardSummary } from "./types";
 
 const MAX_BOARDS = 50;
@@ -18,27 +18,23 @@ export function createBoard(userId: number, b: BoardInput, names: BoardNames): n
   });
 }
 
-/** This person's boards, after giving them a first one if they have none. */
-export function ensureBoards(userId: number, names: BoardNames): BoardSummary[] {
-  const boards = listBoards(userId);
-  if (boards.length) return boards;
-  createBoard(userId, { name: names.board }, names);
-  return listBoards(userId);
-}
+/** This person's boards, after giving them a first one if they have none (checked and made at once, so never twice). */
+export const ensureBoards = (userId: number, names: BoardNames): BoardSummary[] =>
+  transaction(() => {
+    if (!listBoards(userId).length) createBoard(userId, { name: names.board }, names);
+    return listBoards(userId);
+  });
 
 /** { id, name?, project?, notify? } */
 export function updateBoard(userId: number, b: BoardInput): number {
   const id = ownBoard(userId, Number(b.id));
-  transaction(() => {
-    if (b.name !== undefined) run("UPDATE task_boards SET name = ? WHERE id = ?", text(b.name, 80) ?? fail("Name required"), id);
-    if (typeof b.project === "boolean") run("UPDATE task_boards SET project = ? WHERE id = ?", b.project ? 1 : 0, id);
-    if (typeof b.notify === "boolean") run("UPDATE task_boards SET notify = ? WHERE id = ?", b.notify ? 1 : 0, id);
-  });
+  patch("task_boards", id, { name: b.name === undefined ? undefined : (text(b.name, 80) ?? fail("Name required")), project: bool(b.project), notify: bool(b.notify) });
   return id;
 }
 
-/** Deletes the board with its lanes, columns and tasks. */
-export function deleteBoard(userId: number, id: number): undefined {
-  run("DELETE FROM task_boards WHERE id = ?", ownBoard(userId, id));
-  return undefined;
+/** Deletes the board with its lanes, columns and tasks. Returns its (now unknown) id, so the answer falls back to another board. */
+export function deleteBoard(userId: number, id: number): number {
+  const board = ownBoard(userId, id);
+  run("DELETE FROM task_boards WHERE id = ?", board);
+  return board;
 }

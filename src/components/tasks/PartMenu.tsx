@@ -6,9 +6,8 @@ import type { Column } from "@/lib/tasks/types";
 import { useT } from "@/i18n/client";
 import { DeleteButton } from "../edit/controls";
 import { Menu, menuItem } from "../edit/Menu";
+import type { PartChange } from "./model";
 
-/** What can be asked of a column or a lane. */
-export type PartChange = { rename: true } | { done: boolean } | { shift: -1 | 1 } | { remove: true };
 
 interface Props {
   label: string;

@@ -42,22 +42,42 @@ export const ownTask = (userId: number, id: number) =>
     userId,
   ) ?? fail("No such task");
 
+// ---------- writing ----------
+
+type Table = "tasks" | "task_columns" | "task_lanes" | "task_boards";
+
+/** A checkbox sent by a client, as stored (1/0); undefined when it isn't a boolean, so it is left alone. */
+export const bool = (v: unknown) => (typeof v === "boolean" ? (v ? 1 : 0) : undefined);
+/** A stored 1/0, read back. */
+export const flag = (n: number) => n === 1;
+
+/** Set the given columns of one row; an undefined value leaves that column as it is. */
+export function patch(table: Table, id: number, set: Record<string, Arg | undefined>) {
+  const keys = Object.keys(set).filter((k) => set[k] !== undefined);
+  if (keys.length) run(`UPDATE ${table} SET ${keys.map((k) => `${k} = ?`).join(", ")} WHERE id = ?`, ...keys.map((k) => set[k] as Arg), id);
+}
+
 // ---------- ordering ----------
 
+type Ordered = Exclude<Table, "task_boards">;
+type Scope = Record<string, number | null>;
+
+/** The rows matching every `scope` column, nulls included. */
+const scopeWhere = (scope: Scope) => ({ sql: Object.keys(scope).map((k) => `${k} IS ?`).join(" AND "), args: Object.values(scope) });
+
 /**
- * Put `id` at `index` among its siblings (the rows of `table` matching every `scope` column, nulls
- * included) and renumber them. An index past the end, or null, means last.
+ * Put `id` at `index` among its siblings (the rows of `table` in `scope`) and renumber them. An index
+ * past the end, or null, means last.
  */
-export function place(table: "tasks" | "task_columns" | "task_lanes", scope: Record<string, number | null>, id: number, index: number | null) {
-  const keys = Object.keys(scope);
-  const where = keys.map((k) => `${k} IS ?`).join(" AND ");
-  const ids = all<{ id: number }>(`SELECT id FROM ${table} WHERE ${where} AND id != ? ORDER BY ord, id`, ...keys.map((k) => scope[k]), id).map((r) => r.id);
+export function place(table: Ordered, scope: Scope, id: number, index: number | null) {
+  const w = scopeWhere(scope);
+  const ids = all<{ id: number }>(`SELECT id FROM ${table} WHERE ${w.sql} AND id != ? ORDER BY ord, id`, ...w.args, id).map((r) => r.id);
   ids.splice(index === null ? ids.length : Math.min(index, ids.length), 0, id);
   ids.forEach((sibling, ord) => run(`UPDATE ${table} SET ord = ? WHERE id = ?`, ord, sibling));
 }
 
 /** The next free position at the end of a scope. */
-export const lastOrd = (table: "tasks" | "task_columns" | "task_lanes", scope: Record<string, number | null>) => {
-  const keys = Object.keys(scope);
-  return one<{ n: number }>(`SELECT COALESCE(MAX(ord), -1) + 1 AS n FROM ${table} WHERE ${keys.map((k) => `${k} IS ?`).join(" AND ")}`, ...keys.map((k) => scope[k]))!.n;
+export const lastOrd = (table: Ordered, scope: Scope) => {
+  const w = scopeWhere(scope);
+  return one<{ n: number }>(`SELECT COALESCE(MAX(ord), -1) + 1 AS n FROM ${table} WHERE ${w.sql}`, ...w.args)!.n;
 };
