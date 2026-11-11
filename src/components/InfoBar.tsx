@@ -29,7 +29,7 @@ import { bytes, duration } from "@/integrations/format";
 import { msg } from "@/i18n";
 import { formatLocale } from "@/i18n/format";
 import { useT } from "@/i18n/client";
-import { Chip, ClockWidget, FinanceWidget, StatusWidget, TripWidget } from "./InfoWidgets";
+import { Chip, ClockWidget, FinanceWidget, StatusWidget, StocksWidget, TasksWidget, TripWidget } from "./InfoWidgets";
 
 export function InfoBar({ widgets, refreshSeconds }: { widgets: ClientInfoWidget[]; refreshSeconds: number }) {
   const t = useT();
@@ -43,6 +43,10 @@ export function InfoBar({ widgets, refreshSeconds }: { widgets: ClientInfoWidget
             return <ClockWidget key={i} hour12={!!w.hour12} timezone={w.timezone as string} zones={w.zones} seconds={!!w.seconds} />;
           case "trip":
             return <TripWidget key={i} label={w.label as string} />;
+          case "stocks":
+            return <StocksWidget key={i} label={w.label as string} />;
+          case "tasks":
+            return <TasksWidget key={i} label={w.label as string} />;
           case "status":
             return <StatusWidget key={i} refreshSeconds={refreshSeconds} />;
           case "finance":

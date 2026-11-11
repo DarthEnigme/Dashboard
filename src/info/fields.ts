@@ -23,6 +23,14 @@ export const infoFields: Record<string, { label: string; fields: FieldSpec[] }> 
     label: "Next trip",
     fields: [{ key: "label", label: "Label", placeholder: "Next trip" }],
   },
+  stocks: {
+    label: "Stock portfolio",
+    fields: [{ key: "label", label: "Label", placeholder: "Portfolio" }],
+  },
+  tasks: {
+    label: "Tasks due",
+    fields: [{ key: "label", label: "Label", placeholder: "Tasks" }],
+  },
   status: {
     label: "Services up / down",
     fields: [],

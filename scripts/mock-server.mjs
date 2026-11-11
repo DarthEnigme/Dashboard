@@ -64,8 +64,8 @@ const readBody = (req) =>
 
 // Yahoo Finance (Stocks app, PAGE_YAHOO_URL=http://localhost:4010/yahoo): a few symbols with steady, made-up prices.
 const yahooSymbols = {
-  "MC.PA": { name: "LVMH Moët Hennessy", currency: "EUR", exchange: "Paris", base: 600, sector: "Consumer Cyclical", industry: "Luxury Goods", dividend: 6.5 },
-  AAPL: { name: "Apple Inc.", currency: "USD", exchange: "NasdaqGS", base: 200, sector: "Technology", industry: "Consumer Electronics", dividend: 0.5 },
+  "MC.PA": { name: "LVMH Moët Hennessy", currency: "EUR", exchange: "Paris", base: 600, sector: "Consumer Cyclical", industry: "Luxury Goods", dividend: 6.5, isin: "FR0000121014", country: "France", website: "https://www.lvmh.com" },
+  AAPL: { name: "Apple Inc.", currency: "USD", exchange: "NasdaqGS", base: 200, sector: "Technology", industry: "Consumer Electronics", dividend: 0.5, isin: "US0378331005", country: "United States", website: "https://www.apple.com" },
   "^GSPC": { name: "S&P 500", currency: "USD", exchange: "SNP", base: 5000 },
   "USDEUR=X": { name: "USD/EUR", currency: "EUR", exchange: "CCY", base: 0.9, flat: true },
 };
@@ -114,6 +114,13 @@ const yahooFigures = (symbol) => {
         annual("FreeCashFlow", 9e9, 1e9),
         annual("TotalDebt", 30e9, 1e9),
         annual("CashAndCashEquivalents", 8e9, 5e8),
+        annual("EBITDA", 22e9, 1e9),
+        annual("StockholdersEquity", 60e9, 2e9),
+        annual("InvestedCapital", 90e9, 3e9),
+        annual("CurrentAssets", 40e9, 1e9),
+        annual("CurrentLiabilities", 25e9, 1e9),
+        annual("CashDividendsPaid", -4e9, -2e8),
+        series("trailingEnterpriseValue", [point(2025, 322e9)]),
         series("trailingMarketCap", [point(2025, 300e9)]),
         series("trailingPeRatio", [{ asOfDate: "2025-12-31", periodType: "TTM", reportedValue: { raw: 21.5 } }]),
         series("trailingFreeCashFlow", [point(2025, 12e9)]),
@@ -123,11 +130,49 @@ const yahooFigures = (symbol) => {
   };
 };
 
+// The quote summary wants a session: a cookie, then a crumb for it.
+const YAHOO_COOKIE = "A3=mock-session";
+const YAHOO_CRUMB = "mockCrumb";
+const yahooSummary = (symbol) => {
+  const s = yahooSymbols[symbol];
+  const price = s.base * 1.5;
+  const in30 = Math.floor(Date.now() / 1000) + 30 * 86_400;
+  return {
+    quoteSummary: {
+      result: [
+        {
+          assetProfile: { country: s.country, city: "Somewhere", website: s.website, fullTimeEmployees: 150000, longBusinessSummary: `${s.name} makes things people buy.`, companyOfficers: [{ name: "A. Boss", title: "CEO" }] },
+          calendarEvents: { earnings: { earningsDate: [{ raw: in30, fmt: "" }] }, exDividendDate: { raw: in30 + 7 * 86_400 }, dividendDate: { raw: in30 + 14 * 86_400 } },
+          financialData: { targetLowPrice: { raw: price * 0.9 }, targetMeanPrice: { raw: price * 1.2 }, targetHighPrice: { raw: price * 1.5 }, recommendationKey: "buy", recommendationMean: { raw: 2.1 }, numberOfAnalystOpinions: { raw: 30 } },
+          recommendationTrend: { trend: [{ period: "0m", strongBuy: 8, buy: 12, hold: 8, sell: 1, strongSell: 1 }] },
+          majorHoldersBreakdown: { insidersPercentHeld: { raw: 0.02 }, institutionsPercentHeld: { raw: 0.6 }, institutionsCount: { raw: 4000 } },
+          institutionOwnership: { ownershipList: [{ organization: "Big Fund", pctHeld: { raw: 0.08 }, position: { raw: 1e9 }, value: { raw: 2e11 } }] },
+          defaultKeyStatistics: { beta: { raw: 1.1 }, forwardPE: { raw: 19.5 }, pegRatio: { raw: 1.8 }, sharesOutstanding: { raw: 5e9 }, shortPercentOfFloat: { raw: 0.01 } },
+          summaryDetail: { trailingPE: { raw: 21.5 }, dividendYield: { raw: 0.012 }, payoutRatio: { raw: 0.3 }, marketCap: { raw: 300e9 } },
+        },
+      ],
+      error: null,
+    },
+  };
+};
+
 const routes = {
+  "GET /yahoo/cookie": (_req, res) => {
+    res.writeHead(404, { "Set-Cookie": `${YAHOO_COOKIE}; Path=/; HttpOnly` });
+    res.end("not here");
+  },
+  "GET /yahoo/v1/test/getcrumb": (req, res) => {
+    if (!(req.headers.cookie ?? "").includes(YAHOO_COOKIE)) {
+      res.writeHead(401);
+      return res.end("");
+    }
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end(YAHOO_CRUMB);
+  },
   "GET /yahoo/v1/finance/search": (req, res) => {
     const q = (new URL(req.url, "http://x").searchParams.get("q") ?? "").toLowerCase();
     const quotes = Object.entries(yahooSymbols)
-      .filter(([symbol, s]) => !symbol.includes("=") && (symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)))
+      .filter(([symbol, s]) => !symbol.includes("=") && (symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.isin?.toLowerCase() === q))
       .map(([symbol, s]) => ({ symbol, shortname: s.name, longname: s.name, exchDisp: s.exchange, quoteType: symbol.startsWith("^") ? "INDEX" : "EQUITY", sector: s.sector, industry: s.industry }));
     json(res, 200, { quotes });
   },
@@ -514,6 +559,16 @@ const patterns = [
       const symbol = decodeURIComponent(m[1]);
       if (!yahooSymbols[symbol]) return json(res, 404, { chart: { result: null, error: { code: "Not Found", description: "No data found, symbol may be delisted" } } });
       json(res, 200, yahooChart(symbol, new URL(req.url, "http://x").searchParams.get("period1")));
+    },
+  ],
+  [
+    "GET",
+    /^\/yahoo\/v10\/finance\/quoteSummary\/([^/]+)$/,
+    (req, res, m) => {
+      const symbol = decodeURIComponent(m[1]);
+      if (new URL(req.url, "http://x").searchParams.get("crumb") !== YAHOO_CRUMB || !(req.headers.cookie ?? "").includes(YAHOO_COOKIE)) return json(res, 401, { finance: { error: { code: "Unauthorized", description: "Invalid Crumb" } } });
+      if (!yahooSymbols[symbol]?.sector) return json(res, 404, { quoteSummary: { result: null, error: { code: "Not Found", description: "Quote not found" } } });
+      json(res, 200, yahooSummary(symbol));
     },
   ],
   [

@@ -170,6 +170,16 @@ export const settingsSchema = z
     history: z.object({ retentionDays: z.number().min(1).max(400).default(90) }).prefault({}),
     /** Device inventory: remind the alert channels this many days before a warranty ends (0 = off). */
     inventory: z.object({ warrantyDays: z.number().int().min(0).max(365).default(30) }).prefault({}),
+    /** Tasks: a task counts as "due soon" this many days before its due date (reminders and the widget). */
+    tasks: z.object({ dueSoonDays: z.number().int().min(0).max(30).default(1) }).prefault({}),
+    /** Stocks: how often price alerts are checked, and where company logos come from. */
+    stocks: z
+      .object({
+        alertMinutes: z.number().int().min(5).max(1440).default(15),
+        /** A logo URL with {symbol} or {domain} in it; by default the website's icon. */
+        logoSource: z.string().optional(),
+      })
+      .prefault({}),
     /** Nightly zip of the config, the database, uploads and the secret key. */
     backup: z
       .object({

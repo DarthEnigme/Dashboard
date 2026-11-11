@@ -1,6 +1,6 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs" && process.env.NEXT_PHASE !== "phase-production-build") {
-    const { startMonitor, onHourly } = await import("./lib/monitor");
+    const { startMonitor, onEvery, onHourly } = await import("./lib/monitor");
     const { fireflyDailyJob } = await import("./lib/finance/firefly");
     const { budgetAlertJob } = await import("./lib/finance/budgets");
     const { recurringJob, subscriptionReminderJob } = await import("./lib/finance/recurring");
@@ -9,8 +9,12 @@ export async function register() {
     const { updateJob } = await import("./lib/update/job");
     const { backupJob } = await import("./lib/backup");
     const { warrantyJob } = await import("./lib/inventory/store");
+    const { taskReminderJob } = await import("./lib/tasks/reminders");
     const { watchSyncJob } = await import("./lib/watchlist/sync");
     const { pruneStockCache } = await import("./lib/stocks/cache");
+    const { stockAlertJob } = await import("./lib/stocks/alertJob");
+    const { brokerSyncJob } = await import("./lib/stocks/brokers/sync");
+    const { loadConfig } = await import("./lib/config/load");
     const { whenEnabled } = await import("./lib/modules");
     const { reconcileModules } = await import("./lib/module-retention");
     const { announceUpdateOutcome, reconcilePendingUpdate } = await import("./lib/update/apply");
@@ -30,8 +34,11 @@ export async function register() {
     onHourly(backupJob);
     onHourly(async () => reconcileModules());
     onHourly(whenEnabled("inventory", () => warrantyJob()));
+    onHourly(whenEnabled("tasks", () => taskReminderJob()));
     onHourly(whenEnabled("watchlist", () => watchSyncJob()));
     onHourly(whenEnabled("stocks", () => pruneStockCache()));
+    onHourly(whenEnabled("stocks", () => brokerSyncJob()));
+    onEvery(() => loadConfig().settings.stocks.alertMinutes * 60_000, whenEnabled("stocks", () => stockAlertJob()));
     onHourly(async () => void pruneSessions());
     onHourly(async () => void pruneAudit());
   }

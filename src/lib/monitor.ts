@@ -22,6 +22,8 @@ interface MonitorState {
   lastMaintenance: number;
   /** Extra jobs run hourly (e.g. finance sync), registered by other modules. */
   hourly: (() => Promise<void>)[];
+  /** Jobs with their own interval (read each pass, so a settings change applies at once). */
+  periodic: { every: () => number; last: number; job: () => Promise<void> }[];
   /** Latest certificate seen per service id (HTTPS checks). */
   certs: Map<string, CertInfo>;
   lastMetrics: number;
@@ -214,6 +216,11 @@ async function tick(state: MonitorState): Promise<number> {
     }
     for (const job of state.hourly) await job().catch((e) => console.error("[nanodash] hourly job failed:", e));
   }
+  for (const p of state.periodic ?? []) {
+    if (Date.now() - p.last < p.every()) continue;
+    p.last = Date.now();
+    await p.job().catch((e) => console.error("[nanodash] periodic job failed:", e));
+  }
   gauge("page_monitor_pass_duration_ms", {}, Date.now() - started);
   gauge("page_monitor_last_pass_timestamp_seconds", {}, Math.round(Date.now() / 1000));
   dropLabel("service", new Set(ids.flat()));
@@ -227,10 +234,17 @@ export function onHourly(job: () => Promise<void>) {
   g.__pageMonitor!.hourly.push(job);
 }
 
+/** Register a job run every `every()` milliseconds (checked on each monitor pass, so no finer than the ping interval). */
+export function onEvery(every: () => number, job: () => Promise<void>) {
+  startMonitor();
+  // A monitor started by older code (dev reloads) has no list yet.
+  (g.__pageMonitor!.periodic ??= []).push({ every, last: 0, job });
+}
+
 /** Ping every service on the configured interval, store results, track incidents and fire alerts. Idempotent. */
 export function startMonitor() {
   if (g.__pageMonitor) return;
-  const state: MonitorState = { outages: new Map(), lastMaintenance: 0, hourly: [], certs: new Map(), lastMetrics: 0, breaches: new Map() };
+  const state: MonitorState = { outages: new Map(), lastMaintenance: 0, hourly: [], periodic: [], certs: new Map(), lastMetrics: 0, breaches: new Map() };
   g.__pageMonitor = state;
   // Outages that were open when the server stopped stay open until the service is seen up again.
   try {

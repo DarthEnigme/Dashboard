@@ -322,6 +322,7 @@ describe("stocks store", () => {
     });
     vi.spyOn(yahoo, "searchSymbols").mockResolvedValue([{ symbol: "AAPL", name: "Apple Inc.", exchange: "NASDAQ", type: "EQUITY", sector: "Technology", industry: "Consumer Electronics" }]);
     vi.spyOn(yahoo, "fetchFundamentals").mockResolvedValue({ currency: "USD", annual: { TotalRevenue: [{ day: "2025-09-30", value: 416e9 }] }, quarterly: {}, trailing: { PeRatio: 39 } });
+    vi.spyOn(yahoo, "fetchSummary").mockRejectedValue(new Error("offline"));
 
     const portfolios = ensurePortfolios(me, "Main portfolio", "EUR");
     addTransaction(me, { ...buy, quantity: 10, price: 100, portfolio: portfolios[0].id }, "USD");

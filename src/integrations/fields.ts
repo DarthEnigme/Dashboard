@@ -36,7 +36,7 @@ export const STABLE_TYPES = new Set([
   "proxmox", "pbs",
   "docker", "portainer", "dockhand", "arcane",
   "pihole", "adguard", "unifi", "opnsense", "pfsense", "traefik", "npm", "tailscale", "wireguard", "wgdashboard",
-  "customapi", "metric", "calendar", "rss", "snmp", "finance",
+  "customapi", "metric", "calendar", "rss", "snmp", "finance", "stocks",
 ]);
 export const isExperimental = (type: string) => !STABLE_TYPES.has(type);
 
@@ -215,6 +215,10 @@ export const integrationFields: Record<string, { label: string; fields: FieldSpe
       { key: "period", label: "Period", kind: "select", options: ["month", "year"], help: "Data comes from the Finance page (signed-in users only by default)." },
       { key: "chart", label: "Main chart", kind: "select", options: ["donut", "sankey"], help: "Wide and large tiles: spending by category, or the money flow from income to spending." },
     ],
+  },
+  stocks: {
+    label: "Stock prices",
+    fields: [{ key: "symbols", label: "Symbols", kind: "list", required: true, placeholder: "AAPL, MC.PA, ^GSPC, EURUSD=X", help: "Yahoo Finance symbols. Public prices, the same for everyone: portfolios stay in the Stocks app." }],
   },
   prometheus: {
     label: "Prometheus (PromQL)",

@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { BENCHMARKS, type Position, type StocksData } from "@/lib/stocks/types";
 import { msg } from "@/i18n";
 import { dateOnly } from "@/i18n/format";
 import { useT } from "@/i18n/client";
 import { Donut, type DonutSlice } from "../charts/Donut";
+import { ChartExport } from "../charts/ChartExport";
 import { LineChart } from "../charts/LineChart";
+import { Composition } from "./Composition";
 import { inputBase } from "../edit/FieldInput";
 import { cash, percent, quoted, shares, stockHref, tone } from "./format";
 import { Card, Choice, Stat } from "./parts";
+import { SymbolIcon } from "./SymbolIcon";
 
 const PERIODS = [
   { id: "1m", label: msg("1M"), days: 31 },
@@ -43,6 +46,7 @@ function History({ data, onBenchmark }: { data: StocksData; onBenchmark: (symbol
     return cut(xs).map((v) => (v === null || first === null || first === undefined ? null : ((1 + v / 100) / (1 + first / 100) - 1) * 100));
   };
   const benchmark = BENCHMARKS.find((b) => b.symbol === data.benchmark)!;
+  const chart = useRef<HTMLDivElement>(null);
 
   return (
     <Card
@@ -60,9 +64,11 @@ function History({ data, onBenchmark }: { data: StocksData; onBenchmark: (symbol
           )}
           <Choice label={t("Chart")} value={mode} onChange={setMode} options={[{ id: "value", label: t("Value") }, { id: "performance", label: t("Performance") }]} />
           <Choice label={t("Period")} value={period} onChange={setPeriod} options={PERIODS.map((p) => ({ id: p.id, label: t(p.label) }))} />
+          <ChartExport chart={chart} name={`portfolio-${mode}-${period}`} />
         </div>
       }
     >
+      <div ref={chart} className="flex flex-col gap-3">
       {mode === "value" ? (
         <LineChart
           x={cut(series.days).map((d) => Date.parse(d))}
@@ -92,6 +98,7 @@ function History({ data, onBenchmark }: { data: StocksData; onBenchmark: (symbol
           <p className="text-xs text-muted">{t("Time-weighted: money you add or withdraw doesn't count as performance. Prices only, without dividends.")}</p>
         </>
       )}
+      </div>
     </Card>
   );
 }
@@ -138,9 +145,12 @@ function Holdings({ positions, currency }: { positions: Position[]; currency: st
             {positions.map((p) => (
               <tr key={p.symbol} className="border-t border-line hover:bg-hover">
                 <td className={td}>
-                  <Link href={stockHref(p.symbol)} className="group flex flex-col">
-                    <span className="font-semibold group-hover:text-accent">{p.symbol}</span>
-                    <span className="max-w-56 truncate text-xs text-muted">{p.name}</span>
+                  <Link href={stockHref(p.symbol)} className="group flex items-center gap-2.5">
+                    <SymbolIcon symbol={p.symbol} />
+                    <span className="flex flex-col">
+                      <span className="font-semibold group-hover:text-accent">{p.symbol}</span>
+                      <span className="max-w-56 truncate text-xs text-muted">{p.name}</span>
+                    </span>
                   </Link>
                 </td>
                 <td className={td}>{shares(p.quantity)}</td>
@@ -181,6 +191,7 @@ export function PortfolioTab({ data, onBenchmark }: { data: StocksData; onBenchm
         <Holdings positions={data.positions} currency={currency} />
         <Allocation positions={data.positions} currency={currency} />
       </div>
+      <Composition data={data} />
       {data.closed.length > 0 && (
         <Card title={t("Sold positions")}>
           <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-3">

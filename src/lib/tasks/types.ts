@@ -5,6 +5,8 @@ export type Priority = (typeof PRIORITIES)[number];
 export interface Task {
   id: number;
   column_id: number;
+  /** The lane (row) it sits in; null for "no lane". */
+  lane_id: number | null;
   title: string;
   /** Markdown. */
   body: string;
@@ -15,6 +17,10 @@ export interface Task {
   created_at: number;
   /** When it reached a "done" column; null while it is open. */
   completed_at: number | null;
+  /** The tasks it waits for (on the same board). */
+  blocked_by: number[];
+  /** Open, and some task it waits for is still open: it can't be finished yet. */
+  blocked: boolean;
 }
 
 export interface Column {
@@ -25,12 +31,24 @@ export interface Column {
   tasks: Task[];
 }
 
+/** A row across all of a board's columns, to group tasks (a task is in one lane, or none). */
+export interface Lane {
+  id: number;
+  name: string;
+  collapsed: boolean;
+}
+
 export interface BoardSummary {
   id: number;
   name: string;
 }
 
 export interface Board extends BoardSummary {
+  /** Project mode: tasks wait for one another and the board shows its steps and progress. */
+  project: boolean;
+  /** Due and overdue tasks are sent to the alert channels. */
+  notify: boolean;
+  lanes: Lane[];
   columns: Column[];
 }
 
@@ -39,6 +57,59 @@ export interface TasksData {
   board: Board;
   /** Every label in use on this board, for suggestions and filters. */
   labels: string[];
+  /** Whether any alert channel is set up (otherwise a board can't send reminders). */
+  alerts: boolean;
+}
+
+/** An open task with a due date that is past or close, wherever it is. */
+export interface DueTask {
+  id: number;
+  title: string;
+  due: string;
+  board_id: number;
+  board: string;
+  overdue: boolean;
+}
+
+/** One person's tasks at a glance: for the reminders and the dashboard widget. */
+export interface TasksSummary {
+  open: number;
+  overdue: number;
+  /** Overdue first, then due soon; soonest first. */
+  due: DueTask[];
+}
+
+// ---------- what clients send: unchecked, the store cleans every field ----------
+
+export interface BoardInput {
+  id?: unknown;
+  name?: unknown;
+  project?: unknown;
+  notify?: unknown;
+}
+/** A column or a lane: made on `board`, or changed by `id`; `index` moves it among its siblings. */
+export interface PartInput {
+  id?: unknown;
+  board?: unknown;
+  name?: unknown;
+  index?: unknown;
+  /** Columns: tasks here count as finished. */
+  done?: unknown;
+  /** Lanes: folded on the board. */
+  collapsed?: unknown;
+}
+/** A task: made in `column`, or changed by `id`; `column`, `lane` and `index` move it. */
+export interface TaskInput {
+  id?: unknown;
+  column?: unknown;
+  lane?: unknown;
+  index?: unknown;
+  title?: unknown;
+  body?: unknown;
+  priority?: unknown;
+  due?: unknown;
+  labels?: unknown;
+  blocked_by?: unknown;
 }
 
 /** Default names for a first board, in the reader's language. */

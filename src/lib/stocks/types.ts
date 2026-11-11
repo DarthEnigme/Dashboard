@@ -1,7 +1,7 @@
 /** The shapes of the Stocks app, shared by the server and the pages (nothing here touches the database or the network). */
-import type { Fundamentals } from "./yahoo";
+import type { Company, Fundamentals } from "./yahoo";
 
-export type { Fundamentals, Metric, Point, SymbolHit } from "./yahoo";
+export type { Company, Fundamentals, Metric, Point, Recommendations, SymbolHit } from "./yahoo";
 
 export const TRADE_KINDS = ["buy", "sell"] as const;
 export type TradeKind = (typeof TRADE_KINDS)[number];
@@ -25,6 +25,8 @@ export interface Transaction {
   fees: number;
   currency: string;
   note: string | null;
+  /** Its id at the broker or in the file it was imported from. */
+  external_id: string | null;
 }
 
 export interface Position {
@@ -93,6 +95,8 @@ export interface StocksData extends Summary {
   benchmark: string;
   /** Symbols Yahoo didn't answer for. */
   errors: string[];
+  /** All portfolios shown together: what each holds of each symbol (value, in `currency`). Empty otherwise. */
+  byPortfolio: { portfolio: number; symbol: string; value: number }[];
 }
 
 export interface WatchQuote {
@@ -124,6 +128,8 @@ export interface Research {
   chart: { days: string[]; closes: number[] };
   /** Null for what has no company figures (funds, indexes, currencies). */
   fundamentals: Fundamentals | null;
+  /** Profile, calendar, analysts and holders; null when Yahoo didn't say. */
+  company: Company | null;
   /** Paid per share, by calendar year. */
   dividends: { year: string; amount: number }[];
   /** Last twelve months of dividends over the price, in percent. */
@@ -131,6 +137,42 @@ export interface Research {
   /** What this person holds of it, across their portfolios (in the quote currency). */
   holding: { quantity: number; avgCost: number; gainPct: number | null } | null;
   watched: boolean;
+}
+
+/** One symbol on the compare page: its figures (for the measures catalogue), its prices over the range, and how it moves with the benchmark. */
+export interface CompareSymbol {
+  symbol: string;
+  name: string;
+  currency: string;
+  price: number | null;
+  change: number | null;
+  fundamentals: Fundamentals | null;
+  company: Company | null;
+  chart: { days: string[]; closes: number[] };
+  beta: number | null;
+  correlation: number | null;
+  /** Yearly, in percent. */
+  volatility: number | null;
+  country: string | null;
+}
+
+export interface CompareData {
+  range: Range;
+  benchmark: { symbol: string; name: string; chart: { days: string[]; closes: number[] } };
+  symbols: CompareSymbol[];
+  /** The person's portfolios together, crossed with the market; null when not asked for or empty. */
+  portfolio: {
+    currency: string;
+    value: number;
+    cost: number;
+    gain: number;
+    gainPct: number | null;
+    dividends: number;
+    realized: number;
+    holdings: { symbol: string; name: string; value: number; weight: number; sector: string | null; currency: string; country: string | null; beta: number | null }[];
+    exposure: Record<"country" | "currency" | "sector", { name: string; value: number }[]>;
+    beta: number | null;
+  } | null;
 }
 
 /** Yahoo symbols: letters, digits and . ^ = - (AAPL, MC.PA, ^GSPC, EURUSD=X, BRK-B). */
@@ -144,3 +186,51 @@ export const BENCHMARKS = [
   { symbol: "^STOXX50E", name: "Euro Stoxx 50" },
   { symbol: "IWDA.AS", name: "MSCI World (IWDA)" },
 ] as const;
+
+// ---------- what clients send: unchecked, the store cleans every field ----------
+
+export interface PortfolioInput {
+  id?: unknown;
+  name?: unknown;
+  currency?: unknown;
+}
+export interface TransactionInput {
+  id?: unknown;
+  portfolio?: unknown;
+  symbol?: unknown;
+  kind?: unknown;
+  date?: unknown;
+  quantity?: unknown;
+  price?: unknown;
+  fees?: unknown;
+  note?: unknown;
+}
+export interface AlertInput {
+  id?: unknown;
+  kind?: unknown;
+  op?: unknown;
+  value?: unknown;
+  symbol?: unknown;
+  portfolio?: unknown;
+  channels?: unknown;
+  note?: unknown;
+  active?: unknown;
+}
+export interface BrokerInput {
+  id?: unknown;
+  kind?: unknown;
+  portfolio?: unknown;
+  secret?: unknown;
+  account?: unknown;
+}
+
+/** All of someone's portfolios at a glance, for the dashboard widget. */
+export interface StocksSummary {
+  currency: string;
+  value: number;
+  dayChange: number;
+  dayChangePct: number | null;
+  holdings: number;
+  best: { symbol: string; change: number } | null;
+  worst: { symbol: string; change: number } | null;
+}

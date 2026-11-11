@@ -15,6 +15,7 @@ import { synology } from "./synology";
 import { calendar } from "./calendar";
 import { rss } from "./rss";
 import { finance } from "./finance";
+import { stocks } from "./stocks";
 import { prometheus } from "./prometheus";
 import { grafana } from "./grafana";
 import { glances } from "./glances";
@@ -44,7 +45,7 @@ import { wgdashboard } from "./wgdashboard";
 export const integrations: Record<string, Integration> = Object.fromEntries(
   [
     docker, portainer, proxmox, uptimekuma, customapi, pihole, adguard, unifi, firefly, ghostfolio,
-    homeassistant, truenas, synology, calendar, rss, finance,
+    homeassistant, truenas, synology, calendar, rss, finance, stocks,
     prometheus, grafana, glances, netdata, metric, dockhand, arcane, snmpIntegration, pbs,
     opnsense, pfsense, npm, traefik, tailscale, cloudflare,
     immich, nextcloud, gitea, speedtest, paperless, authentik, vaultwarden, homeassistantEnergy,

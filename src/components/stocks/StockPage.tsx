@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Plus, Star } from "lucide-react";
+import { BellPlus, GitCompareArrows, Plus, Star } from "lucide-react";
 import { fetcher, sendJson } from "@/lib/fetcher";
 import { RANGES, type Range, type Research } from "@/lib/stocks/types";
 import { msg } from "@/i18n";
@@ -13,20 +13,11 @@ import { AppHeader } from "../AppHeader";
 import { LineChart } from "../charts/LineChart";
 import { Figures } from "./Figures";
 import { big, percent, quoted, shares, tone } from "./format";
-import { Card, Choice } from "./parts";
+import { CompanyFacts, MoreRatios } from "./CompanyFacts";
+import { Card, Choice, Fact } from "./parts";
+import { SymbolIcon } from "./SymbolIcon";
 
 const RANGE_LABELS: Record<Range, string> = { "1m": msg("1M"), "6m": msg("6M"), ytd: msg("YTD"), "1y": msg("1Y"), "5y": msg("5Y"), max: msg("Max") };
-
-/** One line of the key figures: nothing shows for a figure Yahoo doesn't have. */
-function Fact({ label, value }: { label: string; value: string | null }) {
-  if (value === null) return null;
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-line py-1.5 text-sm last:border-0">
-      <dt className="text-muted">{label}</dt>
-      <dd className="font-medium tabular-nums">{value}</dd>
-    </div>
-  );
-}
 
 /** A closer look at one share, fund or index: its price over time, its key figures, and the company's results. */
 export function StockPage({ symbol }: { symbol: string }) {
@@ -62,10 +53,25 @@ export function StockPage({ symbol }: { symbol: string }) {
 
   return (
     <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:py-12">
-      <AppHeader title={data.name} back={back} subtitle={[data.symbol, data.exchange, data.sector, data.industry].filter(Boolean).join(" · ")}>
+      <AppHeader
+        title={data.name}
+        back={back}
+        subtitle={
+          <span className="flex items-center gap-2">
+            <SymbolIcon symbol={data.symbol} size={22} />
+            {[data.symbol, data.exchange, data.sector, data.industry].filter(Boolean).join(" · ")}
+          </span>
+        }
+      >
         <button type="button" onClick={toggleWatch} aria-pressed={data.watched} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-sm text-muted hover:bg-hover hover:text-fg aria-pressed:text-accent">
           <Star className="h-4 w-4" fill={data.watched ? "currentColor" : "none"} /> {data.watched ? t("Watching") : t("Watch")}
         </button>
+        <Link href={`/stocks?alert=${encodeURIComponent(data.symbol)}`} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-sm text-muted hover:bg-hover hover:text-fg">
+          <BellPlus className="h-4 w-4" /> {t("Alert")}
+        </Link>
+        <Link href={`/stocks/compare?s=${encodeURIComponent(data.symbol)}`} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-sm text-muted hover:bg-hover hover:text-fg">
+          <GitCompareArrows className="h-4 w-4" /> {t("Compare")}
+        </Link>
         <Link href={`/stocks?add=${encodeURIComponent(data.symbol)}`} className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110">
           <Plus className="h-4 w-4" /> {t("New transaction")}
         </Link>
@@ -108,6 +114,7 @@ export function StockPage({ symbol }: { symbol: string }) {
             </dl>
             {!f && <p className="text-xs text-muted">{t("No company figures for this one (funds, indexes and currencies have none).")}</p>}
           </Card>
+          <MoreRatios research={data} />
           {data.holding && (
             <Card title={t("Your position")}>
               <dl>
@@ -121,6 +128,7 @@ export function StockPage({ symbol }: { symbol: string }) {
         </div>
       </div>
 
+      <CompanyFacts research={data} />
       <Figures research={data} />
     </main>
   );

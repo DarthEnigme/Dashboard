@@ -1,28 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { PRIORITIES, type Column, type Priority, type Task } from "@/lib/tasks/types";
+import { PRIORITIES, type Board, type Priority, type Task } from "@/lib/tasks/types";
 import { useT } from "@/i18n/client";
 import { Dialog } from "../edit/Dialog";
 import { DeleteButton } from "../edit/controls";
 import { inputClass } from "../edit/FieldInput";
 import { Markdown } from "../settings/Markdown";
 import { PRIORITY_LABELS } from "./meta";
+import { TaskTitle } from "./TaskCard";
 
 export interface TaskDraft {
   id?: number;
   column: number;
+  lane: number | null;
   title: string;
   body: string;
   priority: Priority;
   due: string | null;
   labels: string[];
+  blocked_by: number[];
 }
 
+/** Where a new task starts. */
+export type NewTask = Pick<Task, "column_id" | "lane_id">;
+
 interface Props {
-  /** The task to edit, or the column a new one starts in. */
-  task: Task | { column_id: number };
-  columns: Column[];
+  /** The task to edit, or where a new one starts. */
+  task: Task | NewTask;
+  board: Board;
   /** Labels already used on the board, offered as suggestions. */
   labels: string[];
   onSave: (draft: TaskDraft) => Promise<void>;
@@ -32,11 +38,13 @@ interface Props {
 
 const label = "flex flex-col gap-1.5 text-xs font-medium text-muted";
 
-export function TaskDialog({ task, columns, labels, onSave, onDelete, onClose }: Props) {
+export function TaskDialog({ task, board, labels, onSave, onDelete, onClose }: Props) {
   const t = useT();
   const existing = "id" in task ? task : undefined;
   const [draft, setDraft] = useState({
     column: task.column_id,
+    lane: task.lane_id,
+    blocked_by: existing?.blocked_by ?? [],
     title: existing?.title ?? "",
     body: existing?.body ?? "",
     priority: existing?.priority ?? (0 as Priority),
@@ -60,7 +68,20 @@ export function TaskDialog({ task, columns, labels, onSave, onDelete, onClose }:
     }
   };
   const save = () =>
-    run(() => onSave({ id: existing?.id, column: draft.column, title: draft.title, body: draft.body, priority: draft.priority, due: draft.due || null, labels: draft.labels.split(",").map((l) => l.trim()).filter(Boolean) }));
+    run(() =>
+      onSave({
+        id: existing?.id,
+        column: draft.column,
+        lane: draft.lane,
+        title: draft.title,
+        body: draft.body,
+        priority: draft.priority,
+        due: draft.due || null,
+        labels: draft.labels.split(",").map((l) => l.trim()).filter(Boolean),
+        blocked_by: draft.blocked_by,
+      }),
+    );
+  const others = board.columns.flatMap((c) => c.tasks).filter((x) => x.id !== existing?.id);
 
   return (
     <Dialog title={existing ? t("Edit task") : t("New task")} onClose={onClose} onSubmit={save} error={error} busy={busy}>
@@ -72,7 +93,7 @@ export function TaskDialog({ task, columns, labels, onSave, onDelete, onClose }:
         <label className={label}>
           {t("Column")}
           <select value={draft.column} onChange={(e) => set("column", Number(e.target.value))} className={inputClass}>
-            {columns.map((c) => (
+            {board.columns.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -94,6 +115,20 @@ export function TaskDialog({ task, columns, labels, onSave, onDelete, onClose }:
           <input type="date" value={draft.due} onChange={(e) => set("due", e.target.value)} className={inputClass} />
         </label>
       </div>
+      {board.lanes.length > 0 && (
+        <label className={label}>
+          {t("Lane")}
+          <select value={draft.lane ?? ""} onChange={(e) => set("lane", e.target.value ? Number(e.target.value) : null)} className={inputClass}>
+            <option value="">{t("No lane")}</option>
+            {board.lanes.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {board.project && others.length > 0 && <BlockedBy tasks={others} value={draft.blocked_by} onChange={(v) => set("blocked_by", v)} />}
       <label className={label}>
         {t("Labels (comma-separated)")}
         <input value={draft.labels} onChange={(e) => set("labels", e.target.value)} list="task-labels" placeholder={t("home, urgent")} className={inputClass} />
@@ -127,5 +162,24 @@ export function TaskDialog({ task, columns, labels, onSave, onDelete, onClose }:
         </div>
       )}
     </Dialog>
+  );
+}
+
+/** The tasks this one waits for: it can't be finished before them. */
+function BlockedBy({ tasks, value, onChange }: { tasks: Task[]; value: number[]; onChange: (v: number[]) => void }) {
+  const t = useT();
+  const chosen = new Set(value);
+  return (
+    <fieldset className={label}>
+      <legend className="mb-1.5">{t("Waits for")}</legend>
+      <div className="flex max-h-36 flex-col gap-0.5 overflow-y-auto rounded-xl border border-line p-1.5">
+        {tasks.map((x) => (
+          <label key={x.id} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-normal text-fg hover:bg-hover">
+            <input type="checkbox" checked={chosen.has(x.id)} onChange={(e) => onChange(e.target.checked ? [...value, x.id] : value.filter((id) => id !== x.id))} />
+            <TaskTitle task={x} />
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }

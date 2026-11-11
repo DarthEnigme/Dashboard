@@ -1,5 +1,6 @@
 import { number } from "@/i18n/format";
 import { money } from "@/lib/finance/format";
+import type { Format } from "@/lib/stocks/metrics";
 
 /** An amount in a portfolio's currency. */
 export const cash = (amount: number, currency: string, signed = false) => money(Math.round(amount * 100), currency, signed);
@@ -24,3 +25,13 @@ export const big = (n: number) => {
 export const tone = (n: number | null) => (n === null || n === 0 ? "" : n > 0 ? "text-[var(--ok)]" : "text-[var(--err)]");
 
 export const stockHref = (symbol: string) => `/stocks/${encodeURIComponent(symbol)}`;
+
+/** A figure from the measures catalogue, written for its kind; `currency` for amounts and per-share figures. */
+export function figure(value: number | null, format: Format, currency = ""): string {
+  if (value === null || !Number.isFinite(value)) return "–";
+  if (format === "percent") return percent(value, false);
+  if (format === "ratio") return number(value, { maximumFractionDigits: 2 });
+  if (format === "count") return big(value);
+  if (format === "share") return currency ? quoted(value, currency) : number(value, { maximumFractionDigits: 2 });
+  return `${big(value)} ${currency}`.trim();
+}

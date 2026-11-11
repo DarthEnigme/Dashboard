@@ -1,6 +1,6 @@
 /**
- * Layout for a three-column money-flow Sankey: sources → one middle node → sinks.
- * Pure (no DOM), so it can be unit tested; Sankey.tsx draws it.
+ * Sankey layouts: any number of columns joined by bands (`layoutLayers`), and the money-flow one
+ * built on it (sources → one middle node → sinks). Pure (no DOM), so they can be unit tested.
  */
 
 export interface FlowItem {
@@ -61,48 +61,110 @@ export function bandPath(x0: number, y0: number, x1: number, y1: number, t: numb
   ].join(" ");
 }
 
+// ---------- any number of columns ----------
+
+export interface LayerNode extends FlowItem {
+  id: string;
+  /** Column, from 0 on the left. */
+  layer: number;
+}
+export interface LayerLink {
+  source: string;
+  target: string;
+  value: number;
+  color: string;
+}
+export interface PlacedNode extends LayerNode {
+  x: number;
+  y: number;
+  h: number;
+}
+export interface PlacedLink extends LayerLink {
+  path: string;
+}
+
+/**
+ * A Sankey of columns (layers) joined by links from one column to the next, e.g. portfolios →
+ * sectors → holdings. Nodes keep the order given within their column; one scale serves every
+ * column, so a band is equally thick at both ends; a node is as tall as the larger of what comes
+ * in and what goes out, and its bands are stacked, centred, in the order of the nodes at their
+ * other end (so they don't cross more than needed).
+ */
+export function layoutLayers(nodes: LayerNode[], links: LayerLink[], opts: { width: number; height: number; nodeWidth?: number; gap?: number }): { nodes: PlacedNode[]; links: PlacedLink[] } {
+  const { width, height, nodeWidth = 10, gap = 8 } = opts;
+  const layers = [...new Set(nodes.map((n) => n.layer))].sort((a, b) => a - b);
+  const inLayer = (l: number) => nodes.filter((n) => n.layer === l);
+  const sum = (xs: { value: number }[]) => xs.reduce((a, i) => a + i.value, 0);
+  const total = Math.max(0, ...layers.map((l) => sum(inLayer(l))));
+  if (!total || width <= 0 || height <= 0 || !layers.length) return { nodes: [], links: [] };
+
+  const usable = Math.min(...layers.map((l) => height - gap * Math.max(0, inLayer(l).length - 1)));
+  const k = Math.max(0, Math.min(usable, height) / total);
+  const span = layers.length > 1 ? (width - nodeWidth) / (layers.length - 1) : 0;
+
+  const placed = new Map<string, PlacedNode>();
+  layers.forEach((l, i) => {
+    const column = inLayer(l);
+    let y = (height - (sum(column) * k + gap * Math.max(0, column.length - 1))) / 2;
+    for (const n of column) {
+      const h = n.value * k;
+      placed.set(n.id, { ...n, x: i * span, y, h });
+      y += h + gap;
+    }
+  });
+
+  // Where each band leaves its source and reaches its target: stacked in the order of the other ends, centred on the node.
+  const offsets = (side: "source" | "target") => {
+    const other = side === "source" ? "target" : "source";
+    const at = new Map<LayerLink, number>();
+    for (const node of placed.values()) {
+      const mine = links.filter((x) => x[side] === node.id && placed.has(x[other])).sort((a, b) => placed.get(a[other])!.y - placed.get(b[other])!.y);
+      let y = node.y + (node.h - sum(mine) * k) / 2;
+      for (const link of mine) {
+        at.set(link, y);
+        y += link.value * k;
+      }
+    }
+    return at;
+  };
+  const from = offsets("source");
+  const to = offsets("target");
+  return {
+    nodes: [...placed.values()],
+    links: links.flatMap((link) => {
+      const a = placed.get(link.source);
+      const b = placed.get(link.target);
+      if (!a || !b) return [];
+      return [{ ...link, path: bandPath(a.x + nodeWidth, from.get(link)!, b.x, to.get(link)!, link.value * k) }];
+    }),
+  };
+}
+
+/** The money-flow Sankey: sources → one middle node → sinks, as three columns. */
 export function layoutSankey(
   sources: FlowItem[],
   middle: Omit<FlowItem, "value">,
   sinks: FlowItem[],
   opts: { width: number; height: number; nodeWidth?: number; gap?: number },
 ): SankeyLayout {
-  const { width, height, nodeWidth = 10, gap = 8 } = opts;
   const sum = (xs: FlowItem[]) => xs.reduce((a, i) => a + i.value, 0);
   const total = Math.max(sum(sources), sum(sinks));
-  if (!total || width <= 0 || height <= 0) return { nodes: [], links: [] };
-
-  // One scale for every column, so a band is equally thick at both ends.
-  const usable = (n: number) => height - gap * Math.max(0, n - 1);
-  const k = Math.max(0, Math.min(usable(sources.length), usable(sinks.length), height) / total);
-
-  const nodes: SankeyNode[] = [];
-  const links: SankeyLink[] = [];
-  const midX = (width - nodeWidth) / 2;
-  const midH = total * k;
-  const midY = (height - midH) / 2;
-
-  const column = (items: FlowItem[], side: "source" | "sink") => {
-    const x = side === "source" ? 0 : width - nodeWidth;
-    const colH = sum(items) * k + gap * Math.max(0, items.length - 1);
-    let y = (height - colH) / 2;
-    // Bands meet the middle node stacked in the same order, without gaps.
-    let midOffset = midY + (midH - sum(items) * k) / 2;
-    for (const item of items) {
-      const h = item.value * k;
-      const index = nodes.push({ ...item, side, x, y, h }) - 1;
-      const path =
-        side === "source"
-          ? bandPath(x + nodeWidth, y, midX, midOffset, h)
-          : bandPath(midX + nodeWidth, midOffset, x, y, h);
-      links.push({ node: index, value: item.value, color: item.color, path });
-      y += h + gap;
-      midOffset += h;
-    }
-  };
-  column(sources, "source");
-  column(sinks, "sink");
-  nodes.push({ ...middle, value: total, side: "middle", x: midX, y: midY, h: midH });
+  const MID = "middle";
+  const src = sources.map((s, i) => ({ ...s, id: `s${i}`, layer: 0 }));
+  const snk = sinks.map((s, i) => ({ ...s, id: `t${i}`, layer: 2 }));
+  const layout = layoutLayers(
+    [...src, { ...middle, value: total, id: MID, layer: 1 }, ...snk],
+    [...src.map((s) => ({ source: s.id, target: MID, value: s.value, color: s.color })), ...snk.map((s) => ({ source: MID, target: s.id, value: s.value, color: s.color }))],
+    opts,
+  );
+  if (!layout.nodes.length) return { nodes: [], links: [] };
+  // Sources, then sinks, then the middle: each link points at its outer end.
+  const outer = [...layout.nodes.filter((n) => n.layer === 0), ...layout.nodes.filter((n) => n.layer === 2)];
+  const nodes: SankeyNode[] = [...outer, layout.nodes.find((n) => n.id === MID)!].map((n) => ({ name: n.name, value: n.value, color: n.color, x: n.x, y: n.y, h: n.h, side: n.layer === 0 ? "source" : n.layer === 2 ? "sink" : "middle" }));
+  const links = layout.links.map((l) => {
+    const end = l.source === MID ? l.target : l.source;
+    return { node: outer.findIndex((n) => n.id === end), value: l.value, color: l.color, path: l.path };
+  });
   return { nodes, links };
 }
 

@@ -248,6 +248,9 @@ export const sections: Section[] = [
       { key: "alerts.threshold", label: msg("Alert after N failed checks"), kind: "number", placeholder: "2" },
       { key: "alerts.certDays", label: msg("Warn about expiring TLS certificates (days before)"), kind: "number", placeholder: "14", help: msg("For services with an HTTPS status check. 0 turns it off.") },
       { key: "inventory.warrantyDays", label: msg("Warn about ending device warranties (days before)"), kind: "number", placeholder: "30", help: msg("For devices in the inventory. 0 turns it off.") },
+      { key: "stocks.alertMinutes", label: msg("Check stock alerts every (minutes)"), kind: "number", placeholder: "15", help: msg("Prices from Yahoo Finance are a little delayed: checking more often than every few minutes gains nothing.") },
+      { key: "stocks.logoSource", label: msg("Company logos from"), placeholder: "https://example.com/logos/{symbol}.png", help: msg("A URL with {symbol} or {domain} in it. Empty: the icon of the company's website. A logo uploaded for a symbol always comes first.") },
+      { key: "tasks.dueSoonDays", label: msg("Tasks count as due soon (days before)"), kind: "number", placeholder: "1", help: msg("For task reminders and the tasks widget. Boards send them to the alert channels only when asked to.") },
       {
         key: "maintenance",
         label: msg("Maintenance windows"),

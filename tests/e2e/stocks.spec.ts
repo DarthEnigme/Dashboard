@@ -26,7 +26,7 @@ test.describe.serial("stocks", () => {
     await trade("apple", /AAPL/, { Date: monthAgo, Shares: "5", "Price per share (in the share's currency)": "260" }, true);
 
     // Holdings: both lines, the foreign one converted, with a gain.
-    const holdings = page.getByRole("table");
+    const holdings = page.getByRole("region", { name: "Holdings" }).getByRole("table");
     await expect(holdings.getByRole("row")).toHaveCount(3);
     await expect(holdings.getByRole("row", { name: /MC\.PA/ })).toContainText("10");
     await expect(holdings.getByRole("row", { name: /AAPL/ })).toContainText("15");
@@ -96,5 +96,53 @@ test.describe.serial("stocks", () => {
     await page.goto("/stocks/%5EGSPC");
     await expect(page.getByRole("heading", { name: "S&P 500", level: 1 })).toBeVisible();
     await expect(page.getByText("No company figures for this one")).toBeVisible();
+  });
+
+  test("alerts, an import, a comparison and exports", async ({ page }) => {
+    // The company's profile, calendar and analysts, from the quote summary.
+    await page.goto("/stocks/MC.PA");
+    await expect(page.getByRole("region", { name: "Company", exact: true })).toContainText("France");
+    await expect(page.getByRole("region", { name: "Analysts", exact: true })).toContainText("buy");
+    await expect(page.getByRole("region", { name: "Composition" })).toHaveCount(0);
+
+    // An alert from the company's page.
+    await page.getByRole("link", { name: "Alert" }).click();
+    const dialog = page.getByRole("dialog", { name: "New alert" });
+    await expect(dialog).toContainText("MC.PA");
+    await dialog.getByLabel("When it").selectOption("above");
+    await dialog.getByLabel("Price (the symbol's currency)").fill("1000");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByRole("tab", { name: "Alerts" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText("goes above")).toBeVisible();
+
+    // An import: a file of the generic kind, previewed, then added; the same file again adds nothing.
+    await page.getByRole("tab", { name: "Import & brokers" }).click();
+    const csv = "Date,Type,ISIN,Shares,Price,Currency,ID\n2024-02-01,Buy,US0378331005,2,150,USD,e2e-1\n";
+    await page.getByLabel("Choose a file").setInputFiles({ name: "trades.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+    await expect(page.getByRole("cell", { name: /AAPL/ })).toBeVisible();
+    await page.getByRole("button", { name: "Add 1 trade" }).click();
+    await expect(page.getByText("1 added, 0 already there, 0 without a symbol.")).toBeVisible();
+    await page.getByLabel("Choose a file").setInputFiles({ name: "trades.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+    await expect(page.getByText("already there")).toBeVisible();
+
+    // Exports.
+    const exported = await page.request.get("/api/stocks/export?what=transactions&format=csv");
+    expect(exported.status()).toBe(200);
+    expect(await exported.text()).toMatch(/^date,symbol,kind,quantity,price,fees,currency,note,portfolio,id/);
+    expect((await page.request.get("/api/stocks/export?what=positions&format=xlsx")).headers()["content-type"]).toContain("spreadsheetml");
+
+    // The composition of the portfolio, by sector.
+    await page.getByRole("tab", { name: "Portfolio" }).click();
+    await expect(page.getByRole("img", { name: "What the portfolio is made of, by sector and holding" })).toBeVisible();
+    await shot(page, "98-stocks-composition");
+
+    // Compare two companies.
+    await page.goto("/stocks/compare?s=AAPL,MC.PA");
+    await expect(page.getByRole("region", { name: "Side by side" })).toContainText("21.5");
+    await page.getByRole("button", { name: "Scatter", exact: true }).click();
+    await expect(page.getByRole("img", { name: /against/ })).toBeVisible();
+    await page.getByRole("button", { name: "Portfolio × market", exact: true }).click();
+    await expect(page.getByRole("region", { name: "By country" })).toBeVisible();
+    await shot(page, "98-stocks-compare");
   });
 });

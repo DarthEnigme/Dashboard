@@ -74,18 +74,35 @@ export function describeAlert(p: AlertPayload): string {
 type Level = "info" | "warn" | "error";
 
 /** Is any alert channel configured? */
-export const hasAlertChannel = (cfg: Settings["alerts"]) =>
-  !!(
-    cfg.discord ||
-    cfg.webhook ||
-    (cfg.gotify && cfg.gotifyToken) ||
-    cfg.ntfy ||
-    cfg.slack ||
-    (cfg.telegramToken && cfg.telegramChat) ||
-    cfg.email?.host ||
-    (cfg.pushoverToken && cfg.pushoverUser) ||
-    (cfg.matrix && cfg.matrixToken && cfg.matrixRoom)
-  );
+/** Each alert channel and the settings it needs, all of them set, to be on. */
+const CHANNELS = {
+  discord: ["discord"],
+  webhook: ["webhook"],
+  gotify: ["gotify", "gotifyToken"],
+  ntfy: ["ntfy"],
+  slack: ["slack"],
+  telegram: ["telegramToken", "telegramChat"],
+  email: ["email"],
+  pushover: ["pushoverToken", "pushoverUser"],
+  matrix: ["matrix", "matrixToken", "matrixRoom"],
+} as const satisfies Record<string, readonly (keyof Settings["alerts"])[]>;
+export type AlertChannel = keyof typeof CHANNELS;
+export const ALERT_CHANNELS = Object.keys(CHANNELS) as AlertChannel[];
+
+const isSet = (cfg: Settings["alerts"], key: keyof Settings["alerts"]) => (key === "email" ? !!cfg.email?.host : !!cfg[key]);
+
+/** The channels these settings turn on. */
+export const configuredChannels = (cfg: Settings["alerts"]) => ALERT_CHANNELS.filter((c) => CHANNELS[c].every((k) => isSet(cfg, k)));
+
+export const hasAlertChannel = (cfg: Settings["alerts"]) => configuredChannels(cfg).length > 0;
+
+/** The settings with only `keep` of the channels left on (all of them when `keep` is empty), for a notice meant for some channels. */
+export function onlyChannels(cfg: Settings["alerts"], keep: readonly string[]): Settings["alerts"] {
+  if (!keep.length) return cfg;
+  const out = { ...cfg };
+  for (const c of ALERT_CHANNELS) if (!keep.includes(c)) for (const k of CHANNELS[c]) delete out[k];
+  return out;
+}
 
 /**
  * Fill {{name}} placeholders; unknown names become empty. `escape` adapts values to the target (JSON strings).

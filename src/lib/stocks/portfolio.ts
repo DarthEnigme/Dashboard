@@ -1,4 +1,4 @@
-import type { Position, Summary } from "./types";
+import type { Position, Summary, Transaction } from "./types";
 
 /**
  * Portfolio arithmetic: positions, gains, dividends and the value over time, from trades and
@@ -18,6 +18,9 @@ export interface Trade {
   price: number;
   fees: number;
 }
+
+/** Transactions as entered, as the arithmetic reads them. */
+export const toTrades = (transactions: Transaction[]): Trade[] => transactions.map((t) => ({ symbol: t.symbol, kind: t.kind, day: t.date, quantity: t.quantity, price: t.price, fees: t.fees }));
 
 /** What is known of a symbol's market: the part of a Yahoo history the arithmetic needs. */
 export interface Market {
@@ -246,10 +249,15 @@ export function dividendsByYear(dividends: Market["dividends"]): { year: string;
   return [...years].sort(([a], [b]) => a.localeCompare(b)).map(([year, amount]) => ({ year, amount }));
 }
 
+/** The indexes of at most `max` of `n` points, evenly spread and always ending on the last one. */
+export function thinIndexes(n: number, max: number): number[] {
+  const step = n <= max ? 1 : Math.ceil(n / max);
+  return Array.from({ length: n }, (_, i) => i).filter((i) => (n - 1 - i) % step === 0);
+}
+
 /** At most `max` points of a series, evenly spread and always ending on the last one. */
 export function thin(s: Series, max: number): Series {
   if (s.days.length <= max) return s;
-  const step = Math.ceil(s.days.length / max);
-  const keep = (_: unknown, i: number) => (s.days.length - 1 - i) % step === 0;
-  return { days: s.days.filter(keep), closes: s.closes.filter(keep) };
+  const keep = thinIndexes(s.days.length, max);
+  return { days: keep.map((i) => s.days[i]), closes: keep.map((i) => s.closes[i]) };
 }

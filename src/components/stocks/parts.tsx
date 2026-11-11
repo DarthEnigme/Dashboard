@@ -51,3 +51,14 @@ export function Spark({ values, width = 96, height = 28 }: { values: number[]; w
     </svg>
   );
 }
+
+/** One line of a list of figures: nothing shows for a figure Yahoo doesn't have. */
+export function Fact({ label, value }: { label: string; value: ReactNode | null }) {
+  if (value === null) return null;
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-line py-1.5 text-sm last:border-0">
+      <dt className="text-muted">{label}</dt>
+      <dd className="text-right font-medium tabular-nums">{value}</dd>
+    </div>
+  );
+}

@@ -7,6 +7,7 @@ import { fetcher } from "@/lib/fetcher";
 import type { SymbolHit } from "@/lib/stocks/types";
 import { useT } from "@/i18n/client";
 import { inputClass } from "../edit/FieldInput";
+import { SymbolIcon } from "./SymbolIcon";
 
 /** Find a share, fund or index by name or symbol; `onPick` gets the one chosen. */
 export function SymbolSearch({ onPick, placeholder, autoFocus }: { onPick: (hit: SymbolHit) => void; placeholder?: string; autoFocus?: boolean }) {
@@ -61,7 +62,8 @@ export function SymbolSearch({ onPick, placeholder, autoFocus }: { onPick: (hit:
           {!error && !data && isLoading && <li className="px-2 py-1.5 text-sm text-muted">{t("Searching…")}</li>}
           {data?.map((hit) => (
             <li key={hit.symbol} role="option" aria-selected={false}>
-              <button type="button" onClick={() => pick(hit)} className="flex w-full items-baseline gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-hover">
+              <button type="button" onClick={() => pick(hit)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-hover">
+                <SymbolIcon symbol={hit.symbol} size={20} />
                 <span className="w-20 shrink-0 font-semibold">{hit.symbol}</span>
                 <span className="min-w-0 flex-1 truncate">{hit.name}</span>
                 <span className="shrink-0 text-xs text-muted">{hit.exchange}</span>

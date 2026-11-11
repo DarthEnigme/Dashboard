@@ -21,9 +21,15 @@ export interface PingRow {
 const COUNTED = "NOT (maint = 1 AND up = 0)";
 
 // One handle per process: route handlers and the monitor may load this module separately.
-const g = globalThis as typeof globalThis & { __pageDb?: DatabaseSync };
+const g = globalThis as typeof globalThis & { __pageDb?: DatabaseSync; __pageDbSchema?: number };
 
 export function db(): DatabaseSync {
+  // Code with newer schema steps than the open handle (a dev server reloading changed code keeps its
+  // handle): open again, so the new steps run, after their snapshot, like at a start.
+  if (g.__pageDb && g.__pageDbSchema !== SCHEMA_VERSION) {
+    g.__pageDb.close();
+    g.__pageDb = undefined;
+  }
   if (!g.__pageDb) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     const file = path.join(DATA_DIR, "page.db");
@@ -47,6 +53,7 @@ export function db(): DatabaseSync {
       return s;
     };
     g.__pageDb = d;
+    g.__pageDbSchema = SCHEMA_VERSION;
   }
   return g.__pageDb;
 }
@@ -70,6 +77,10 @@ const MIGRATIONS: ((d: DatabaseSync) => void)[] = [
   baseline,
   // 2: the Tasks and Stocks apps.
   tasksAndStocks,
+  // 3: Tasks: lanes, dependencies, project mode and reminders.
+  taskProjects,
+  // 4: Stocks: alerts, broker connections, logos, and ids that keep imports from doubling.
+  stockAlertsAndBrokers,
 ];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
@@ -519,6 +530,85 @@ function tasksAndStocks(d: DatabaseSync) {
     );
     -- The last answer to each Yahoo request (JSON), served again when Yahoo doesn't answer.
     CREATE TABLE stock_cache (key TEXT PRIMARY KEY, at INTEGER NOT NULL, value TEXT NOT NULL);
+  `);
+}
+
+/** Schema step 3: lanes (rows across a board's columns), "blocked by" links between tasks, project mode and reminders per board. */
+function taskProjects(d: DatabaseSync) {
+  d.exec(`
+    ALTER TABLE task_boards ADD COLUMN project INTEGER NOT NULL DEFAULT 0;
+    -- Due and overdue tasks of this board are sent to the alert channels.
+    ALTER TABLE task_boards ADD COLUMN notify INTEGER NOT NULL DEFAULT 0;
+    CREATE TABLE task_lanes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      board_id INTEGER NOT NULL REFERENCES task_boards(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      ord INTEGER NOT NULL,
+      collapsed INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX task_lanes_board ON task_lanes (board_id, ord);
+    ALTER TABLE tasks ADD COLUMN lane_id INTEGER REFERENCES task_lanes(id) ON DELETE SET NULL;
+    -- task_id waits for blocked_by (both on the same board).
+    CREATE TABLE task_deps (
+      task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      blocked_by INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      PRIMARY KEY (task_id, blocked_by)
+    );
+    CREATE INDEX task_deps_blocker ON task_deps (blocked_by);
+  `);
+}
+
+/** Schema step 4: Stocks alerts, connections to brokers, logos, and the id each imported trade has at its source. */
+function stockAlertsAndBrokers(d: DatabaseSync) {
+  d.exec(`
+    -- The trade's id at the broker, or a fingerprint of its import line: the same trade isn't added twice.
+    ALTER TABLE stock_transactions ADD COLUMN external_id TEXT;
+    CREATE UNIQUE INDEX stock_transactions_external ON stock_transactions (portfolio_id, external_id) WHERE external_id IS NOT NULL;
+    CREATE TABLE stock_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      -- price | move | position | portfolio | event
+      kind TEXT NOT NULL,
+      symbol TEXT,
+      portfolio_id INTEGER REFERENCES stock_portfolios(id) ON DELETE CASCADE,
+      -- above | below (or gain | loss, earnings | dividend for the kinds that need them)
+      op TEXT NOT NULL,
+      value REAL NOT NULL,
+      -- JSON list of alert channels; empty for all of them
+      channels TEXT NOT NULL DEFAULT '[]',
+      note TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      -- What last fired: the same condition doesn't fire again until it has stopped holding.
+      fired_key TEXT,
+      fired_at INTEGER,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX stock_alerts_owner ON stock_alerts (owner_id);
+    CREATE TABLE stock_brokers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      portfolio_id INTEGER NOT NULL REFERENCES stock_portfolios(id) ON DELETE CASCADE,
+      -- t212 | ibkr
+      kind TEXT NOT NULL,
+      -- The API key or token, sealed with the instance's secret key.
+      secret TEXT NOT NULL,
+      -- Interactive Brokers: the Flex query id.
+      account TEXT,
+      synced_at INTEGER,
+      error TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX stock_brokers_owner ON stock_brokers (owner_id);
+    -- Company logos: fetched (owner_id null, shared by everyone) or uploaded by someone for themselves.
+    CREATE TABLE stock_logos (
+      symbol TEXT NOT NULL,
+      owner_id INTEGER NOT NULL DEFAULT 0,
+      mime TEXT,
+      data BLOB,
+      source TEXT,
+      at INTEGER NOT NULL,
+      PRIMARY KEY (symbol, owner_id)
+    );
   `);
 }
 

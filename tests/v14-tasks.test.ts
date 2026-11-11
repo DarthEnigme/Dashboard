@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { APPS, PERMISSIONS } from "@/lib/config/schema";
 import { MODULE_TABLES } from "@/lib/modules";
 import { APP_SECTIONS, PERMISSION_BLURBS } from "@/lib/sections";
-import { addColumn, addTask, createBoard, deleteBoard, deleteColumn, deleteTask, loadBoard, renameBoard, updateColumn, updateTask, type BoardNames } from "@/lib/tasks/store";
+import { addColumn, addTask, createBoard, deleteBoard, deleteColumn, deleteTask, loadBoard, updateBoard, updateColumn, updateTask, type BoardNames } from "@/lib/tasks/store";
 
 const user = (name: string) => Number(db().prepare("INSERT INTO users (username, role, created_at) VALUES (?, 'user', ?)").run(name, Date.now()).lastInsertRowid);
 const NAMES: BoardNames = { board: "My board", columns: ["To do", "In progress", "Done"] };
@@ -51,7 +51,7 @@ describe("task boards", () => {
     expect(() => addTask(other, { column: todo.id, title: "Sneaky" })).toThrow(/No such column/);
     expect(() => updateTask(other, { id: task.id, title: "Theirs" })).toThrow(/No such task/);
     expect(() => deleteTask(other, task.id)).toThrow(/No such task/);
-    expect(() => renameBoard(other, board().id, { name: "Theirs" })).toThrow(/No such board/);
+    expect(() => updateBoard(other, { id: board().id, name: "Theirs" })).toThrow(/No such board/);
     expect(() => deleteColumn(other, todo.id)).toThrow(/No such column/);
     // Someone else's board id shows your own first board instead.
     expect(board(other, board().id).id).not.toBe(board().id);
@@ -131,7 +131,7 @@ describe("task boards", () => {
     const first = board();
     const work = createBoard(me, { name: "Work" }, NAMES);
     addTask(me, { column: board(me, work).columns[0].id, title: "Ship it" });
-    renameBoard(me, work, { name: "Job" });
+    updateBoard(me, { id: work, name: "Job" });
     expect(loadBoard(me, work, NAMES).boards.map((x) => x.name)).toEqual(["My board", "Job"]);
     deleteBoard(me, work);
     expect(loadBoard(me, work, NAMES).board.id).toBe(first.id);

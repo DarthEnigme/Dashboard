@@ -2,38 +2,45 @@
 
 import { useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import type { Column, Task } from "@/lib/tasks/types";
+import type { Column, Lane, Task } from "@/lib/tasks/types";
 import { msg } from "@/i18n";
 import { useT } from "@/i18n/client";
 import { inputBase } from "../edit/FieldInput";
-import { DueDate, Labels, PriorityDot } from "./TaskCard";
+import { DueDate, Labels, PriorityDot, TaskTitle } from "./TaskCard";
 import { PRIORITY_LABELS } from "./meta";
 
-type SortKey = "title" | "column" | "priority" | "due";
+type SortKey = "title" | "column" | "lane" | "priority" | "due";
 const HEADS: { key: SortKey; label: string }[] = [
   { key: "title", label: msg("Task") },
   { key: "column", label: msg("Column") },
+  { key: "lane", label: msg("Lane") },
   { key: "priority", label: msg("Priority") },
   { key: "due", label: msg("Due date") },
 ];
 
 interface Props {
   columns: Column[];
+  lanes: Lane[];
   onOpen: (task: Task) => void;
   /** Send a task to another column (it lands last there). */
-  onMove: (task: number, column: number) => void;
+  onMove: (task: Task, column: number) => void;
 }
 
 /** Every task of the board in one table: sort by a heading, change a task's column in place. */
-export function ListView({ columns, onOpen, onMove }: Props) {
+export function ListView({ columns, lanes, onOpen, onMove }: Props) {
   const t = useT();
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "column", dir: 1 });
   const order = new Map(columns.map((c, i) => [c.id, i]));
+  const lane = new Map(lanes.map((l, i) => [l.id, { i, name: l.name }]));
+  // Without lanes there is nothing to show or sort in that column.
+  const heads = lanes.length ? HEADS : HEADS.filter((h) => h.key !== "lane");
   const rows = columns.flatMap((c) => c.tasks);
 
   const compare: Record<SortKey, (a: Task, b: Task) => number> = {
     title: (a, b) => a.title.localeCompare(b.title),
     column: (a, b) => order.get(a.column_id)! - order.get(b.column_id)!,
+    // In the board's order, tasks with no lane last.
+    lane: (a, b) => (a.lane_id === null ? lanes.length : lane.get(a.lane_id)!.i) - (b.lane_id === null ? lanes.length : lane.get(b.lane_id)!.i),
     // High first.
     priority: (a, b) => b.priority - a.priority,
     // Soonest first, undated last.
@@ -49,7 +56,7 @@ export function ListView({ columns, onOpen, onMove }: Props) {
       <table className="w-full min-w-[40rem] text-sm">
         <thead>
           <tr className="text-left text-xs text-muted">
-            {HEADS.map((h) => (
+            {heads.map((h) => (
               <th key={h.key} scope="col" aria-sort={sort.key === h.key ? (sort.dir === 1 ? "ascending" : "descending") : "none"} className="px-3 py-2 font-medium">
                 <button type="button" onClick={() => setSort({ key: h.key, dir: sort.key === h.key && sort.dir === 1 ? -1 : 1 })} className="flex items-center gap-1 hover:text-fg">
                   {t(h.label)}
@@ -66,12 +73,12 @@ export function ListView({ columns, onOpen, onMove }: Props) {
           {sorted.map((task) => (
             <tr key={task.id} className="border-t border-line hover:bg-hover">
               <td className="px-3 py-2">
-                <button type="button" onClick={() => onOpen(task)} className={`text-left hover:text-accent ${task.completed_at ? "text-muted line-through" : ""}`}>
-                  {task.title}
+                <button type="button" onClick={() => onOpen(task)} className="text-left hover:text-accent">
+                  <TaskTitle task={task} />
                 </button>
               </td>
               <td className="px-3 py-1.5">
-                <select value={task.column_id} onChange={(e) => onMove(task.id, Number(e.target.value))} aria-label={t("Column of {task}", { task: task.title })} className={`${inputBase} h-8 py-0 text-sm`}>
+                <select value={task.column_id} onChange={(e) => onMove(task, Number(e.target.value))} aria-label={t("Column of {task}", { task: task.title })} className={`${inputBase} h-8 py-0 text-sm`}>
                   {columns.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -79,6 +86,7 @@ export function ListView({ columns, onOpen, onMove }: Props) {
                   ))}
                 </select>
               </td>
+              {lanes.length > 0 && <td className="px-3 py-2 text-muted">{task.lane_id === null ? t("No lane") : lane.get(task.lane_id)?.name}</td>}
               <td className="px-3 py-2">
                 <span className="flex items-center gap-2">
                   <PriorityDot priority={task.priority} />

@@ -1,11 +1,16 @@
 "use client";
 
-import { AlignLeft, CalendarDays } from "lucide-react";
+import { AlignLeft, CalendarDays, Lock } from "lucide-react";
 import type { Task } from "@/lib/tasks/types";
 import { dateOnly } from "@/i18n/format";
 import { useT } from "@/i18n/client";
 import { asLocal } from "@/lib/day";
 import { overdue, PRIORITY_COLORS, PRIORITY_LABELS } from "./meta";
+
+/** A task's title, crossed out once it is finished: the same everywhere a task shows. */
+export function TaskTitle({ task }: { task: Pick<Task, "title" | "completed_at"> }) {
+  return <span className={`break-words ${task.completed_at ? "text-muted line-through" : ""}`}>{task.title}</span>;
+}
 
 /** Priority as a dot with its name for screen readers (nothing for "no priority"). */
 export function PriorityDot({ priority }: { priority: Task["priority"] }) {
@@ -23,6 +28,16 @@ export function DueDate({ task }: { task: Pick<Task, "due" | "completed_at"> }) 
   );
 }
 
+/** Waiting for other tasks that are still open. */
+export function Blocked() {
+  const t = useT();
+  return (
+    <span className="flex items-center gap-1 text-[var(--warn)]" title={t("Waits for tasks that are still open")}>
+      <Lock className="h-3 w-3" /> {t("Waiting")}
+    </span>
+  );
+}
+
 export function Labels({ labels }: { labels: string[] }) {
   return labels.map((l) => (
     <span key={l} className="rounded-full bg-accent/25 px-2 py-0.5 text-[11px] text-fg/90">
@@ -34,16 +49,17 @@ export function Labels({ labels }: { labels: string[] }) {
 /** A task as it shows on the board: title, then whatever it has of priority, due date, labels and notes. */
 export function TaskCard({ task, onOpen, dragging }: { task: Task; onOpen?: () => void; dragging?: boolean }) {
   const t = useT();
-  const extras = task.priority > 0 || task.due || task.labels.length > 0 || task.body;
+  const extras = task.priority > 0 || task.due || task.labels.length > 0 || task.body || task.blocked;
   return (
     <button
       type="button"
       onClick={onOpen}
       className={`flex w-full cursor-grab flex-col gap-1.5 rounded-xl border border-line bg-chip px-3 py-2 text-left text-sm hover:border-accent/60 active:cursor-grabbing ${dragging ? "shadow-xl" : ""}`}
     >
-      <span className={task.completed_at ? "text-muted line-through" : undefined}>{task.title}</span>
+      <TaskTitle task={task} />
       {extras && (
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          {task.blocked && <Blocked />}
           <PriorityDot priority={task.priority} />
           <DueDate task={task} />
           <Labels labels={task.labels} />

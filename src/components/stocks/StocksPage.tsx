@@ -4,28 +4,36 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { motion } from "framer-motion";
-import { Pencil, Plus } from "lucide-react";
-import { fetcher, sendJson } from "@/lib/fetcher";
+import { GitCompareArrows, Pencil, Plus } from "lucide-react";
+import Link from "next/link";
+import { fetcher } from "@/lib/fetcher";
 import type { Portfolio, StocksData, Transaction } from "@/lib/stocks/types";
 import { msg } from "@/i18n";
 import { useT } from "@/i18n/client";
 import { AppHeader } from "../AppHeader";
-import { Dialog } from "../edit/Dialog";
-import { DeleteButton, IconButton } from "../edit/controls";
-import { inputBase, inputClass } from "../edit/FieldInput";
+import { IconButton } from "../edit/controls";
+import { inputBase } from "../edit/FieldInput";
 import { stockHref } from "./format";
 import { PortfolioTab } from "./PortfolioTab";
 import { SymbolSearch } from "./SymbolSearch";
-import { DividendsTab, TransactionsTab, WatchTab } from "./tabs";
+import { AlertsTab } from "./AlertsTab";
+import { DividendsTab } from "./DividendsTab";
+import type { Tab } from "./tabIds";
+import { ImportTab } from "./ImportTab";
+import { PortfolioDialog } from "./PortfolioDialog";
+import { TransactionsTab } from "./TransactionsTab";
+import { WatchTab } from "./WatchTab";
 import { TransactionDialog } from "./TransactionDialog";
 
-const TABS = [
+/** The page's sections: the first three show recorded trades (and an invitation to record one when there are none). */
+const TABS: { id: Tab; label: string }[] = [
   { id: "portfolio", label: msg("Portfolio") },
   { id: "transactions", label: msg("Transactions") },
   { id: "dividends", label: msg("Dividends") },
   { id: "watchlist", label: msg("Watched") },
-] as const;
-type Tab = (typeof TABS)[number]["id"];
+  { id: "alerts", label: msg("Alerts") },
+  { id: "import", label: msg("Import & brokers") },
+];
 
 const PORTFOLIO_KEY = "page.stocks.portfolio";
 const BENCHMARK_KEY = "page.stocks.benchmark";
@@ -45,13 +53,17 @@ const store = (key: string, value: string | undefined) => {
   }
 };
 
-/** Stocks: what you hold and how it is doing, your trades, your dividends, and symbols you watch. `add` opens a new transaction for that symbol. */
-export function StocksPage({ add }: { add?: string }) {
+/**
+ * Stocks: what you hold and how it is doing, your trades, your dividends, symbols you watch, alerts,
+ * imports and brokers. `add` opens a new transaction for that symbol; `tab` opens a section
+ * (`alert`: the alerts, with a new one for that symbol).
+ */
+export function StocksPage({ add, tab: firstTab, alert }: { add?: string; tab?: Tab; alert?: string }) {
   const t = useT();
   const router = useRouter();
   const [portfolio, setPortfolio] = useState<number>();
   const [benchmark, setBenchmark] = useState<string>();
-  const [tab, setTab] = useState<Tab>("portfolio");
+  const [tab, setTab] = useState<Tab>(alert ? "alerts" : (firstTab ?? "portfolio"));
   const [editing, setEditing] = useState<Transaction | { portfolio_id: number; symbol?: string }>();
   const [managing, setManaging] = useState<Portfolio | "new">();
   const query = new URLSearchParams({ ...(portfolio ? { portfolio: String(portfolio) } : {}), ...(benchmark ? { benchmark } : {}) });
@@ -86,6 +98,9 @@ export function StocksPage({ add }: { add?: string }) {
   return (
     <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:py-12">
       <AppHeader title={t("Stocks")} subtitle={t("Your portfolio, your dividends, and a closer look at any company. Prices from Yahoo Finance, a little delayed.")}>
+        <Link href="/stocks/compare" className="flex items-center gap-1.5 rounded-full px-4 py-2 text-sm text-muted hover:bg-hover hover:text-fg">
+          <GitCompareArrows className="h-4 w-4" /> {t("Compare")}
+        </Link>
         {data && (
           <button type="button" onClick={() => setEditing({ portfolio_id: shown?.id ?? data.portfolios[0].id })} className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110">
             <Plus className="h-4 w-4" /> {t("New transaction")}
@@ -143,19 +158,16 @@ export function StocksPage({ add }: { add?: string }) {
         <WatchTab />
       ) : !data ? (
         <p className="text-muted">{isLoading ? t("Loading…") : ""}</p>
-      ) : !data.transactions.length ? (
-        <div className="glass flex flex-col items-center gap-3 rounded-3xl p-10 text-center">
-          <p className="text-muted">{t("Record what you bought to see your portfolio: its value, its gains and its dividends follow from there.")}</p>
-          <button type="button" onClick={() => setEditing({ portfolio_id: shown?.id ?? data.portfolios[0].id })} className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110">
-            <Plus className="h-4 w-4" /> {t("Add your first transaction")}
-          </button>
-        </div>
-      ) : tab === "portfolio" ? (
-        <PortfolioTab data={data} onBenchmark={showBenchmark} />
-      ) : tab === "transactions" ? (
-        <TransactionsTab data={data} onOpen={setEditing} />
       ) : (
-        <DividendsTab data={data} />
+        <Section
+          tab={tab}
+          data={data}
+          alert={alert}
+          onBenchmark={showBenchmark}
+          onOpen={setEditing}
+          onFirst={() => setEditing({ portfolio_id: shown?.id ?? data.portfolios[0].id })}
+          onChanged={() => void mutate()}
+        />
       )}
 
       {editing && data && <TransactionDialog transaction={editing} portfolios={data.portfolios} onSaved={() => void mutate()} onClose={closeEditing} />}
@@ -176,47 +188,37 @@ export function StocksPage({ add }: { add?: string }) {
   );
 }
 
-interface PortfolioDialogProps {
-  portfolio?: Portfolio;
-  canDelete: boolean;
-  onSaved: (portfolios: Portfolio[], removed: boolean) => void;
-  onClose: () => void;
+interface SectionProps {
+  tab: Exclude<Tab, "watchlist">;
+  data: StocksData;
+  alert?: string;
+  onBenchmark: (symbol: string) => void;
+  onOpen: (t: Transaction) => void;
+  onFirst: () => void;
+  onChanged: () => void;
 }
 
-function PortfolioDialog({ portfolio, canDelete, onSaved, onClose }: PortfolioDialogProps) {
+/** The sections about recorded trades, which invite a first one when there are none. */
+const NEEDS_TRADES = new Set<Tab>(["portfolio", "transactions", "dividends"]);
+
+/** One section of the page, from its data. */
+function Section({ tab, data, alert, onBenchmark, onOpen, onFirst, onChanged }: SectionProps) {
   const t = useT();
-  const [name, setName] = useState(portfolio?.name ?? "");
-  const [currency, setCurrency] = useState(portfolio?.currency ?? "EUR");
-  const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState(false);
-
-  const run = async (work: () => Promise<Portfolio[]>, removed = false) => {
-    setBusy(true);
-    try {
-      onSaved(await work(), removed);
-      onClose();
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
+  if (NEEDS_TRADES.has(tab) && !data.transactions.length)
+    return (
+      <div className="glass flex flex-col items-center gap-3 rounded-3xl p-10 text-center">
+        <p className="text-muted">{t("Record what you bought to see your portfolio: its value, its gains and its dividends follow from there.")}</p>
+        <button type="button" onClick={onFirst} className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110">
+          <Plus className="h-4 w-4" /> {t("Add your first transaction")}
+        </button>
+      </div>
+    );
+  const sections: Record<SectionProps["tab"], () => React.ReactNode> = {
+    portfolio: () => <PortfolioTab data={data} onBenchmark={onBenchmark} />,
+    transactions: () => <TransactionsTab data={data} onOpen={onOpen} />,
+    dividends: () => <DividendsTab data={data} />,
+    alerts: () => <AlertsTab portfolios={data.portfolios} preset={alert} />,
+    import: () => <ImportTab portfolios={data.portfolios} portfolio={data.portfolio} onImported={onChanged} />,
   };
-
-  return (
-    <Dialog title={portfolio ? t("Edit portfolio") : t("New portfolio")} onClose={onClose} onSubmit={() => void run(() => sendJson<Portfolio[]>("/api/stocks/portfolios", portfolio ? "PATCH" : "POST", { id: portfolio?.id, name, currency }))} error={error} busy={busy}>
-      <label className="flex flex-col gap-1.5 text-xs font-medium text-muted">
-        {t("Name")}
-        <input autoFocus required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("PEA, brokerage account…")} className={inputClass} />
-      </label>
-      <label className="flex flex-col gap-1.5 text-xs font-medium text-muted">
-        {t("Currency its totals are shown in")}
-        <input required minLength={3} maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} placeholder="EUR" className={inputClass} />
-      </label>
-      {portfolio && canDelete && (
-        <div className="flex items-center gap-2 text-xs text-muted">
-          <DeleteButton label={t("Delete portfolio")} onConfirm={() => void run(() => sendJson<Portfolio[]>(`/api/stocks/portfolios?id=${portfolio.id}`, "DELETE"), true)} />
-          {t("Delete this portfolio and its transactions")}
-        </div>
-      )}
-    </Dialog>
-  );
+  return sections[tab]();
 }

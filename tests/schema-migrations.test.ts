@@ -8,7 +8,7 @@ import { bootId, reconcilePendingUpdate, updateHistory } from "@/lib/update/appl
 import { readJournal, writeJournal, type Journal } from "@/lib/update/journal";
 import { buildInfo } from "@/lib/version";
 
-const g = globalThis as typeof globalThis & { __pageDb?: DatabaseSync };
+const g = globalThis as typeof globalThis & { __pageDb?: DatabaseSync; __pageDbSchema?: number };
 const FILE = path.join(DATA_DIR, "page.db");
 
 /** Close the shared handle and remove every database file, so the next db() opens from scratch. */
@@ -67,6 +67,18 @@ function upgradedByNewerVersion(legacyPending?: Journal) {
 const usernames = () => (db().prepare("SELECT username FROM users ORDER BY id").all() as { username: string }[]).map((u) => u.username);
 
 describe("schema migrations", () => {
+  it("opens again when reloaded code has schema steps the open handle hasn't run", () => {
+    reset();
+    db();
+    // As a dev server keeps its handle while the code changes: the handle was opened by code one step behind.
+    g.__pageDbSchema = SCHEMA_VERSION - 1;
+    const before = g.__pageDb;
+    const after = db();
+    expect(after === before).toBe(false);
+    expect(db() === after).toBe(true);
+    expect((after.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(SCHEMA_VERSION);
+  });
+
   it("creates a fresh database at the current schema, without a snapshot", () => {
     reset();
     expect(version()).toBe(SCHEMA_VERSION);
