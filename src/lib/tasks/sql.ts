@@ -1,17 +1,13 @@
-import { db } from "../db";
 import { fail } from "../clean";
+import { all, one, owned, run } from "../sql";
 
-/** What every part of the task store shares: query helpers, ownership checks and ordering. */
-type Arg = string | number | null;
-
+/** What every part of the task store shares: the query helpers, ownership checks and ordering. */
 export { fail };
-export const run = (sql: string, ...args: Arg[]) => db().prepare(sql).run(...args);
-export const one = <T>(sql: string, ...args: Arg[]) => db().prepare(sql).get(...args) as T | undefined;
-export const all = <T>(sql: string, ...args: Arg[]) => db().prepare(sql).all(...args) as unknown as T[];
+export { all, bool, flag, one, patch, run } from "../sql";
 
 // ---------- ownership: each returns the row with its board, or throws ----------
 
-export const ownBoard = (userId: number, id: number) => one<{ id: number }>("SELECT id FROM task_boards WHERE id = ? AND owner_id = ?", id, userId)?.id ?? fail("No such board");
+export const ownBoard = (userId: number, id: number) => owned("task_boards", userId, id, "No such board");
 
 export interface ColumnRow {
   id: number;
@@ -41,24 +37,9 @@ export const ownTask = (userId: number, id: number) =>
     userId,
   ) ?? fail("No such task");
 
-// ---------- writing ----------
-
-type Table = "tasks" | "task_columns" | "task_lanes" | "task_boards";
-
-/** A checkbox sent by a client, as stored (1/0); undefined when it isn't a boolean, so it is left alone. */
-export const bool = (v: unknown) => (typeof v === "boolean" ? (v ? 1 : 0) : undefined);
-/** A stored 1/0, read back. */
-export const flag = (n: number) => n === 1;
-
-/** Set the given columns of one row; an undefined value leaves that column as it is. */
-export function patch(table: Table, id: number, set: Record<string, Arg | undefined>) {
-  const keys = Object.keys(set).filter((k) => set[k] !== undefined);
-  if (keys.length) run(`UPDATE ${table} SET ${keys.map((k) => `${k} = ?`).join(", ")} WHERE id = ?`, ...keys.map((k) => set[k] as Arg), id);
-}
-
 // ---------- ordering ----------
 
-type Ordered = Exclude<Table, "task_boards">;
+type Ordered = "tasks" | "task_columns" | "task_lanes";
 type Scope = Record<string, number | null>;
 
 /** The rows matching every `scope` column, nulls included. */

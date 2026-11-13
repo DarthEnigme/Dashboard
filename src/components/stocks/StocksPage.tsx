@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { motion } from "framer-motion";
@@ -15,31 +15,48 @@ import { AppHeader } from "../AppHeader";
 import { IconButton } from "../edit/controls";
 import { inputBase } from "../edit/FieldInput";
 import { stockHref } from "./format";
+import { PortfolioSelect } from "./parts";
 import { PortfolioTab } from "./PortfolioTab";
 import { SymbolSearch } from "./SymbolSearch";
 import { AlertsTab } from "./AlertsTab";
 import { DividendsTab } from "./DividendsTab";
 import type { Tab } from "./tabIds";
 import { ImportTab } from "./ImportTab";
+import { InvestorsTab } from "./InvestorsTab";
+import { RebalanceTab } from "./RebalanceTab";
 import { PortfolioDialog } from "./PortfolioDialog";
 import { TransactionsTab } from "./TransactionsTab";
 import { WatchTab } from "./WatchTab";
 import { TransactionDialog } from "./TransactionDialog";
 
-/** The page's sections: the first three show recorded trades (and an invitation to record one when there are none). */
-const TABS: { id: Tab; label: string }[] = [
+type TradesTab = "portfolio" | "transactions" | "dividends";
+
+/** What a section that doesn't show recorded trades is drawn with. */
+interface SectionContext {
+  portfolios: Portfolio[];
+  shown: Portfolio | undefined;
+  /** A symbol to start a new alert for. */
+  alert?: string;
+  changed: () => void;
+}
+
+/**
+ * The page's sections. Those about recorded trades need the portfolio worked out with prices (and
+ * invite a first trade when there are none); the others draw themselves from the portfolio list.
+ */
+const TABS: ({ id: TradesTab; label: string } | { id: Exclude<Tab, TradesTab>; label: string; render: (c: SectionContext) => ReactNode })[] = [
   { id: "portfolio", label: msg("Portfolio") },
   { id: "transactions", label: msg("Transactions") },
   { id: "dividends", label: msg("Dividends") },
-  { id: "watchlist", label: msg("Watched") },
-  { id: "alerts", label: msg("Alerts") },
-  { id: "import", label: msg("Import & brokers") },
+  { id: "rebalance", label: msg("Rebalance"), render: (c) => <RebalanceTab key={c.shown?.id ?? 0} portfolio={c.shown?.id ?? null} /> },
+  { id: "investors", label: msg("Investors"), render: () => <InvestorsTab /> },
+  { id: "watchlist", label: msg("Watched"), render: () => <WatchTab /> },
+  { id: "alerts", label: msg("Alerts"), render: (c) => <AlertsTab portfolios={c.portfolios} preset={c.alert} /> },
+  { id: "import", label: msg("Import & brokers"), render: (c) => <ImportTab portfolios={c.portfolios} portfolio={c.shown?.id ?? null} onImported={c.changed} /> },
 ];
 
 const PORTFOLIO_KEY = "page.stocks.portfolio";
 const BENCHMARK_KEY = "page.stocks.benchmark";
-/** The sections about recorded trades: they need the portfolio worked out with prices (the others only its list). */
-const NEEDS_TRADES = new Set<Tab>(["portfolio", "transactions", "dividends"]);
 
 /**
  * Stocks: what you hold and how it is doing, your trades, your dividends, symbols you watch, alerts,
@@ -53,6 +70,7 @@ export function StocksPage({ add, tab: firstTab, alert }: { add?: string; tab?: 
   const [savedPortfolio, savePortfolio] = useRemembered(PORTFOLIO_KEY);
   const [benchmark, saveBenchmark] = useRemembered(BENCHMARK_KEY);
   const [tab, setTab] = useState<Tab>(alert ? "alerts" : (firstTab ?? "portfolio"));
+  const section = TABS.find((x) => x.id === tab) ?? TABS[0];
   const [editing, setEditing] = useState<Transaction | { portfolio_id: number; symbol?: string }>();
   const [managing, setManaging] = useState<Portfolio | "new">();
 
@@ -60,7 +78,7 @@ export function StocksPage({ add, tab: firstTab, alert }: { add?: string; tab?: 
   const portfolios = list?.portfolios;
   const shown = portfolios?.find((p) => p.id === Number(savedPortfolio));
   const query = new URLSearchParams({ ...(shown ? { portfolio: String(shown.id) } : {}), ...(benchmark ? { benchmark } : {}) });
-  const wanted = NEEDS_TRADES.has(tab) && savedPortfolio !== undefined && benchmark !== undefined && !!list;
+  const wanted = !("render" in section) && savedPortfolio !== undefined && benchmark !== undefined && !!list;
   const { data, mutate, error, isLoading } = useSWR<StocksData>(wanted ? `/api/stocks?${query}` : null, fetcher, { keepPreviousData: true });
   const changed = () => void Promise.all([mutate(), mutateList()]);
 
@@ -103,14 +121,14 @@ export function StocksPage({ add, tab: firstTab, alert }: { add?: string; tab?: 
       <div className="flex flex-wrap items-center gap-2">
         {portfolios && (
           <>
-            <select value={shown?.id ?? ""} onChange={(e) => showPortfolio(Number(e.target.value) || undefined)} aria-label={t("Portfolio")} className={`${inputBase} w-48 font-medium`}>
-              {portfolios.length > 1 && <option value="">{t("All portfolios")}</option>}
-              {portfolios.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <PortfolioSelect
+              portfolios={portfolios}
+              value={shown?.id ?? null}
+              onChange={(id) => showPortfolio(id ?? undefined)}
+              all={portfolios.length > 1 ? t("All portfolios") : undefined}
+              label={t("Portfolio")}
+              className={`${inputBase} w-48 font-medium`}
+            />
             {(shown ?? (portfolios.length === 1 ? portfolios[0] : undefined)) && (
               <IconButton label="Edit portfolio" onClick={() => setManaging(shown ?? portfolios[0])}>
                 <Pencil className="h-4 w-4" />
@@ -135,16 +153,12 @@ export function StocksPage({ add, tab: firstTab, alert }: { add?: string; tab?: 
         ))}
       </nav>
 
-      {tab === "watchlist" ? (
-        <WatchTab />
-      ) : tab === "alerts" ? (
-        portfolios && <AlertsTab portfolios={portfolios} preset={alert} />
-      ) : tab === "import" ? (
-        portfolios && <ImportTab portfolios={portfolios} portfolio={shown?.id ?? null} onImported={changed} />
+      {"render" in section ? (
+        portfolios && section.render({ portfolios, shown, alert, changed })
       ) : !data || !portfolios ? (
         <p className="text-muted">{isLoading || !list ? t("Loading…") : ""}</p>
       ) : (
-        <TradesSection tab={tab} data={data} onBenchmark={saveBenchmark} onOpen={setEditing} onFirst={() => setEditing({ portfolio_id: shown?.id ?? portfolios[0].id })} />
+        <TradesSection tab={section.id} data={data} onBenchmark={saveBenchmark} onOpen={setEditing} onFirst={() => setEditing({ portfolio_id: shown?.id ?? portfolios[0].id })} />
       )}
 
       {editing && portfolios && <TransactionDialog transaction={editing} portfolios={portfolios} onSaved={changed} onClose={closeEditing} />}
@@ -166,7 +180,7 @@ export function StocksPage({ add, tab: firstTab, alert }: { add?: string; tab?: 
 }
 
 interface SectionProps {
-  tab: "portfolio" | "transactions" | "dividends";
+  tab: TradesTab;
   data: StocksData;
   onBenchmark: (symbol: string) => void;
   onOpen: (t: Transaction) => void;

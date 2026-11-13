@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useT } from "@/i18n/client";
@@ -13,6 +13,28 @@ interface Props {
   error?: string;
   busy?: boolean;
   children: ReactNode;
+}
+
+/**
+ * What a dialog's buttons do: `run` shows the work as busy, closes the dialog (`onDone`) when it
+ * succeeds and keeps its error when it throws. Spread `busy` and `error` into the Dialog;
+ * `setError` reports a check made before any work.
+ */
+export function useDialogRun(onDone: () => void) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const run = async (work: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await work();
+      onDone();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  };
+  return { run, busy, error, setError };
 }
 
 export function Dialog({ title, onClose, onSubmit, submitLabel, error, busy, children }: Props) {

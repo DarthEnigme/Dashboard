@@ -65,7 +65,7 @@ const readBody = (req) =>
 // Yahoo Finance (Stocks app, PAGE_YAHOO_URL=http://localhost:4010/yahoo): a few symbols with steady, made-up prices.
 const yahooSymbols = {
   "MC.PA": { name: "LVMH Moët Hennessy", currency: "EUR", exchange: "Paris", base: 600, sector: "Consumer Cyclical", industry: "Luxury Goods", dividend: 6.5, isin: "FR0000121014", country: "France", website: "https://www.lvmh.com" },
-  AAPL: { name: "Apple Inc.", currency: "USD", exchange: "NasdaqGS", base: 200, sector: "Technology", industry: "Consumer Electronics", dividend: 0.5, isin: "US0378331005", country: "United States", website: "https://www.apple.com" },
+  AAPL: { name: "Apple Inc.", currency: "USD", exchange: "NasdaqGS", base: 200, sector: "Technology", industry: "Consumer Electronics", dividend: 0.5, isin: "US0378331005", cusip: "037833100", country: "United States", website: "https://www.apple.com" },
   "^GSPC": { name: "S&P 500", currency: "USD", exchange: "SNP", base: 5000 },
   "USDEUR=X": { name: "USD/EUR", currency: "EUR", exchange: "CCY", base: 0.9, flat: true },
 };
@@ -158,7 +158,23 @@ const yahooSummary = (symbol) => {
   };
 };
 
+// SEC EDGAR (investors' 13F reports, PAGE_SEC_URL=http://localhost:4010/sec and PAGE_SEC_DATA_URL=…/sec-data):
+// Berkshire's last two reports. Like the SEC, it refuses tools that give no contact e-mail.
+const secRow = (issuer, cusip, value, shares) =>
+  `<infoTable><nameOfIssuer>${issuer}</nameOfIssuer><titleOfClass>COM</titleOfClass><cusip>${cusip}</cusip><value>${value}</value><shrsOrPrnAmt><sshPrnamt>${shares}</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt></infoTable>`;
+const secTables = {
+  "000119312526000002": secRow("APPLE INC", "037833100", 60000000000, 300000000) + secRow("BANK AMER CORP", "060505104", 30000000000, 650000000),
+  "000119312526000001": secRow("APPLE INC", "037833100", 70000000000, 400000000) + secRow("KRAFT HEINZ CO", "500754106", 9000000000, 325000000),
+};
+const secRefused = (req, res) => !/@/.test(req.headers["user-agent"] ?? "") && (res.writeHead(403, { "Content-Type": "text/html" }).end("Undeclared Automated Tool"), true);
+
 const routes = {
+  "GET /sec-data/submissions/CIK0001067983.json": (req, res) =>
+    secRefused(req, res) ||
+    json(res, 200, {
+      name: "BERKSHIRE HATHAWAY INC",
+      filings: { recent: { accessionNumber: ["0001193125-26-000002", "0001193125-26-000001"], form: ["13F-HR", "13F-HR"], filingDate: ["2026-08-14", "2026-05-15"], reportDate: ["2026-06-30", "2026-03-31"] } },
+    }),
   "GET /yahoo/cookie": (_req, res) => {
     res.writeHead(404, { "Set-Cookie": `${YAHOO_COOKIE}; Path=/; HttpOnly` });
     res.end("not here");
@@ -174,7 +190,7 @@ const routes = {
   "GET /yahoo/v1/finance/search": (req, res) => {
     const q = (new URL(req.url, "http://x").searchParams.get("q") ?? "").toLowerCase();
     const quotes = Object.entries(yahooSymbols)
-      .filter(([symbol, s]) => !symbol.includes("=") && (symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.isin?.toLowerCase() === q))
+      .filter(([symbol, s]) => !symbol.includes("=") && (symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.isin?.toLowerCase() === q || s.cusip === q))
       .map(([symbol, s]) => ({ symbol, shortname: s.name, longname: s.name, exchDisp: s.exchange, quoteType: symbol.startsWith("^") ? "INDEX" : "EQUITY", sector: s.sector, industry: s.industry }));
     json(res, 200, { quotes });
   },
@@ -554,6 +570,21 @@ const routes = {
 
 // Parameterised routes: [method, regex, handler(req, res, match)].
 const patterns = [
+  [
+    "GET",
+    /^\/sec\/Archives\/edgar\/data\/1067983\/(\d+)\/index\.json$/,
+    (req, res, m) => secRefused(req, res) || (secTables[m[1]] ? json(res, 200, { directory: { item: [{ name: "primary_doc.xml" }, { name: "table.xml" }] } }) : json(res, 404, {})),
+  ],
+  [
+    "GET",
+    /^\/sec\/Archives\/edgar\/data\/1067983\/(\d+)\/table\.xml$/,
+    (req, res, m) => {
+      if (secRefused(req, res)) return;
+      if (!secTables[m[1]]) return json(res, 404, {});
+      res.writeHead(200, { "Content-Type": "text/xml" });
+      res.end(`<informationTable xmlns="http://www.sec.gov/edgar/document/thirteenf/informationtable">${secTables[m[1]]}</informationTable>`);
+    },
+  ],
   [
     "GET",
     /^\/yahoo\/v8\/finance\/chart\/([^/]+)$/,

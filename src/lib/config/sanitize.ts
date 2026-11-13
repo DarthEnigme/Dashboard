@@ -75,9 +75,12 @@ export function sanitize(cfg: LoadedConfig, canSee: (v: Visibility) => boolean =
   // Ids come from the full config so they don't shift with what this viewer can see.
   const ids = serviceIds(cfg.services);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { alerts, docker, auth, ...settings } = cfg.settings;
+  const { alerts, docker, auth, ...rest } = cfg.settings;
+  // The SEC contact is someone's e-mail: it stays on the server.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { secContact, ...stocks } = rest.stocks;
   return {
-    settings,
+    settings: { ...rest, stocks },
     bookmarks: cfg.bookmarks.filter((g) => canSee(g.visible ?? "public")),
     widgets: cfg.widgets
       .map((w, index) => ({ ...withoutSecrets(w), index }) as ClientInfoWidget)

@@ -34,6 +34,10 @@ const child = spawn(process.execPath, [path.join(root, "node_modules", "next", "
     PAGE_OPENLIBRARY_COVERS_URL: "http://localhost:4010/ol-covers",
     // Prices and company figures for the Stocks app.
     PAGE_YAHOO_URL: "http://localhost:4010/yahoo",
+    // Investors' 13F reports, and the contact e-mail the SEC asks for.
+    PAGE_SEC_URL: "http://localhost:4010/sec",
+    PAGE_SEC_DATA_URL: "http://localhost:4010/sec-data",
+    PAGE_SEC_CONTACT: "e2e@example.com",
   },
 });
 const stop = () => child.kill();

@@ -1,5 +1,5 @@
-import { db } from "../db";
 import { fail, num, text } from "../clean";
+import { all, owned, run } from "../sql";
 import { ALERT_CHANNELS } from "../alerts";
 import { ALERT_RULES, alertOp, type AlertKind, type AlertRule } from "./alerts";
 import { cleanSymbol, ownPortfolio } from "./store";
@@ -13,10 +13,10 @@ type Row = Omit<AlertRule, "channels" | "active"> & { owner_id: number; channels
 const COLUMNS = "id, owner_id, kind, symbol, portfolio_id, op, value, channels, note, active, fired_key, fired_at";
 const toRule = (r: Row): AlertRule & { owner_id: number } => ({ ...r, channels: JSON.parse(r.channels) as string[], active: r.active === 1 });
 
-export const listAlerts = (userId: number) => (db().prepare(`SELECT ${COLUMNS} FROM stock_alerts WHERE owner_id = ? ORDER BY created_at, id`).all(userId) as unknown as Row[]).map(toRule);
+export const listAlerts = (userId: number) => all<Row>(`SELECT ${COLUMNS} FROM stock_alerts WHERE owner_id = ? ORDER BY created_at, id`, userId).map(toRule);
 
 /** Every rule that is on, everyone's: for the job. */
-export const activeAlerts = () => (db().prepare(`SELECT ${COLUMNS} FROM stock_alerts WHERE active = 1 ORDER BY owner_id, id`).all() as unknown as Row[]).map(toRule);
+export const activeAlerts = () => all<Row>(`SELECT ${COLUMNS} FROM stock_alerts WHERE active = 1 ORDER BY owner_id, id`).map(toRule);
 
 /** A portfolio of this person's, or null for all of them. */
 const portfolioOrAll = (userId: number, v: unknown) => (v === null || v === undefined || v === "" ? null : ownPortfolio(userId, Number(v)));
@@ -43,12 +43,22 @@ function clean(userId: number, b: AlertInput) {
 export function addAlert(userId: number, b: AlertInput) {
   if (listAlerts(userId).length >= MAX_ALERTS) fail(`A person can have up to ${MAX_ALERTS} alerts`);
   const a = clean(userId, b);
-  db()
-    .prepare("INSERT INTO stock_alerts (owner_id, kind, symbol, portfolio_id, op, value, channels, note, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(userId, a.kind, a.symbol, a.portfolio, a.op, a.value, a.channels, a.note, a.active, Date.now());
+  run(
+    "INSERT INTO stock_alerts (owner_id, kind, symbol, portfolio_id, op, value, channels, note, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    userId,
+    a.kind,
+    a.symbol,
+    a.portfolio,
+    a.op,
+    a.value,
+    a.channels,
+    a.note,
+    a.active,
+    Date.now(),
+  );
 }
 
-const ownAlert = (userId: number, id: number) => (db().prepare("SELECT id FROM stock_alerts WHERE id = ? AND owner_id = ?").get(id, userId) as { id: number } | undefined)?.id ?? fail("No such alert");
+const ownAlert = (userId: number, id: number) => owned("stock_alerts", userId, id, "No such alert");
 
 /** The columns that say when a rule holds. Changing one starts the rule again, as if it had never fired. */
 const SAME_CONDITION = "kind = ? AND symbol IS ? AND portfolio_id IS ? AND op = ? AND value = ?";
@@ -59,16 +69,21 @@ export function updateAlert(userId: number, b: AlertInput) {
   const id = ownAlert(userId, Number(b.id));
   const a = clean(userId, b);
   const condition = conditionOf(a, a.portfolio);
-  db()
-    .prepare(
-      `UPDATE stock_alerts SET fired_key = CASE WHEN ${SAME_CONDITION} THEN fired_key END, fired_at = CASE WHEN ${SAME_CONDITION} THEN fired_at END,
-       kind = ?, symbol = ?, portfolio_id = ?, op = ?, value = ?, channels = ?, note = ?, active = ? WHERE id = ?`,
-    )
-    .run(...condition, ...condition, ...condition, a.channels, a.note, a.active, id);
+  run(
+    `UPDATE stock_alerts SET fired_key = CASE WHEN ${SAME_CONDITION} THEN fired_key END, fired_at = CASE WHEN ${SAME_CONDITION} THEN fired_at END,
+     kind = ?, symbol = ?, portfolio_id = ?, op = ?, value = ?, channels = ?, note = ?, active = ? WHERE id = ?`,
+    ...condition,
+    ...condition,
+    ...condition,
+    a.channels,
+    a.note,
+    a.active,
+    id,
+  );
 }
 
 export function deleteAlert(userId: number, id: number) {
-  db().prepare("DELETE FROM stock_alerts WHERE id = ?").run(ownAlert(userId, id));
+  run("DELETE FROM stock_alerts WHERE id = ?", ownAlert(userId, id));
 }
 
 /**
@@ -76,7 +91,5 @@ export function deleteAlert(userId: number, id: number) {
  * condition was changed meanwhile: a rule edited while the job ran starts again as edited.
  */
 export function markFired(rule: AlertRule, key: string | null, firedNow: boolean) {
-  db()
-    .prepare(`UPDATE stock_alerts SET fired_key = ?, fired_at = CASE WHEN ? THEN ? ELSE fired_at END WHERE id = ? AND ${SAME_CONDITION}`)
-    .run(key, firedNow ? 1 : 0, Date.now(), rule.id, ...conditionOf(rule, rule.portfolio_id));
+  run(`UPDATE stock_alerts SET fired_key = ?, fired_at = CASE WHEN ? THEN ? ELSE fired_at END WHERE id = ? AND ${SAME_CONDITION}`, key, firedNow ? 1 : 0, Date.now(), rule.id, ...conditionOf(rule, rule.portfolio_id));
 }

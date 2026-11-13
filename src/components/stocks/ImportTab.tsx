@@ -13,10 +13,10 @@ import { dateOnly } from "@/i18n/format";
 import { useT } from "@/i18n/client";
 import { asLocal } from "@/lib/day";
 import { DeleteButton } from "../edit/controls";
-import { inputBase, inputClass } from "../edit/FieldInput";
-import { Dialog } from "../edit/Dialog";
+import { inputBase, inputClass, labelClass as field } from "../edit/FieldInput";
+import { Dialog, useDialogRun } from "../edit/Dialog";
 import { quoted, shares } from "./format";
-import { Card } from "./parts";
+import { Card, PortfolioSelect } from "./parts";
 import { SymbolIcon } from "./SymbolIcon";
 
 const BROKERS_URL = "/api/stocks/brokers";
@@ -96,13 +96,7 @@ function ImportCard({ portfolios, start, onImported }: { portfolios: Portfolio[]
     <Card title={t("Import trades")}>
       <p className="text-sm text-muted">{t("A CSV or Excel export from Degiro, Trade Republic, Trading 212, Interactive Brokers, or NanoDash itself. Importing a file twice adds nothing.")}</p>
       <div className="flex flex-wrap items-center gap-2">
-        <select value={portfolio} onChange={(e) => setPortfolio(Number(e.target.value))} aria-label={t("Into portfolio")} className={`${inputBase} w-44`}>
-          {portfolios.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <PortfolioSelect portfolios={portfolios} value={portfolio} onChange={(id) => id && setPortfolio(id)} label={t("Into portfolio")} className={`${inputBase} w-44`} />
         <label className="flex cursor-pointer items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110">
           <Upload className="h-4 w-4" /> {t("Choose a file")}
           <input type="file" accept=".csv,.txt,.xlsx,text/csv" className="sr-only" onChange={(e) => e.target.files?.[0] && void look(e.target.files[0])} />
@@ -230,7 +224,6 @@ function BrokersCard({ portfolios, onSynced }: { portfolios: Portfolio[]; onSync
   );
 }
 
-const field = "flex flex-col gap-1.5 text-xs font-medium text-muted";
 
 function ConnectDialog({ portfolios, onSave, onClose }: { portfolios: Portfolio[]; onSave: (body: unknown) => Promise<void>; onClose: () => void }) {
   const t = useT();
@@ -239,18 +232,8 @@ function ConnectDialog({ portfolios, onSave, onClose }: { portfolios: Portfolio[
   const [portfolio, setPortfolio] = useState(portfolios[0].id);
   const [secret, setSecret] = useState("");
   const [account, setAccount] = useState("");
-  const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState(false);
-  const save = async () => {
-    setBusy(true);
-    try {
-      await onSave({ kind, portfolio, secret, account });
-      onClose();
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
-  };
+  const { run, busy, error } = useDialogRun(onClose);
+  const save = () => run(() => onSave({ kind, portfolio, secret, account }));
   return (
     <Dialog title={t("Connect a broker")} onClose={onClose} onSubmit={save} error={error} busy={busy}>
       <label className={field}>
@@ -265,13 +248,7 @@ function ConnectDialog({ portfolios, onSave, onClose }: { portfolios: Portfolio[
       </label>
       <label className={field}>
         {t("Into portfolio")}
-        <select value={portfolio} onChange={(e) => setPortfolio(Number(e.target.value))} className={inputClass}>
-          {portfolios.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <PortfolioSelect portfolios={portfolios} value={portfolio} onChange={(id) => id && setPortfolio(id)} className={inputClass} />
       </label>
       <label className={field}>
         {t(info.secretLabel)}

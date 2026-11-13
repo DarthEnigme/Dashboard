@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { Portfolio } from "@/lib/stocks/types";
 
 /** A headline figure with its label, and a smaller line under it. */
 export function Stat({ label, value, note, tone = "" }: { label: string; value: string; note?: ReactNode; tone?: string }) {
@@ -60,5 +61,19 @@ export function Fact({ label, value }: { label: string; value: ReactNode | null 
       <dt className="text-muted">{label}</dt>
       <dd className="text-right font-medium tabular-nums">{value}</dd>
     </div>
+  );
+}
+
+/** Picks one of the person's portfolios; with `all`, also "all of them" (null). */
+export function PortfolioSelect({ portfolios, value, onChange, all, className, label }: { portfolios: Portfolio[]; value: number | null; onChange: (id: number | null) => void; all?: string; className: string; label?: string }) {
+  return (
+    <select value={value ?? ""} onChange={(e) => onChange(Number(e.target.value) || null)} aria-label={label} className={className}>
+      {all !== undefined && <option value="">{all}</option>}
+      {portfolios.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.name}
+        </option>
+      ))}
+    </select>
   );
 }

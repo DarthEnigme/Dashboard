@@ -1,12 +1,14 @@
 import { transaction } from "../db";
 import { cleanTags, day, int, text } from "../clean";
 import { createsCycle } from "./graph";
+import { REPEAT_UNITS, type RepeatUnit } from "./repeat";
 import { boardWaits, checkNewBlockers, enterColumn } from "./rules";
 import { all, fail, lastOrd, ownColumn, ownLane, ownTask, patch, place, run, type ColumnRow, type TaskRow } from "./sql";
-import { PRIORITIES, type Task, type TaskInput } from "./types";
+import { PRIORITIES, type CheckItem, type Task, type TaskInput } from "./types";
 
 const MAX_BODY = 20_000;
 const MAX_BLOCKERS = 20;
+const MAX_CHECKS = 50;
 
 /** A lane given by the client (null or "" for none), checked to be on `boardId`. */
 function laneOn(userId: number, v: unknown, boardId: number): number | null {
@@ -33,8 +35,38 @@ function setBlockers(task: Pick<TaskRow, "id" | "board_id">, v: unknown): number
 
 // ---------- fields ----------
 
+/** { every, unit }, or null for a task done once. */
+function cleanRepeat(v: unknown): { repeat_every: number | null; repeat_unit: RepeatUnit | null } {
+  if (v === null || v === "") return { repeat_every: null, repeat_unit: null };
+  const r = (typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const every = int(r.every, 1, 365) ?? fail("Repeat every 1 to 365 days, weeks or months");
+  const unit = REPEAT_UNITS.find((u) => u === r.unit) ?? fail("Repeat every day, week or month");
+  return { repeat_every: every, repeat_unit: unit };
+}
+
+/** The checklist as given: items with some text, each ticked or not. */
+function cleanChecklist(v: unknown): string {
+  if (!Array.isArray(v)) fail("The checklist is a list");
+  const items: CheckItem[] = (v as unknown[]).flatMap((x) => {
+    const item = (typeof x === "object" && x ? x : {}) as Record<string, unknown>;
+    const label = text(item.text, 200);
+    return label ? [{ text: label, done: item.done === true }] : [];
+  });
+  if (items.length > MAX_CHECKS) fail(`A checklist can hold up to ${MAX_CHECKS} items`);
+  return JSON.stringify(items);
+}
+
+/** A service id (as in services.yaml), or null for none. */
+const cleanService = (v: unknown) => (v === null || v === "" ? null : typeof v === "string" && /^[\w.-]{1,200}$/.test(v) ? v : fail("No such service"));
+
 function fields(b: TaskInput) {
-  const out: Partial<Pick<Task, "title" | "body" | "priority" | "due">> & { labels?: string } = {};
+  const out: Partial<Pick<Task, "title" | "body" | "priority" | "due">> & {
+    labels?: string;
+    checklist?: string;
+    service_id?: string | null;
+    repeat_every?: number | null;
+    repeat_unit?: RepeatUnit | null;
+  } = {};
   if (b.title !== undefined) out.title = text(b.title, 200) ?? fail("Title required");
   if (b.body !== undefined) {
     out.body = typeof b.body === "string" ? b.body : "";
@@ -43,12 +75,15 @@ function fields(b: TaskInput) {
   if (b.priority !== undefined) out.priority = PRIORITIES.find((p) => p === int(b.priority, 0, 3)) ?? fail("Priority is 0 to 3");
   if (b.due !== undefined) out.due = b.due === null || b.due === "" ? null : (day(b.due) ?? fail("The due date must be YYYY-MM-DD"));
   if (b.labels !== undefined) out.labels = JSON.stringify(cleanTags(b.labels));
+  if (b.checklist !== undefined) out.checklist = cleanChecklist(b.checklist);
+  if (b.service !== undefined) out.service_id = cleanService(b.service);
+  if (b.repeat !== undefined) Object.assign(out, cleanRepeat(b.repeat));
   return out;
 }
 
 // ---------- changes ----------
 
-/** { column, title, lane?, blocked_by?, body?, priority?, due?, labels? }: a new task, last in its cell. */
+/** { column, title, lane?, blocked_by?, body?, priority?, due?, labels?, checklist?, service?, repeat? }: a new task, last in its cell. */
 export function addTask(userId: number, b: TaskInput): number {
   const column = ownColumn(userId, Number(b.column));
   const lane = b.lane === undefined ? null : laneOn(userId, b.lane, column.board_id);
@@ -58,7 +93,8 @@ export function addTask(userId: number, b: TaskInput): number {
   transaction(() => {
     const id = Number(
       run(
-        "INSERT INTO tasks (column_id, lane_id, title, body, priority, due, labels, ord, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        `INSERT INTO tasks (column_id, lane_id, title, body, priority, due, labels, checklist, service_id, repeat_every, repeat_unit, ord, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         column.id,
         lane,
         title,
@@ -66,6 +102,10 @@ export function addTask(userId: number, b: TaskInput): number {
         f.priority ?? 0,
         f.due ?? null,
         f.labels ?? "[]",
+        f.checklist ?? "[]",
+        f.service_id ?? null,
+        f.repeat_every ?? null,
+        f.repeat_unit ?? null,
         lastOrd("tasks", { column_id: column.id, lane_id: lane }),
         now,
         now,

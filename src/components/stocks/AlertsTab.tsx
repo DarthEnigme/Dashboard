@@ -9,9 +9,10 @@ import { alertChannels } from "../settings/sections";
 import type { Portfolio } from "@/lib/stocks/types";
 import { number } from "@/i18n/format";
 import { useT } from "@/i18n/client";
-import { Dialog } from "../edit/Dialog";
+import { Dialog, useDialogRun } from "../edit/Dialog";
 import { DeleteButton, IconButton } from "../edit/controls";
-import { inputClass } from "../edit/FieldInput";
+import { inputClass, labelClass as field } from "../edit/FieldInput";
+import { PortfolioSelect } from "./parts";
 import { SymbolIcon } from "./SymbolIcon";
 import { SymbolSearch } from "./SymbolSearch";
 
@@ -99,7 +100,6 @@ export function AlertsTab({ portfolios, preset }: { portfolios: Portfolio[]; pre
   );
 }
 
-const field = "flex flex-col gap-1.5 text-xs font-medium text-muted";
 
 function AlertDialog({ rule, portfolios, channels, onSave, onClose }: { rule: AlertRule | { symbol?: string }; portfolios: Portfolio[]; channels: string[]; onSave: (body: unknown) => Promise<void>; onClose: () => void }) {
   const t = useT();
@@ -111,21 +111,9 @@ function AlertDialog({ rule, portfolios, channels, onSave, onClose }: { rule: Al
   const [value, setValue] = useState(existing ? String(existing.value) : "");
   const [chosen, setChosen] = useState<string[]>(existing?.channels ?? []);
   const [note, setNote] = useState(existing?.note ?? "");
-  const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState(false);
+  const { run, busy, error } = useDialogRun(onClose);
   const u = unit(kind, op);
-
-  const save = async () => {
-    setBusy(true);
-    setError(undefined);
-    try {
-      await onSave({ id: existing?.id, kind, op, symbol, portfolio, value: Number(value.replace(",", ".")), channels: chosen, note, active: existing?.active ?? true });
-      onClose();
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
-  };
+  const save = () => run(() => onSave({ id: existing?.id, kind, op, symbol, portfolio, value: Number(value.replace(",", ".")), channels: chosen, note, active: existing?.active ?? true }));
 
   return (
     <Dialog title={existing ? t("Edit alert") : t("New alert")} onClose={onClose} onSubmit={save} error={error} busy={busy}>
@@ -178,14 +166,7 @@ function AlertDialog({ rule, portfolios, channels, onSave, onClose }: { rule: Al
       {ALERT_RULES[kind].needs === "portfolio" && (
         <label className={field}>
           {t("Portfolio")}
-          <select value={portfolio ?? ""} onChange={(e) => setPortfolio(Number(e.target.value) || null)} className={inputClass}>
-            <option value="">{t("All portfolios")}</option>
-            {portfolios.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <PortfolioSelect portfolios={portfolios} value={portfolio} onChange={setPortfolio} all={t("All portfolios")} className={inputClass} />
         </label>
       )}
       <label className={field}>

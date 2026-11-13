@@ -7,13 +7,13 @@ import { localDay } from "@/lib/day";
 import { TRADE_KINDS, type Portfolio, type TradeKind, type Transaction } from "@/lib/stocks/types";
 import { msg } from "@/i18n";
 import { useT } from "@/i18n/client";
-import { Dialog } from "../edit/Dialog";
+import { Dialog, useDialogRun } from "../edit/Dialog";
 import { DeleteButton } from "../edit/controls";
-import { inputClass } from "../edit/FieldInput";
+import { inputClass, labelClass as label } from "../edit/FieldInput";
+import { PortfolioSelect } from "./parts";
 import { SymbolSearch } from "./SymbolSearch";
 
 const KIND_LABELS: Record<TradeKind, string> = { buy: msg("Buy"), sell: msg("Sell") };
-const label = "flex flex-col gap-1.5 text-xs font-medium text-muted";
 
 interface Props {
   /** The transaction to edit, or what a new one starts with. */
@@ -39,22 +39,12 @@ export function TransactionDialog({ transaction, portfolios, onSaved, onClose }:
     fees: existing?.fees ? String(existing.fees) : "",
     note: existing?.note ?? "",
   });
-  const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState(false);
+  const { run, busy, error, setError } = useDialogRun(() => {
+    onSaved();
+    onClose();
+  });
   const set = <K extends keyof typeof draft>(k: K, v: (typeof draft)[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
-  const run = async (work: () => Promise<unknown>) => {
-    setBusy(true);
-    setError(undefined);
-    try {
-      await work();
-      onSaved();
-      onClose();
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
-  };
   const save = () => {
     if (!draft.symbol) return setError(t("Pick what you bought or sold"));
     void run(() => sendJson("/api/stocks/transactions", existing ? "PATCH" : "POST", { ...draft, id: existing?.id }));
@@ -102,13 +92,7 @@ export function TransactionDialog({ transaction, portfolios, onSaved, onClose }:
         </label>
         <label className={label}>
           {t("Portfolio")}
-          <select value={draft.portfolio} onChange={(e) => set("portfolio", Number(e.target.value))} className={inputClass}>
-            {portfolios.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <PortfolioSelect portfolios={portfolios} value={draft.portfolio} onChange={(id) => id && set("portfolio", id)} className={inputClass} />
         </label>
       </div>
       <label className={label}>

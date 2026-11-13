@@ -13,7 +13,7 @@ export const MODULE_TABLES = {
   inventory: ["devices"],
   notes: ["note_services", "notes"],
   tasks: ["task_deps", "tasks", "task_lanes", "task_columns", "task_boards"],
-  stocks: ["stock_alerts", "stock_brokers", "stock_transactions", "stock_portfolios", "stock_watch", "stock_cache", "stock_logos"],
+  stocks: ["stock_alerts", "stock_brokers", "stock_targets", "stock_transactions", "stock_portfolios", "stock_watch", "stock_cache", "stock_logos"],
 } as const satisfies Record<App, readonly string[]>;
 
 export const appEnabled = (app: App) => loadConfig().settings.apps.includes(app);

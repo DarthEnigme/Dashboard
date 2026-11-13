@@ -5,7 +5,7 @@ import { safeText, toCsv } from "@/lib/finance/csvText";
 import { oneOf } from "@/lib/clean";
 import { writeXlsx } from "@/lib/xlsxWrite";
 import { dividendsTable, figuresTable, positionsTable, transactionsTable, type Table } from "@/lib/stocks/exports";
-import { factsFor, loadStocks } from "@/lib/stocks/service";
+import { factsFor, portfolioSnapshot } from "@/lib/stocks/service";
 import { cleanSymbol, listTransactions } from "@/lib/stocks/store";
 import { guard, portfoliosOf } from "../_shared";
 
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       if (!symbols.length || !measures.length) return bad("Pick at least one symbol and one figure");
       table = figuresTable(await Promise.all(symbols.map(factsFor)), measures, q.get("period") === "quarterly" ? "quarterly" : "annual");
     } else {
-      const data = await loadStocks(g.user.id, portfolios, portfolio?.id, undefined);
+      const data = await portfolioSnapshot(g.user.id, portfolios, portfolio?.id);
       table = what === "positions" ? positionsTable(data) : dividendsTable(data);
     }
   } catch (e) {

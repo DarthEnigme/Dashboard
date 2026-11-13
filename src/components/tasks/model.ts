@@ -1,4 +1,4 @@
-import type { Priority, Task } from "@/lib/tasks/types";
+import type { CheckItem, Priority, Repeat, Task } from "@/lib/tasks/types";
 
 /** What the page and its parts pass around, apart from the board itself. */
 
@@ -13,10 +13,13 @@ export interface TaskDraft {
   due: string | null;
   labels: string;
   blocked_by: number[];
+  repeat: Repeat | null;
+  checklist: CheckItem[];
+  service: string | null;
 }
 
-/** Where a new task starts. */
-export type NewTask = Pick<Task, "column_id" | "lane_id">;
+/** Where a new task starts, and the service it is about when started from that service's page. */
+export type NewTask = Pick<Task, "column_id" | "lane_id"> & { service?: string };
 
 /** What can be asked of a column or a lane from its menu. */
 export type PartChange = { rename: true } | { done: boolean } | { shift: -1 | 1 } | { remove: true };

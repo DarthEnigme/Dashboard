@@ -250,6 +250,7 @@ export const sections: Section[] = [
       { key: "inventory.warrantyDays", label: msg("Warn about ending device warranties (days before)"), kind: "number", placeholder: "30", help: msg("For devices in the inventory. 0 turns it off.") },
       { key: "stocks.alertMinutes", label: msg("Check stock alerts every (minutes)"), kind: "number", placeholder: "15", help: msg("Prices from Yahoo Finance are a little delayed: checking more often than every few minutes gains nothing.") },
       { key: "stocks.logoSource", label: msg("Company logos from"), placeholder: "https://example.com/logos/{symbol}.png", help: msg("A URL with {symbol} or {domain} in it. Empty: the icon of the company's website. A logo uploaded for a symbol always comes first.") },
+      { key: "stocks.secContact", label: msg("Contact e-mail for the SEC"), placeholder: "you@example.com", help: msg("Investors' holdings come from the SEC, which asks automated tools for a contact e-mail. It is sent to the SEC only.") },
       { key: "tasks.dueSoonDays", label: msg("Tasks count as due soon (days before)"), kind: "number", placeholder: "1", help: msg("For task reminders and the tasks widget. Boards send them to the alert channels only when asked to.") },
       {
         key: "maintenance",

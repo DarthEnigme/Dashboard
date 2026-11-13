@@ -3,28 +3,44 @@ import { localDay } from "../day";
 import { ensureBoards } from "./boards";
 import { boardWaits } from "./rules";
 import { all, flag, one } from "./sql";
-import type { BoardNames, DueTask, Task, TasksData, TasksSummary } from "./types";
+import type { BoardNames, CheckItem, DueTask, RepeatUnit, ServiceTask, Task, TasksData, TasksSummary } from "./types";
 
 /**
  * The board `boardId` (or this person's first one) with its lanes, columns and tasks. Someone with no
  * board yet gets one, with the three usual columns named by `names` (the caller's language).
  */
-export function loadBoard(userId: number, boardId: number | undefined, names: BoardNames): Omit<TasksData, "alerts"> {
+export function loadBoard(userId: number, boardId: number | undefined, names: BoardNames): Omit<TasksData, "alerts" | "services"> {
   const boards = ensureBoards(userId, names);
   const summary = boards.find((b) => b.id === boardId) ?? boards[0];
   const flags = one<{ project: number; notify: number }>("SELECT project, notify FROM task_boards WHERE id = ?", summary.id)!; // the row exists: it was just listed
   const lanes = all<{ id: number; name: string; collapsed: number }>("SELECT id, name, collapsed FROM task_lanes WHERE board_id = ? ORDER BY ord, id", summary.id);
   const columns = all<{ id: number; name: string; done: number }>("SELECT id, name, done FROM task_columns WHERE board_id = ? ORDER BY ord, id", summary.id);
-  const rows = all<Omit<Task, "labels" | "blocked_by" | "blocked"> & { labels: string | null }>(
-    `SELECT t.id, t.column_id, t.lane_id, t.title, t.body, t.priority, t.due, t.labels, t.created_at, t.completed_at
+  const rows = all<
+    Omit<Task, "labels" | "blocked_by" | "blocked" | "repeat" | "checklist" | "service"> & {
+      labels: string | null;
+      checklist: string;
+      service_id: string | null;
+      repeat_every: number | null;
+      repeat_unit: RepeatUnit | null;
+    }
+  >(
+    `SELECT t.id, t.column_id, t.lane_id, t.title, t.body, t.priority, t.due, t.labels, t.created_at, t.completed_at, t.checklist, t.service_id, t.repeat_every, t.repeat_unit
      FROM tasks t JOIN task_columns c ON c.id = t.column_id WHERE c.board_id = ? ORDER BY t.ord, t.id`,
     summary.id,
   );
   const waits = boardWaits(summary.id);
   const open = new Set(rows.filter((r) => r.completed_at === null).map((r) => r.id));
-  const tasks: Task[] = rows.map((r) => {
+  const tasks: Task[] = rows.map(({ checklist, service_id, repeat_every, repeat_unit, ...r }) => {
     const blocked_by = waits.get(r.id) ?? [];
-    return { ...r, labels: parseTags(r.labels), blocked_by, blocked: open.has(r.id) && blocked_by.some((b) => open.has(b)) };
+    return {
+      ...r,
+      labels: parseTags(r.labels),
+      blocked_by,
+      blocked: open.has(r.id) && blocked_by.some((b) => open.has(b)),
+      repeat: repeat_every && repeat_unit ? { every: repeat_every, unit: repeat_unit } : null,
+      checklist: JSON.parse(checklist) as CheckItem[],
+      service: service_id,
+    };
   });
   const labels = [...new Map(tasks.flatMap((t) => t.labels).map((l) => [l.toLowerCase(), l])).values()].sort((a, b) => a.localeCompare(b));
   return {
@@ -71,4 +87,18 @@ export function tasksSummary(userId: number, days: number, now = new Date(), max
     userId,
   )!;
   return { open, overdue: due.filter((t) => t.overdue).length, due: due.slice(0, max) };
+}
+
+/** This person's open tasks about a service, soonest due first (undated last), for the service's page. */
+export function tasksForService(userId: number, serviceId: string): ServiceTask[] {
+  return all<Omit<ServiceTask, "checked" | "checks"> & { checklist: string }>(
+    `SELECT t.id, t.title, t.due, t.priority, b.id AS board_id, b.name AS board, t.checklist FROM tasks t
+     JOIN task_columns c ON c.id = t.column_id JOIN task_boards b ON b.id = c.board_id
+     WHERE b.owner_id = ? AND t.service_id = ? AND t.completed_at IS NULL ORDER BY t.due IS NULL, t.due, t.priority DESC, t.id LIMIT 50`,
+    userId,
+    serviceId,
+  ).map(({ checklist, ...t }) => {
+    const items = JSON.parse(checklist) as CheckItem[];
+    return { ...t, checked: items.filter((i) => i.done).length, checks: items.length };
+  });
 }

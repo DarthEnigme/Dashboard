@@ -97,4 +97,45 @@ test.describe.serial("tasks", () => {
     await expect(page.getByLabel("Board", { exact: true }).locator("option:checked")).toHaveText("My board");
     await expect(page.getByText("2 open tasks")).toBeVisible();
   });
+
+  test("a repeating task with a checklist, about a service", async ({ page }) => {
+    const column = (name: string) => page.getByRole("region", { name, exact: true });
+
+    // From a service's page: a new task about that service.
+    await page.goto("/service/infra.proxmox");
+    await page.getByRole("link", { name: "New task about this service" }).click();
+    const dialog = page.getByRole("dialog", { name: "New task" });
+    await expect(dialog.getByLabel("About service")).toHaveValue("infra.proxmox");
+    await dialog.getByLabel("Title").fill("Patch Proxmox");
+    await dialog.getByLabel("Due date").fill("2099-01-05");
+    await dialog.getByLabel("Repeat", { exact: true }).selectOption("on");
+    await dialog.getByLabel("Repeat every").fill("2");
+    await dialog.getByLabel("Repeat unit").selectOption("week");
+    for (const item of ["Update packages", "Reboot"]) {
+      await dialog.getByLabel("New checklist item").fill(item);
+      await dialog.getByLabel("New checklist item").press("Enter");
+    }
+    await dialog.getByLabel("Done: Update packages").check();
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(column("To do").getByRole("button", { name: /Patch Proxmox/ })).toContainText("1/2");
+
+    // The service's page lists it, and opens it on its board.
+    await page.goto("/service/infra.proxmox");
+    const tasks = page.getByRole("region", { name: "Tasks", exact: true });
+    await expect(tasks).toContainText("Patch Proxmox");
+    await expect(tasks).toContainText("1/2");
+    await tasks.getByRole("link", { name: /Patch Proxmox/ }).click();
+
+    // Finished: the next one is made, two weeks later, its checklist unticked.
+    const edit = page.getByRole("dialog", { name: "Edit task" });
+    await edit.getByLabel("Column").selectOption({ label: "Done" });
+    await edit.getByRole("button", { name: "Save" }).click();
+    await expect(edit).toHaveCount(0);
+    await expect(column("Done").getByRole("button", { name: /Patch Proxmox/ })).toBeVisible();
+    const next = column("To do").getByRole("button", { name: /Patch Proxmox/ });
+    await expect(next).toContainText("0/2");
+    await next.click();
+    await expect(page.getByRole("dialog", { name: "Edit task" }).getByLabel("Due date")).toHaveValue("2099-01-19");
+  });
 });

@@ -189,6 +189,20 @@ describe("alert rules", () => {
     expect(decide(rule({ fired_key: "x" }), read(rule({}), ctx(100, { quote: () => undefined })))).toEqual({ key: "x" });
   });
 
+  it("compares every condition with its threshold, the threshold itself included", () => {
+    // Today's change is -4 %, the position +25 %, the portfolio 10,000 and -3 % today.
+    const holds = (kind: AlertRule["kind"], op: string, value: number) => read(rule({ kind, op, value, symbol: kind === "portfolio" ? null : "AAPL" }), ctx(100))?.holds;
+    expect([holds("price", "above", 100), holds("price", "above", 101), holds("price", "below", 100), holds("price", "below", 99)]).toEqual([true, false, true, false]);
+    expect([holds("move", "up", 4), holds("move", "down", 4), holds("move", "down", 5), holds("move", "either", 4), holds("move", "either", 5)]).toEqual([false, true, false, true, false]);
+    expect([holds("position", "gain", 25), holds("position", "loss", 25)]).toEqual([true, false]);
+    expect([holds("portfolio", "above", 10_000), holds("portfolio", "dayUp", 1), holds("portfolio", "dayDown", 3)]).toEqual([true, false, true]);
+    // An event today counts; one in the past doesn't.
+    const on = (day: string) => read(rule({ kind: "event", op: "exDividend", value: 0 }), ctx(100, { company: () => ({ calendar: { earnings: [], exDividend: day, dividendPaid: null } }) as never }))?.holds;
+    expect([on("2026-11-11"), on("2026-11-10")]).toEqual([true, false]);
+    // A condition the kind doesn't have reads as nothing.
+    expect(holds("price", "dayUp", 1)).toBeUndefined();
+  });
+
   it("keeps rules private and checks them", () => {
     addAlert(me, { kind: "price", op: "above", value: 150, symbol: "aapl", channels: ["discord"] });
     const [a] = listAlerts(me);
@@ -464,7 +478,31 @@ describe("broker connections", () => {
     // Again: nothing new.
     await startSync(me, t212);
     expect(listTransactions(me)).toHaveLength(3);
+    expect(listConnections(me).find((c) => c.id === t212)).toMatchObject({ syncing: false, added: 0 });
     expect(() => addConnection(me, { kind: "ibkr", portfolio: p.id, secret: "tok" })).toThrow(/query id/);
+  });
+
+  it("keeps a sync's progress in the database: one running elsewhere isn't started twice, a crashed one is taken over", async () => {
+    vi.spyOn(yahoo, "searchSymbols").mockResolvedValue([{ symbol: "AAPL", name: "Apple", exchange: "NMS", type: "EQUITY", sector: null, industry: null }]);
+    vi.spyOn(yahoo, "fetchHistory").mockResolvedValue(history("AAPL", "USD", 200));
+    const [p] = ensurePortfolios(me, "Main", "EUR");
+    const id = addConnection(me, { kind: "t212", portfolio: p.id, secret: "key" });
+    const started = (at: number | null) => db().prepare("UPDATE stock_brokers SET sync_started_at = ? WHERE id = ?").run(at, id);
+    const before = asked.length;
+
+    // Another process (or the instance before a restart) is syncing it: shown, and not started again.
+    started(Date.now() - 60_000);
+    expect(listConnections(me).find((c) => c.id === id)?.syncing).toBe(true);
+    await startSync(me, id);
+    expect(asked.length).toBe(before);
+
+    // A sync that started an hour ago crashed: the next one takes over and clears the mark.
+    started(Date.now() - 3_600_000);
+    expect(listConnections(me).find((c) => c.id === id)?.syncing).toBe(false);
+    await startSync(me, id);
+    expect(asked.length).toBeGreaterThan(before);
+    const after = db().prepare("SELECT sync_started_at, last_added, error FROM stock_brokers WHERE id = ?").get(id);
+    expect(after).toEqual({ sync_started_at: null, last_added: expect.any(Number), error: null });
   });
 });
 

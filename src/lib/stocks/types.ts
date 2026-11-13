@@ -1,8 +1,16 @@
 /** The shapes of the Stocks app, shared by the server and the pages (nothing here touches the database or the network). */
 import { daysBefore } from "../day";
+import type { DividendForecast } from "./forecast";
+import type { Holding, Target } from "./rebalance";
 import type { Company, Fundamentals } from "./yahoo";
 
 export type { Company, Fundamentals, Metric, Point, Recommendations, SymbolHit } from "./yahoo";
+
+/** A value per day, oldest first. */
+export interface Series {
+  days: string[];
+  closes: number[];
+}
 
 export const TRADE_KINDS = ["buy", "sell"] as const;
 export type TradeKind = (typeof TRADE_KINDS)[number];
@@ -88,6 +96,9 @@ export interface Summary {
   dividendList: { day: string; symbol: string; amount: number }[];
 }
 
+/** Where a portfolio stands today, without its history: what the widget, alerts, compare page and exports read. */
+export type Snapshot = Omit<Summary, "series">;
+
 export interface StocksData extends Summary {
   portfolios: Portfolio[];
   /** The portfolio shown, or null for all of them together. */
@@ -98,6 +109,20 @@ export interface StocksData extends Summary {
   errors: string[];
   /** All portfolios shown together: what each holds of each symbol (value, in `currency`). Empty otherwise. */
   byPortfolio: { portfolio: number; symbol: string; value: number }[];
+  /** Dividends expected over the next twelve months, on what is held now. */
+  forecast: DividendForecast;
+}
+
+/** The rebalancing page of one portfolio (or all together): what the page needs to work the trades out. */
+export interface TargetsData {
+  portfolio: number | null;
+  currency: string;
+  value: number;
+  /** What is held, then the targets not held yet (worth 0). */
+  holdings: Holding[];
+  targets: Target[];
+  /** Symbols Yahoo didn't answer for. */
+  errors: string[];
 }
 
 export interface WatchQuote {
@@ -138,7 +163,7 @@ export interface Research {
   change: number | null;
   high52: number | null;
   low52: number | null;
-  chart: { days: string[]; closes: number[] };
+  chart: Series;
   /** Null for what has no company figures (funds, indexes, currencies). */
   fundamentals: Fundamentals | null;
   /** Profile, calendar, analysts and holders; null when Yahoo didn't say. */
@@ -161,7 +186,7 @@ export interface CompareSymbol {
   change: number | null;
   fundamentals: Fundamentals | null;
   company: Company | null;
-  chart: { days: string[]; closes: number[] };
+  chart: Series;
   beta: number | null;
   correlation: number | null;
   /** Yearly, in percent. */
@@ -171,7 +196,7 @@ export interface CompareSymbol {
 
 export interface CompareData {
   range: Range;
-  benchmark: { symbol: string; name: string; chart: { days: string[]; closes: number[] } };
+  benchmark: { symbol: string; name: string; chart: Series };
   symbols: CompareSymbol[];
   /** The person's portfolios together, crossed with the market; null when not asked for or empty. */
   portfolio: {

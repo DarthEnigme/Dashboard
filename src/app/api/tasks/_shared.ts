@@ -3,7 +3,8 @@ import { crudRoutes, guardFor } from "@/lib/api";
 import { getT } from "@/i18n/server";
 import { hasAlertChannel } from "@/lib/alerts";
 import { loadConfig } from "@/lib/config/load";
-import { loadBoard, type BoardNames } from "@/lib/tasks/store";
+import { allServices } from "@/lib/config/lookup";
+import { loadBoard, type BoardNames, type TasksData } from "@/lib/tasks/store";
 
 export const guard = guardFor("tasks", "the task boards");
 
@@ -14,7 +15,11 @@ export async function names(): Promise<BoardNames> {
 }
 
 /** The board as it is now, and whether reminders can go anywhere: what every tasks route answers with. */
-export const board = async (userId: number, boardId?: number) => ({ ...loadBoard(userId, boardId, await names()), alerts: hasAlertChannel(loadConfig().settings.alerts) });
+export const board = async (userId: number, boardId?: number): Promise<TasksData> => ({
+  ...loadBoard(userId, boardId, await names()),
+  alerts: hasAlertChannel(loadConfig().settings.alerts),
+  services: (await allServices()).map((s) => ({ id: s.id, name: s.service.name, group: s.group })),
+});
 export const reply = async (userId: number, boardId?: number) => NextResponse.json(await board(userId, boardId));
 
 /** The handlers of a part of a board (a column, a lane, a task): each answers with the board it touched. */

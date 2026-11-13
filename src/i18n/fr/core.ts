@@ -1062,4 +1062,6 @@ export const core: Record<string, string> = {
   "Use the stock portfolio and research pages": "Utiliser le portefeuille boursier et les fiches d'analyse",
   "Use the task boards": "Utiliser les tableaux de tâches",
   "View": "Affichage",
+  "Contact e-mail for the SEC": "E-mail de contact pour la SEC",
+  "Investors' holdings come from the SEC, which asks automated tools for a contact e-mail. It is sent to the SEC only.": "Les positions des investisseurs viennent de la SEC, qui demande aux outils automatiques un e-mail de contact. Il n'est envoyé qu'à la SEC.",
 };

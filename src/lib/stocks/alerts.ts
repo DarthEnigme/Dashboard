@@ -21,9 +21,17 @@ interface KindSpec {
   symbol: boolean;
   /** The lowest threshold allowed. */
   min: number;
-  /** Its conditions, in the order offered, with what their threshold counts. */
-  ops: Record<string, { label: string; unit: AlertUnit }>;
+  /** Its conditions, in the order offered: what their threshold counts, and when a reading meets it. */
+  ops: Record<string, { label: string; unit: AlertUnit; holds: (reading: number, threshold: number) => boolean }>;
 }
+
+/** How a reading compares with the threshold. */
+const atLeast = (x: number, v: number) => x >= v;
+const atMost = (x: number, v: number) => x <= v;
+const downBy = (x: number, v: number) => x <= -v;
+const eitherBy = (x: number, v: number) => Math.abs(x) >= v;
+/** Event rules hold when the date is within `v` days; the reading is the number of days to it. */
+const withinDays = (days: number, v: number) => days >= 0 && days <= v;
 
 /** Every kind of rule, its conditions and what they need: the one description the store, the job and the page share. */
 export const ALERT_RULES = {
@@ -33,7 +41,7 @@ export const ALERT_RULES = {
     needs: "quote",
     symbol: true,
     min: 0,
-    ops: { above: { label: msg("goes above"), unit: "amount" }, below: { label: msg("goes below"), unit: "amount" } },
+    ops: { above: { label: msg("goes above"), unit: "amount", holds: atLeast }, below: { label: msg("goes below"), unit: "amount", holds: atMost } },
   },
   /** Today's change reaches ± `value` percent. */
   move: {
@@ -41,7 +49,7 @@ export const ALERT_RULES = {
     needs: "quote",
     symbol: true,
     min: 0.01,
-    ops: { up: { label: msg("rises by"), unit: "%" }, down: { label: msg("falls by"), unit: "%" }, either: { label: msg("moves by"), unit: "%" } },
+    ops: { up: { label: msg("rises by"), unit: "%", holds: atLeast }, down: { label: msg("falls by"), unit: "%", holds: downBy }, either: { label: msg("moves by"), unit: "%", holds: eitherBy } },
   },
   /** What is held of the symbol is up `value` percent (a target), or down `value` percent (a stop). */
   position: {
@@ -49,7 +57,7 @@ export const ALERT_RULES = {
     needs: "portfolio",
     symbol: true,
     min: 0.01,
-    ops: { gain: { label: msg("gains (target)"), unit: "%" }, loss: { label: msg("loses (stop)"), unit: "%" } },
+    ops: { gain: { label: msg("gains (target)"), unit: "%", holds: atLeast }, loss: { label: msg("loses (stop)"), unit: "%", holds: downBy } },
   },
   /** A portfolio's value crosses `value` (its currency), or its day reaches ± `value` percent. */
   portfolio: {
@@ -58,10 +66,10 @@ export const ALERT_RULES = {
     symbol: false,
     min: 0,
     ops: {
-      above: { label: msg("goes above"), unit: "amount" },
-      below: { label: msg("goes below"), unit: "amount" },
-      dayUp: { label: msg("rises in a day by"), unit: "%" },
-      dayDown: { label: msg("falls in a day by"), unit: "%" },
+      above: { label: msg("goes above"), unit: "amount", holds: atLeast },
+      below: { label: msg("goes below"), unit: "amount", holds: atMost },
+      dayUp: { label: msg("rises in a day by"), unit: "%", holds: atLeast },
+      dayDown: { label: msg("falls in a day by"), unit: "%", holds: downBy },
     },
   },
   /** Results, or an ex-dividend day, within `value` days. */
@@ -70,7 +78,10 @@ export const ALERT_RULES = {
     needs: "company",
     symbol: true,
     min: 0.01,
-    ops: { earnings: { label: msg("publishes results within"), unit: "days" }, exDividend: { label: msg("goes ex-dividend within"), unit: "days" } },
+    ops: {
+      earnings: { label: msg("publishes results within"), unit: "days", holds: withinDays },
+      exDividend: { label: msg("goes ex-dividend within"), unit: "days", holds: withinDays },
+    },
   },
 } as const satisfies Record<string, KindSpec>;
 export type AlertKind = keyof typeof ALERT_RULES;
@@ -121,46 +132,50 @@ export interface Reading {
 const fmt = (n: number, digits = 2) => n.toLocaleString("en-US", { maximumFractionDigits: digits });
 const pct = (n: number) => `${n > 0 ? "+" : ""}${fmt(n)} %`;
 const DAY = 86_400_000;
-const within = (today: string, day: string, days: number) => day >= today && Date.parse(day) - Date.parse(today) <= days * DAY;
+const daysUntil = (today: string, day: string) => (Date.parse(day) - Date.parse(today)) / DAY;
 
+/** A rule's reading now; undefined while the data it needs is missing (or the rule names a condition its kind doesn't have). */
 export function read(rule: AlertRule, ctx: AlertContext): Reading | undefined {
+  const condition = alertOp(rule.kind, rule.op);
+  if (!condition) return undefined;
+  const meets = (x: number) => condition.holds(x, rule.value);
   const tag = `${rule.kind}:${rule.op}:${rule.value}`;
   const symbol = rule.symbol ?? "";
   switch (rule.kind) {
     case "price": {
       const q = ctx.quote(symbol);
       if (!q) return undefined;
-      const holds = rule.op === "above" ? q.price >= rule.value : q.price <= rule.value;
+      const holds = meets(q.price);
       return { holds, key: tag, level: "info", message: `${symbol} (${q.name}) is ${rule.op} ${fmt(rule.value)} ${q.currency}: ${fmt(q.price)} ${q.currency} now.` };
     }
     case "move": {
       const q = ctx.quote(symbol);
       if (!q || q.change === null) return undefined;
-      const holds = rule.op === "up" ? q.change >= rule.value : rule.op === "down" ? q.change <= -rule.value : Math.abs(q.change) >= rule.value;
+      const holds = meets(q.change);
       return { holds, key: `${tag}:${ctx.today}`, dated: true, level: q.change < 0 ? "warn" : "info", message: `${symbol} (${q.name}) moved ${pct(q.change)} today, to ${fmt(q.price)} ${q.currency}.` };
     }
     case "position": {
       const p = ctx.position(symbol, rule.portfolio_id);
       if (!p || p.gainPct === null) return undefined;
-      const holds = rule.op === "gain" ? p.gainPct >= rule.value : p.gainPct <= -rule.value;
+      const holds = meets(p.gainPct);
       return { holds, key: tag, level: rule.op === "loss" ? "warn" : "info", message: `Your ${symbol} position is ${pct(p.gainPct)} (${rule.op === "gain" ? "target" : "stop"}: ${rule.op === "gain" ? "+" : "−"}${fmt(rule.value)} %).` };
     }
     case "portfolio": {
       const p = ctx.portfolio(rule.portfolio_id);
       if (!p) return undefined;
       if (rule.op === "above" || rule.op === "below") {
-        const holds = rule.op === "above" ? p.value >= rule.value : p.value <= rule.value;
+        const holds = meets(p.value);
         return { holds, key: tag, level: rule.op === "below" ? "warn" : "info", message: `${p.name} is ${rule.op} ${fmt(rule.value, 0)} ${p.currency}: ${fmt(p.value, 0)} ${p.currency} now.` };
       }
       if (p.dayChangePct === null) return undefined;
-      const holds = rule.op === "dayUp" ? p.dayChangePct >= rule.value : p.dayChangePct <= -rule.value;
+      const holds = meets(p.dayChangePct);
       return { holds, key: `${tag}:${ctx.today}`, dated: true, level: p.dayChangePct < 0 ? "warn" : "info", message: `${p.name} moved ${pct(p.dayChangePct)} today.` };
     }
     case "event": {
       const c = ctx.company(symbol);
       if (c === undefined) return undefined;
       const day = rule.op === "earnings" ? c?.calendar.earnings[0] : c?.calendar.exDividend;
-      const holds = !!day && within(ctx.today, day, rule.value);
+      const holds = !!day && meets(daysUntil(ctx.today, day));
       const what = rule.op === "earnings" ? "publishes its results" : "goes ex-dividend";
       return { holds, key: `${tag}:${day ?? "none"}`, dated: true, level: "info", message: `${symbol} ${what} on ${day}.` };
     }

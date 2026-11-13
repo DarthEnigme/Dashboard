@@ -7,5 +7,5 @@ export type * from "./types";
 export { createBoard, deleteBoard, ensureBoards, listBoards, updateBoard } from "./boards";
 export { addColumn, addLane, deleteColumn, deleteLane, updateColumn, updateLane } from "./parts";
 export { addTask, deleteTask, updateTask } from "./items";
-export { loadBoard, tasksSummary } from "./read";
+export { loadBoard, tasksForService, tasksSummary } from "./read";
 export { taskReminderJob } from "./reminders";

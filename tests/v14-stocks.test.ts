@@ -4,7 +4,7 @@ import { forget } from "@/lib/cache";
 import { remembered } from "@/lib/stocks/cache";
 import { adjustForSplits, dividendsByYear, makeFx, summarize, thin, valueAt, type Market, type Trade } from "@/lib/stocks/portfolio";
 import { addPortfolio, addTransaction, deletePortfolio, deleteTransaction, ensurePortfolios, listTransactions, listWatched, unwatch, updateTransaction, watch } from "@/lib/stocks/store";
-import { loadResearch, loadStocks, loadWatchlist } from "@/lib/stocks/service";
+import { loadResearch, loadStocks, loadWatchlist, portfolioSnapshot } from "@/lib/stocks/service";
 import * as yahoo from "@/lib/stocks/yahoo";
 import { parseFundamentals, parseHistory, parseSearch, type History } from "@/lib/stocks/yahoo";
 
@@ -341,6 +341,17 @@ describe("stocks store", () => {
     expect(data.transactions).toHaveLength(2);
     expect(data.series.days[0]).toBe("2024-01-02");
     expect(data.series.benchmark?.[data.series.benchmark.length - 1]).toBeCloseTo(25);
+
+    // The snapshot (widget, alerts, compare, exports) is the page without its history: same figures, no benchmark asked.
+    asked.length = 0;
+    db().prepare("DELETE FROM stock_cache").run();
+    forget("stocks:");
+    const snap = await portfolioSnapshot(me, portfolios, portfolios[0].id);
+    expect(snap).not.toHaveProperty("series");
+    expect(Object.keys(snap).length).toBeGreaterThan(5);
+    expect(snap).toEqual(Object.fromEntries(Object.keys(snap).map((k) => [k, data[k as keyof typeof data]])));
+    expect(asked).toEqual(expect.arrayContaining(["AAPL", "USDEUR=X"]));
+    expect(asked).not.toContain("^GSPC");
 
     const research = await loadResearch(me, "AAPL", "max");
     expect(research).toMatchObject({ symbol: "AAPL", name: "AAPL Inc", sector: "Technology", price: 200, watched: false, holding: { quantity: 10, avgCost: 100 } });

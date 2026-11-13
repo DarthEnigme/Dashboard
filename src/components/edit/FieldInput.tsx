@@ -16,6 +16,8 @@ export type FormValue = unknown;
 export const inputBase =
   "h-10 rounded-xl border border-line bg-chip px-3 text-sm outline-none transition placeholder:text-muted/70 focus:border-accent focus:ring-2 focus:ring-accent/30";
 export const inputClass = `${inputBase} w-full`;
+/** A form field's label, holding its title and its input. */
+export const labelClass = "flex flex-col gap-1.5 text-xs font-medium text-muted";
 
 export function FieldInput({
   spec,

@@ -18,6 +18,7 @@ import { MetricsSection } from "./MetricsSection";
 import { ActionMenu } from "./ActionMenu";
 import { MaintenanceButton, MuteButton } from "./MuteButton";
 import { Runbook } from "./notes/Runbook";
+import { ServiceTasks } from "./tasks/ServiceTasks";
 import { LineChart } from "./charts/LineChart";
 import { Legend, Tooltip, useWidth } from "./charts/common";
 import { msg } from "@/i18n";
@@ -101,6 +102,7 @@ export function ServiceDetail({ service: s, group, settings, canAct, canMute }: 
       </header>
 
       <Runbook serviceId={s.id} />
+      <ServiceTasks serviceId={s.id} />
 
       {s.widget && (
         <section className="glass flex flex-col gap-3 rounded-3xl p-5">

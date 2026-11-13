@@ -1,5 +1,5 @@
 import { latestOf, measure, periodName, seriesOf, type Period, type SymbolFacts } from "./metrics";
-import type { StocksData, Transaction } from "./types";
+import type { Position, Snapshot, Transaction } from "./types";
 
 /**
  * The Stocks app's numbers as tables (a header row, then one row each), for CSV, XLSX or JSON.
@@ -17,13 +17,13 @@ export function transactionsTable(transactions: Transaction[], portfolioName: (i
   return [TRANSACTION_COLUMNS, ...rows.map((t) => [t.date, t.symbol, t.kind, t.quantity, t.price, t.fees, t.currency, t.note ?? "", portfolioName(t.portfolio_id), t.external_id ?? `tx:${t.id}`])];
 }
 
-export function positionsTable(data: StocksData): Table {
+export function positionsTable(data: Snapshot): Table {
   const header = ["symbol", "name", "sector", "quote currency", "quantity", "average cost", "price", `value (${data.currency})`, `cost (${data.currency})`, `gain (${data.currency})`, "gain %", `realized (${data.currency})`, `dividends (${data.currency})`, "weight %", "status"];
-  const row = (p: StocksData["positions"][number], status: string) => [p.symbol, p.name, p.sector ?? "", p.currency, p.quantity, p.avgCost, p.price, p.value, p.cost, p.gain, p.gainPct, p.realized, p.dividends, p.weight * 100, status];
+  const row = (p: Position, status: string) => [p.symbol, p.name, p.sector ?? "", p.currency, p.quantity, p.avgCost, p.price, p.value, p.cost, p.gain, p.gainPct, p.realized, p.dividends, p.weight * 100, status];
   return [header, ...data.positions.map((p) => row(p, "held")), ...data.closed.map((p) => row(p, "sold"))];
 }
 
-export function dividendsTable(data: StocksData): Table {
+export function dividendsTable(data: Snapshot): Table {
   return [["day", "symbol", `amount (${data.currency})`], ...[...data.dividendList].reverse().map((d) => [d.day, d.symbol, d.amount])];
 }
 

@@ -1,4 +1,4 @@
-import type { Position, Summary, Transaction } from "./types";
+import type { Position, Series, Snapshot, Summary, Transaction } from "./types";
 
 /**
  * Portfolio arithmetic: positions, gains, dividends and the value over time, from trades and
@@ -35,11 +35,7 @@ export interface Market {
   splits: { day: string; ratio: number }[];
 }
 
-/** A value per day, oldest first. */
-export interface Series {
-  days: string[];
-  closes: number[];
-}
+export type { Series } from "./types";
 
 /** Units of the portfolio's currency for one unit of `currency` on `day`. */
 export type Fx = (currency: string, day: string) => number;
@@ -144,15 +140,29 @@ function heldBefore(trades: Trade[], day: string): number {
   return quantity;
 }
 
-/**
- * Everything the portfolio page shows. `trades` are as entered; `markets` holds what Yahoo knows
- * of each symbol (a symbol missing from it is valued at the last price paid); `benchmark` is
- * compared over the same days.
- */
-export function summarize(trades: Trade[], markets: Map<string, Market>, fx: Fx, currency: string, today: string, benchmark?: Series): Summary {
+/** Trades grouped by symbol, restated in today's shares and in the order they happened. */
+function bySymbolOf(trades: Trade[], markets: Map<string, Market>): Map<string, Trade[]> {
   const bySymbol = new Map<string, Trade[]>();
   for (const t of trades) bySymbol.set(t.symbol, [...(bySymbol.get(t.symbol) ?? []), t]);
   for (const [symbol, list] of bySymbol) bySymbol.set(symbol, adjustForSplits(list, markets.get(symbol)?.splits ?? []).sort(byDay));
+  return bySymbol;
+}
+
+/**
+ * Everything the portfolio page shows: the snapshot, and the value over time with `benchmark`
+ * compared over the same days.
+ */
+export function summarize(trades: Trade[], markets: Map<string, Market>, fx: Fx, currency: string, today: string, benchmark?: Series): Summary {
+  return { ...snapshot(trades, markets, fx, currency, today), series: valueOverTime(bySymbolOf(trades, markets), markets, fx, today, benchmark) };
+}
+
+/**
+ * Where the portfolio stands today: positions, gains and dividends. `trades` are as entered;
+ * `markets` holds what Yahoo knows of each symbol (a symbol missing from it is valued at the last
+ * price paid).
+ */
+export function snapshot(trades: Trade[], markets: Map<string, Market>, fx: Fx, currency: string, today: string): Snapshot {
+  const bySymbol = bySymbolOf(trades, markets);
 
   // Each dividend goes to the shares held before its ex-dividend day.
   const paid = [...bySymbol].flatMap(([symbol, list]) => {
@@ -170,7 +180,6 @@ export function summarize(trades: Trade[], markets: Map<string, Market>, fx: Fx,
   // Yesterday's value of what is held today; a position with no change known counts as flat.
   const before = held.reduce((s, p) => s + p.value / (1 + (p.change ?? 0) / 100), 0);
 
-
   return {
     currency,
     value,
@@ -183,7 +192,6 @@ export function summarize(trades: Trade[], markets: Map<string, Market>, fx: Fx,
     dayChangePct: pct(value - before, before),
     positions: held.map(weigh),
     closed: all.filter((p) => p.quantity <= EPSILON).sort((a, b) => b.realized - a.realized).map(weigh),
-    series: valueOverTime(bySymbol, markets, fx, today, benchmark),
     dividendYears: [...sumBy((d) => d.day.slice(0, 4))].sort(([a], [b]) => a.localeCompare(b)).map(([year, amount]) => ({ year, amount })),
     dividendList: paid.sort((a, b) => b.day.localeCompare(a.day)),
   };

@@ -36,10 +36,13 @@ export function TasksPage() {
   const openCount = all.filter((x) => x.completed_at === null).length;
   const late = all.filter(overdue).length;
   // The task the address asks for (a reminder's link) is open once its board has loaded.
-  const dialog = open ?? all.find((x) => x.id === tasks.wantedTask);
+  // From a service's page: a new task about it, in the first open column.
+  const firstOpen = columns.find((c) => !c.done) ?? columns[0];
+  const forService: NewTask | undefined = tasks.wantedService && firstOpen ? { column_id: firstOpen.id, lane_id: null, service: tasks.wantedService } : undefined;
+  const dialog = open ?? all.find((x) => x.id === tasks.wantedTask) ?? forService;
   const closeDialog = () => {
     setOpen(undefined);
-    if (tasks.wantedTask) tasks.opened();
+    if (tasks.wantedTask || tasks.wantedService) tasks.opened();
   };
   // A view the board doesn't have (the workflow, out of project mode) falls back to the board.
   const current = board && viewsFor(board).includes(view) ? view : "board";
@@ -109,7 +112,7 @@ export function TasksPage() {
         </>
       )}
 
-      {dialog && board && <TaskDialog task={dialog} board={board} labels={data?.labels ?? []} onSave={tasks.saveTask} onDelete={tasks.deleteTask} onClose={closeDialog} />}
+      {dialog && board && <TaskDialog task={dialog} board={board} labels={data?.labels ?? []} services={data?.services ?? []} onSave={tasks.saveTask} onDelete={tasks.deleteTask} onClose={closeDialog} />}
       {naming && <NameDialog naming={naming} onSave={tasks.saveName} onClose={() => setNaming(undefined)} />}
     </main>
   );

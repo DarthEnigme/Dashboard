@@ -41,7 +41,8 @@ A self-hosted homelab dashboard with a frosted-glass look, in the spirit of [Hom
   - notes with runbooks shown on service pages, and a device inventory with live status, Wake-on-LAN and warranty reminders
   - a finance tracker: spending, income and balance charts, a money-flow (Sankey) chart, budgets, subscriptions with renewal reminders, CSV bank import, Firefly III sync
   - a travel log, and a watchlist and reading list (with lists, tags and sync from Jellyfin or Plex)
-  - task boards (kanban and list views), and a stock portfolio with dividends, performance against an index and a research page per company
+  - task boards (kanban and list views) with repeating tasks, checklists, and tasks linked to a service (they show on its page)
+  - a stock portfolio with dividends and a 12-month dividend forecast, performance against an index, target weights with rebalancing suggestions, a research page per company, and what well-known investors hold (their 13F reports to the SEC; set the contact e-mail the SEC asks for under **Settings → Monitoring & alerts**, or `PAGE_SEC_CONTACT`)
 
 ## Run with Docker
 

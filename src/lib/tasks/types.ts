@@ -1,4 +1,7 @@
 /** The shapes of the Tasks app, shared by the server's store and the page (nothing here touches the database). */
+import type { Repeat } from "./repeat";
+
+export type { Repeat, RepeatUnit } from "./repeat";
 export const PRIORITIES = [0, 1, 2, 3] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
@@ -21,6 +24,23 @@ export interface Task {
   blocked_by: number[];
   /** Open, and some task it waits for is still open: it can't be finished yet. */
   blocked: boolean;
+  /** Null: done once. Finishing a repeating task makes the next one (and the repeat moves to it). */
+  repeat: Repeat | null;
+  checklist: CheckItem[];
+  /** The service (config id) it is about: it shows on that service's page. */
+  service: string | null;
+}
+
+export interface CheckItem {
+  text: string;
+  done: boolean;
+}
+
+/** A service a task can be about. */
+export interface ServiceRef {
+  id: string;
+  name: string;
+  group: string;
 }
 
 export interface Column {
@@ -59,6 +79,21 @@ export interface TasksData {
   labels: string[];
   /** Whether any alert channel is set up (otherwise a board can't send reminders). */
   alerts: boolean;
+  /** The services a task can be linked to. */
+  services: ServiceRef[];
+}
+
+/** An open task about a service, for that service's page. */
+export interface ServiceTask {
+  id: number;
+  title: string;
+  due: string | null;
+  priority: Priority;
+  board_id: number;
+  board: string;
+  /** Checklist progress: done of total (0 of 0 without one). */
+  checked: number;
+  checks: number;
 }
 
 /** An open task with a due date that is past or close, wherever it is. */
@@ -110,6 +145,12 @@ export interface TaskInput {
   due?: unknown;
   labels?: unknown;
   blocked_by?: unknown;
+  /** { every, unit }, or null to stop repeating. */
+  repeat?: unknown;
+  /** [{ text, done }] */
+  checklist?: unknown;
+  /** A service id, or null / "" for none. */
+  service?: unknown;
 }
 
 /** Default names for a first board, in the reader's language. */

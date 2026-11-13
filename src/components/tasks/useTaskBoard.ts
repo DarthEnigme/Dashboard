@@ -83,6 +83,8 @@ export function useTaskBoard() {
     problem: failure ?? (error as Error | undefined)?.message,
     /** The task the address asks to open, until `opened` is called. */
     wantedTask: Number(params.get("task")) || undefined,
+    /** A service the address asks to start a new task about (from that service's page), until `opened` is called. */
+    wantedService: params.get("service") || undefined,
     opened: () => {
       if (board) go(board.id);
     },

@@ -15,6 +15,9 @@ const task = (id: number, column_id: number, lane_id: number | null = null): Tas
   completed_at: null,
   blocked_by: [],
   blocked: false,
+  repeat: null,
+  checklist: [],
+  service: null,
 });
 const col = (id: number, tasks: Task[]): Column => ({ id, name: `c${id}`, done: false, tasks });
 const ids = (columns: Column[]) => columns.map((c) => c.tasks.map((t) => [t.id, t.lane_id]));

@@ -3,6 +3,8 @@ import { baseline } from "./001-baseline";
 import { tasksAndStocks } from "./002-tasks-and-stocks";
 import { taskProjects } from "./003-task-projects";
 import { stockAlertsAndBrokers } from "./004-stock-alerts-and-brokers";
+import { brokerSyncState } from "./005-broker-sync-state";
+import { recurringChecklistsTargets } from "./006-recurring-checklists-targets";
 
 /**
  * Schema steps, in order: step i brings the database from user_version i to i + 1, in one transaction.
@@ -18,4 +20,8 @@ export const MIGRATIONS: ((d: DatabaseSync) => void)[] = [
   taskProjects,
   // 4: Stocks: alerts, broker connections, logos, and ids that keep imports from doubling.
   stockAlertsAndBrokers,
+  // 5: Stocks: a broker sync's progress kept in the database.
+  brokerSyncState,
+  // 6: Tasks: repeating, checklists, links to services. Stocks: target weights.
+  recurringChecklistsTargets,
 ];

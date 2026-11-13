@@ -3,9 +3,9 @@ import { hasAlertChannel, onlyChannels, sendNotice } from "../alerts";
 import { daysBefore, localDay } from "../day";
 import { ALERT_RULES, decide, read, type AlertContext, type AlertRule } from "./alerts";
 import { activeAlerts, markFired } from "./alertStore";
-import { companyOf, history, loadStocks } from "./service";
+import { companyOf, history, portfolioSnapshot } from "./service";
 import { listPortfolios } from "./store";
-import type { Company, StocksData } from "./types";
+import type { Company, Snapshot } from "./types";
 
 /**
  * Checks everyone's stock alerts: gathers what the rules need (quotes, positions, calendars) once,
@@ -29,11 +29,11 @@ async function contextFor(userId: number, rules: AlertRule[], today: string): Pr
   const [quotes, companies, summaries] = await Promise.all([
     Promise.all(symbols.map(async (s) => [s, await history(s, from).then((h): Quote => ({ price: h.price, change: h.change, currency: h.currency, name: h.name })).catch(() => undefined)] as const)),
     Promise.all(events.map(async (s) => [s, await companyOf(s)] as const)),
-    Promise.all(views.map(async (p) => [p, portfolios.length ? await loadStocks(userId, portfolios, p ?? undefined, undefined).catch(() => undefined) : undefined] as const)),
+    Promise.all(views.map(async (p) => [p, portfolios.length ? await portfolioSnapshot(userId, portfolios, p ?? undefined).catch(() => undefined) : undefined] as const)),
   ]);
   const quote = new Map(quotes);
   const company = new Map<string, Company | null>(companies);
-  const summary = new Map<number | null, StocksData | undefined>(summaries);
+  const summary = new Map<number | null, Snapshot | undefined>(summaries);
 
   return {
     today,
@@ -46,7 +46,7 @@ async function contextFor(userId: number, rules: AlertRule[], today: string): Pr
     portfolio: (p) => {
       const d = summary.get(p);
       if (!d) return undefined;
-      const name = d.portfolios.find((x) => x.id === p)?.name ?? "Your portfolios";
+      const name = portfolios.find((x) => x.id === p)?.name ?? "Your portfolios";
       return { name, value: d.value, dayChangePct: d.dayChangePct, currency: d.currency };
     },
   };

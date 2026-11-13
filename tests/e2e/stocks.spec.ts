@@ -112,6 +112,7 @@ test.describe.serial("stocks", () => {
     await dialog.getByLabel("When it").selectOption("above");
     await dialog.getByLabel("Price (the symbol's currency)").fill("1000");
     await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "Alerts" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByText("goes above")).toBeVisible();
 
@@ -144,5 +145,39 @@ test.describe.serial("stocks", () => {
     await page.getByRole("button", { name: "Portfolio × market", exact: true }).click();
     await expect(page.getByRole("region", { name: "By country" })).toBeVisible();
     await shot(page, "98-stocks-compare");
+  });
+
+  test("a dividend forecast, target weights, and what well-known investors hold", async ({ page }) => {
+    // Dividends expected over the next year, from those of the last one.
+    await page.goto("/stocks?tab=dividends");
+    await expect(page.getByRole("region", { name: "Dividend figures" })).toContainText("Expected, next 12 months");
+    await expect(page.getByRole("img", { name: "Dividends expected per month" })).toBeVisible();
+
+    // Targets: from today's weights, then half and half; kept once saved.
+    await page.goto("/stocks?tab=rebalance");
+    await page.getByRole("button", { name: "Start from today's weights" }).click();
+    await page.getByLabel("Target for AAPL (%)").fill("50");
+    await page.getByLabel("Target for MC.PA (%)").fill("50");
+    await expect(page.getByRole("region", { name: "Rebalancing figures" })).toContainText("100 %");
+    await page.getByRole("button", { name: "Save targets" }).click();
+    await expect(page.getByRole("button", { name: "Save targets" })).toBeDisabled();
+    await page.reload();
+    await expect(page.getByLabel("Target for AAPL (%)")).toHaveValue("50");
+    // Only buying with cash added: nothing to sell, nothing left over.
+    await page.getByLabel("Cash to add").fill("1000");
+    await page.getByLabel("Only buy (sell nothing)").check();
+    await expect(page.getByRole("region", { name: "Rebalancing figures" })).toContainText(/To sell\D*0\.00/);
+    await expect(page.getByText(/Cash left after the trades: \D*0\.00\./)).toBeVisible();
+    await shot(page, "99-stocks-rebalance");
+
+    // Berkshire's last 13F against the one before, crossed with what you hold.
+    await page.goto("/stocks?tab=investors");
+    await expect(page.getByRole("region", { name: "Investor figures" })).toContainText("Berkshire Hathaway");
+    const apple = page.getByRole("row", { name: /AAPL/ });
+    await expect(apple).toContainText("You hold it");
+    await expect(apple).toContainText("-25.00 %");
+    await expect(page.getByRole("row", { name: /BANK AMER CORP/ })).toContainText("New");
+    await expect(page.getByText("KRAFT HEINZ CO")).toBeVisible();
+    await shot(page, "99-stocks-investors");
   });
 });

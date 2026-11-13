@@ -1,10 +1,13 @@
 import { errorReason } from "../cache";
 import { daysBefore, localDay } from "../day";
 import { remembered } from "./cache";
-import { dividendsByYear, makeFx, summarize, thin, thinIndexes, toTrades, type Market, type Series } from "./portfolio";
+import { dividendsByYear, makeFx, snapshot, summarize, thin, thinIndexes, toTrades, type Market, type Series } from "./portfolio";
+import { forecastDividends } from "./forecast";
+import type { Holding } from "./rebalance";
 import { listTransactions, listWatched } from "./store";
+import { listTargets } from "./targets";
 import type { SymbolFacts } from "./metrics";
-import { BENCHMARKS, rangeStart, type Portfolio, type Range, type Research, type StocksData, type SymbolHit, type Transaction, type WatchQuote } from "./types";
+import { BENCHMARKS, rangeStart, type Portfolio, type Range, type Research, type Snapshot, type StocksData, type TargetsData, type SymbolHit, type Transaction, type WatchQuote } from "./types";
 import { fetchFundamentals, fetchHistory, fetchSummary, searchSymbols, type Company, type Fundamentals, type History } from "./yahoo";
 
 /** What the Stocks pages show: the person's trades put together with what Yahoo knows. */
@@ -62,35 +65,50 @@ const settle = async <K, V>(keys: K[], load: (key: K) => Promise<V>, errors: str
   return out;
 };
 
-/** The portfolio page: one portfolio, or all of this person's together (shown in the first one's currency). */
-export async function loadStocks(userId: number, portfolios: Portfolio[], portfolioId: number | undefined, benchmarkSymbol: string | undefined): Promise<StocksData> {
+/** One portfolio, or all of this person's together (in the first one's currency): its trades, and from when its market data is needed. */
+function scopeOf(userId: number, portfolios: Portfolio[], portfolioId: number | undefined) {
   const shown = portfolios.find((p) => p.id === portfolioId);
-  const currency = (shown ?? portfolios[0]).currency;
   const transactions = listTransactions(userId, shown?.id);
-  const benchmark = BENCHMARKS.find((b) => b.symbol === benchmarkSymbol)?.symbol ?? BENCHMARKS[0].symbol;
   const today = localDay();
+  // A few days of margin, so the first trade has a close before it and a rate to convert at; and at
+  // least a year, so the dividend forecast sees a year of dividends (still the recent history kept).
+  const from = transactions.length ? [daysBefore(transactions[transactions.length - 1].date, 10), daysBefore(today, 370)].sort()[0] : today;
+  return { shown, currency: (shown ?? portfolios[0]).currency, transactions, today, from };
+}
+
+/**
+ * What Yahoo knows of every symbol traded (and of `extra` ones, such as targets not held yet), and the
+ * rates to convert them: what both the snapshot and the page are computed from.
+ */
+async function marketsOf({ transactions, currency, from }: ReturnType<typeof scopeOf>, extra: string[] = []) {
   const errors: string[] = [];
-
-  const symbols = [...new Set(transactions.map((t) => t.symbol))];
-  // A few days of margin, so the first trade has a close before it and a rate to convert at.
-  const from = transactions.length ? daysBefore(transactions[transactions.length - 1].date, 10) : today;
-  const [histories, profiles, bench] = await Promise.all([
-    settle(symbols, (s) => history(s, from), errors),
-    settle(symbols, profile, []),
-    transactions.length ? history(benchmark, from).catch(() => undefined) : undefined,
-  ]);
-
+  const symbols = [...new Set([...transactions.map((t) => t.symbol), ...extra])];
+  const [histories, profiles] = await Promise.all([settle(symbols, (s) => history(s, from), errors), settle(symbols, profile, [])]);
   const foreign = [...new Set([...histories.values()].map((h) => h.currency.toUpperCase()))].filter((c) => c !== currency);
   const rates = await settle(foreign, (c) => history(`${c}${currency}=X`, from) as Promise<Series>, errors);
-  const fx = makeFx(currency, rates);
-
   const markets = new Map<string, Market>([...histories].map(([symbol, h]) => [symbol, { ...h, sector: profiles.get(symbol)?.sector ?? null }]));
+  return { errors, markets, fx: makeFx(currency, rates) };
+}
+
+/** Where a portfolio (or all of them together) stands today, without the history the page draws. */
+export async function portfolioSnapshot(userId: number, portfolios: Portfolio[], portfolioId?: number): Promise<Snapshot> {
+  const h = scopeOf(userId, portfolios, portfolioId);
+  const { markets, fx } = await marketsOf(h);
+  return snapshot(toTrades(h.transactions), markets, fx, h.currency, h.today);
+}
+
+/** The portfolio page: the snapshot, its value over time against a benchmark, and its transactions. */
+export async function loadStocks(userId: number, portfolios: Portfolio[], portfolioId: number | undefined, benchmarkSymbol: string | undefined): Promise<StocksData> {
+  const benchmark = BENCHMARKS.find((b) => b.symbol === benchmarkSymbol)?.symbol ?? BENCHMARKS[0].symbol;
+  const h = scopeOf(userId, portfolios, portfolioId);
+  const { shown, currency, transactions, today } = h;
+  const [{ errors, markets, fx }, bench] = await Promise.all([marketsOf(h), transactions.length ? history(benchmark, h.from).catch(() => undefined) : undefined]);
   const summary = summarize(toTrades(transactions), markets, fx, currency, today, bench);
   // Shown together, the portfolios are also told apart (for the composition chart).
   const byPortfolio =
     shown || portfolios.length < 2
       ? []
-      : portfolios.flatMap((p) => summarize(toTrades(transactions.filter((t) => t.portfolio_id === p.id)), markets, fx, currency, today).positions.map((x) => ({ portfolio: p.id, symbol: x.symbol, value: x.value })));
+      : portfolios.flatMap((p) => snapshot(toTrades(transactions.filter((t) => t.portfolio_id === p.id)), markets, fx, currency, today).positions.map((x) => ({ portfolio: p.id, symbol: x.symbol, value: x.value })));
   // The page draws a few hundred points, not every day of ten years.
   const keep = thinIndexes(summary.series.days.length, 600);
   const pick = <T>(xs: T[]) => keep.map((i) => xs[i]);
@@ -104,7 +122,30 @@ export async function loadStocks(userId: number, portfolios: Portfolio[], portfo
     benchmark,
     errors,
     byPortfolio,
+    forecast: forecastDividends(summary.positions, markets, fx, today),
   };
+}
+
+/**
+ * The rebalancing page: what is held (each with the price of a share), the targets, and a price for
+ * each target not held yet, all in the portfolio's currency. The trades are worked out on the page.
+ */
+export async function loadTargets(userId: number, portfolios: Portfolio[], portfolioId: number | undefined): Promise<TargetsData> {
+  const h = scopeOf(userId, portfolios, portfolioId);
+  const targets = listTargets(userId, h.shown?.id ?? null);
+  const { errors, markets, fx } = await marketsOf(h, targets.map((t) => t.symbol));
+  const { positions, value } = snapshot(toTrades(h.transactions), markets, fx, h.currency, h.today);
+  const held = new Set(positions.map((p) => p.symbol));
+  const holdings: Holding[] = [
+    ...positions.map((p) => ({ symbol: p.symbol, name: p.name, value: p.value, price: p.quantity > 0 ? p.value / p.quantity : null })),
+    ...targets
+      .filter((t) => !held.has(t.symbol))
+      .map((t) => {
+        const m = markets.get(t.symbol);
+        return { symbol: t.symbol, name: m?.name ?? t.symbol, value: 0, price: m ? m.price * fx(m.currency, h.today) : null };
+      }),
+  ];
+  return { portfolio: h.shown?.id ?? null, currency: h.currency, value, holdings, targets, errors };
 }
 
 /** The symbols someone watches, each with its price and its last weeks. */
@@ -127,7 +168,7 @@ export async function loadWatchlist(userId: number): Promise<WatchQuote[]> {
 function holdingOf(transactions: Transaction[], market: Market, today: string): Research["holding"] {
   if (!transactions.length) return null;
   const trades = toTrades(transactions);
-  const [p] = summarize(trades, new Map([[trades[0].symbol, market]]), () => 1, market.currency, today).positions;
+  const [p] = snapshot(trades, new Map([[trades[0].symbol, market]]), () => 1, market.currency, today).positions;
   return p ? { quantity: p.quantity, avgCost: p.avgCost, gainPct: p.gainPct } : null;
 }
 

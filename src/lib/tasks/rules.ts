@@ -1,3 +1,4 @@
+import { repeatFinished } from "./recur";
 import { all, fail, one, run, type TaskRow } from "./sql";
 
 /**
@@ -13,10 +14,14 @@ function waitsOnOpen(id: number, ids?: readonly number[]) {
   return rows.some((r) => !ids || ids.includes(r.id));
 }
 
-/** The one way a task enters a column: finished in a "done" column (keeping the first time), open again anywhere else. */
+/**
+ * The one way a task enters a column: finished in a "done" column (keeping the first time), open
+ * again anywhere else. A repeating task that gets finished makes its next one.
+ */
 export function enterColumn(task: Pick<TaskRow, "id" | "completed_at">, column: { id: number; done: number }) {
   if (column.done && waitsOnOpen(task.id)) fail(WAITING);
   run("UPDATE tasks SET column_id = ?, completed_at = ? WHERE id = ?", column.id, column.done ? (task.completed_at ?? Date.now()) : null, task.id);
+  if (column.done && task.completed_at === null) repeatFinished([task.id]);
 }
 
 /** A finished task can't start waiting for an open one: checked on the blockers it just gained. */
@@ -37,9 +42,14 @@ export function setColumnDone(columnId: number, done: boolean) {
       columnId,
     );
     if (stuck) fail(WAITING);
+    const finishing = all<{ id: number }>("SELECT id FROM tasks WHERE column_id = ? AND completed_at IS NULL", columnId).map((r) => r.id);
     run("UPDATE tasks SET completed_at = COALESCE(completed_at, ?) WHERE column_id = ?", Date.now(), columnId);
-  } else run("UPDATE tasks SET completed_at = NULL WHERE column_id = ?", columnId);
-  run("UPDATE task_columns SET done = ? WHERE id = ?", done ? 1 : 0, columnId);
+    run("UPDATE task_columns SET done = 1 WHERE id = ?", columnId);
+    repeatFinished(finishing);
+    return;
+  }
+  run("UPDATE tasks SET completed_at = NULL WHERE column_id = ?", columnId);
+  run("UPDATE task_columns SET done = 0 WHERE id = ?", columnId);
 }
 
 /** Every "waits for" link of a board, as task → the tasks it waits for. */

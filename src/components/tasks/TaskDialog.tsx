@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { PRIORITIES, type Board, type Priority, type Task } from "@/lib/tasks/types";
+import { PRIORITIES, type Board, type Priority, type ServiceRef, type Task } from "@/lib/tasks/types";
 import type { NewTask, TaskDraft } from "./model";
 import { useT } from "@/i18n/client";
-import { Dialog } from "../edit/Dialog";
+import { Dialog, useDialogRun } from "../edit/Dialog";
 import { DeleteButton } from "../edit/controls";
-import { inputClass } from "../edit/FieldInput";
+import { inputClass, labelClass as label } from "../edit/FieldInput";
 import { Markdown } from "../settings/Markdown";
 import { PRIORITY_LABELS } from "./meta";
+import { ChecklistEditor } from "./Checklist";
+import { RepeatField, ServiceField } from "./TaskFields";
 import { TaskTitle } from "./TaskCard";
 
 interface Props {
@@ -17,14 +19,14 @@ interface Props {
   board: Board;
   /** Labels already used on the board, offered as suggestions. */
   labels: string[];
+  /** Services the task can be about. */
+  services: ServiceRef[];
   onSave: (draft: TaskDraft) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onClose: () => void;
 }
 
-const label = "flex flex-col gap-1.5 text-xs font-medium text-muted";
-
-export function TaskDialog({ task, board, labels, onSave, onDelete, onClose }: Props) {
+export function TaskDialog({ task, board, labels, services, onSave, onDelete, onClose }: Props) {
   const t = useT();
   const existing = "id" in task ? task : undefined;
   const [draft, setDraft] = useState({
@@ -36,23 +38,14 @@ export function TaskDialog({ task, board, labels, onSave, onDelete, onClose }: P
     priority: existing?.priority ?? (0 as Priority),
     due: existing?.due ?? "",
     labels: existing?.labels.join(", ") ?? "",
+    repeat: existing?.repeat ?? null,
+    checklist: existing?.checklist ?? [],
+    service: existing ? existing.service : ("service" in task ? (task.service ?? null) : null),
   });
   const [preview, setPreview] = useState(false);
-  const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState(false);
+  const { run, busy, error } = useDialogRun(onClose);
   const set = <K extends keyof typeof draft>(k: K, v: (typeof draft)[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
-  const run = async (work: () => Promise<void>) => {
-    setBusy(true);
-    setError(undefined);
-    try {
-      await work();
-      onClose();
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
-  };
   const save = () =>
     run(() =>
       onSave({
@@ -65,6 +58,9 @@ export function TaskDialog({ task, board, labels, onSave, onDelete, onClose }: P
         due: draft.due || null,
         labels: draft.labels,
         blocked_by: draft.blocked_by,
+        repeat: draft.repeat,
+        checklist: draft.checklist.filter((c) => c.text.trim()),
+        service: draft.service,
       }),
     );
   const others = board.columns.flatMap((c) => c.tasks).filter((x) => x.id !== existing?.id);
@@ -114,6 +110,12 @@ export function TaskDialog({ task, board, labels, onSave, onDelete, onClose }: P
           </select>
         </label>
       )}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <RepeatField value={draft.repeat} onChange={(v) => set("repeat", v)} />
+        {services.length > 0 && <ServiceField services={services} value={draft.service} onChange={(v) => set("service", v)} />}
+      </div>
+      {draft.repeat && <p className="-mt-2 text-xs text-muted">{t("Finishing it makes the next one, due one repeat later.")}</p>}
+      <ChecklistEditor items={draft.checklist} onChange={(v) => set("checklist", v)} />
       {board.project && others.length > 0 && <BlockedBy tasks={others} value={draft.blocked_by} onChange={(v) => set("blocked_by", v)} />}
       <label className={label}>
         {t("Labels (comma-separated)")}

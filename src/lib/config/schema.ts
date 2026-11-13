@@ -178,6 +178,8 @@ export const settingsSchema = z
         alertMinutes: z.number().int().min(5).max(1440).default(15),
         /** A logo URL with {symbol} or {domain} in it; by default the website's icon. */
         logoSource: z.string().optional(),
+        /** A contact e-mail the SEC asks for, to read investors' 13F reports (sent to the SEC only). */
+        secContact: z.string().optional(),
       })
       .prefault({}),
     /** Nightly zip of the config, the database, uploads and the secret key. */

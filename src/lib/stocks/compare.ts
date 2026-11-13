@@ -1,6 +1,6 @@
 import { daysBefore, localDay } from "../day";
 import { thin } from "./portfolio";
-import { companyOf, factsFor, history, loadStocks } from "./service";
+import { companyOf, factsFor, history, portfolioSnapshot } from "./service";
 import { betaAndCorrelation, volatility, type Closes } from "./stats";
 import { listPortfolios } from "./store";
 import { BENCHMARKS, rangeStart, type CompareData, type Range } from "./types";
@@ -50,7 +50,7 @@ export async function loadCompare(userId: number, symbols: string[], range: Rang
 /** The person's portfolio crossed with the market: exposure by country, currency and sector, and its beta over a year. */
 async function portfolioCompare(userId: number, portfolios: ReturnType<typeof listPortfolios>, benchmark: string, today: string): Promise<CompareData["portfolio"]> {
   const yearAgo = daysBefore(today, 366);
-  const [data, yearBench] = await Promise.all([loadStocks(userId, portfolios, undefined, benchmark), history(benchmark, yearAgo).catch(() => undefined)]);
+  const [data, yearBench] = await Promise.all([portfolioSnapshot(userId, portfolios), history(benchmark, yearAgo).catch(() => undefined)]);
   const holdings = await Promise.all(
     data.positions.map(async (p) => {
       const [company, h] = await Promise.all([companyOf(p.symbol), history(p.symbol, yearAgo).catch(() => undefined)]);
