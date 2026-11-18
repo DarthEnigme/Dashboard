@@ -23,9 +23,11 @@ interface Props {
   message?: string;
   footer?: string;
   passwordForm?: boolean;
+  /** Where to go once signed in: a path on this site. */
+  next?: string;
 }
 
-export function LoginForm({ title, logo, methods, error: initialError, canGoBack, heading, message, footer, passwordForm = true }: Props) {
+export function LoginForm({ title, logo, methods, error: initialError, canGoBack, heading, message, footer, passwordForm = true, next = "/" }: Props) {
   const t = useT();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -53,7 +55,7 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
           return;
         }
       }
-      window.location.href = "/";
+      window.location.href = next;
     } catch (err) {
       if (ticket && /took too long|again/i.test((err as Error).message)) setTicket(undefined);
       setError((err as Error).message);
@@ -163,7 +165,7 @@ export function LoginForm({ title, logo, methods, error: initialError, canGoBack
             {methods.providers.map((p) => (
               <a
                 key={p.id}
-                href={`/api/auth/oauth/${p.id}/start`}
+                href={`/api/auth/oauth/${p.id}/start${next === "/" ? "" : `?next=${encodeURIComponent(next)}`}`}
                 className="flex h-10 items-center justify-center gap-2.5 rounded-xl border border-line bg-chip text-sm font-medium transition hover:bg-hover"
               >
                 {providerIcon(p.type) ? <Icon icon={providerIcon(p.type)} name={p.label} size={18} /> : <KeyRound className="h-4 w-4" />}

@@ -30,12 +30,16 @@ export function withoutDisabledApps(granted: readonly Permission[], apps: readon
   return granted.filter((p) => !(APPS as readonly string[]).includes(p) || apps.includes(p));
 }
 
-function viewerFor(user: User, sessionId?: string): Viewer {
-  const groups = groupsOf(user.id);
+/** What this account may do: its role, `auth.userPermissions` and its groups, less the apps turned off. */
+export function permissionsOf(user: Pick<User, "id" | "role">, groups = groupsOf(user.id)): Permission[] {
   const { auth, apps } = loadConfig().settings;
   const granted = user.role === "admin" ? [...PERMISSIONS] : [...new Set([...auth.userPermissions, ...groups.flatMap((g) => g.permissions)])];
-  const permissions = withoutDisabledApps(granted, apps);
-  return { user, role: user.role, groups: groups.map((g) => g.name), permissions, sessionId };
+  return withoutDisabledApps(granted, apps);
+}
+
+function viewerFor(user: User, sessionId?: string): Viewer {
+  const groups = groupsOf(user.id);
+  return { user, role: user.role, groups: groups.map((g) => g.name), permissions: permissionsOf(user, groups), sessionId };
 }
 
 let bootstrapped = false;
@@ -187,6 +191,21 @@ export function publicOrigin(req: Request): string {
   const proto = req.headers.get("x-forwarded-proto")?.split(",")[0].trim() ?? new URL(req.url).protocol.replace(":", "");
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? new URL(req.url).host;
   return `${proto}://${host}`;
+}
+
+/** publicOrigin() for a page (a server component), from the request's headers. */
+export async function pageOrigin(): Promise<string> {
+  const h = await headers();
+  return publicOrigin(new Request(`http://${h.get("host") ?? "localhost"}/`, { headers: h }));
+}
+
+/**
+ * Where to go after signing in: a path on this site (from ?next=), else the dashboard. Never another
+ * site ("//evil.example", "/\evil.example" or a full URL), so a link can't bounce a fresh session away.
+ */
+export function safeNext(v: unknown): string {
+  // Browsers drop tabs and newlines from URLs, so "/\t/evil.example" would become "//evil.example".
+  return typeof v === "string" && /^\/(?![/\\])/.test(v) && !/[\u0000-\u001f\u007f]/.test(v) && v.length <= 4000 ? v : "/";
 }
 
 export interface ClientAuth {

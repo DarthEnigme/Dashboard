@@ -4,6 +4,8 @@ import type { ExternalIdentity } from "./identity";
 import { signToken, verifyToken } from "./session";
 
 export const STATE_COOKIE = "page_oauth";
+/** The page to land on after signing in with a provider (a path on this site, checked again when read). */
+export const NEXT_COOKIE = "page_oauth_next";
 
 const GOOGLE_ISSUER = "https://accounts.google.com";
 

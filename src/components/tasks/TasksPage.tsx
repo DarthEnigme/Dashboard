@@ -8,6 +8,7 @@ import { useRemembered } from "@/lib/useRemembered";
 import { useT } from "@/i18n/client";
 import { AppHeader } from "../AppHeader";
 import { Board } from "./Board";
+import { ConnectClaude } from "./ConnectClaude";
 import { ListView } from "./ListView";
 import { NameDialog } from "./NameDialog";
 import { Reminders } from "./Reminders";
@@ -65,6 +66,7 @@ export function TasksPage() {
           ) : undefined
         }
       >
+        <ConnectClaude />
         <Reminders />
         {board && (
           <button type="button" onClick={() => setOpen({ column_id: columns[0]?.id ?? 0, lane_id: null })} disabled={!columns.length} className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50">

@@ -951,6 +951,45 @@ In Docker, a broadcast only reaches your LAN with `network_mode: host`; on a bri
 - Filter by text, label or priority. Dragging is paused while a filter is on, since only some tasks are showing.
 - Keep several boards (the **+** next to the board's name); deleting a board deletes its tasks.
 
+### Claude and other MCP clients
+
+NanoDash serves your task boards as an [MCP](https://modelcontextprotocol.io) server at `/api/mcp`, so Claude can add, change, move, complete and delete your tasks. It runs on your Claude plan: NanoDash never calls Claude itself, so no API key is involved. The **Connect Claude** button (the robot, in **Tasks**) has both setups.
+
+The tools are `list_boards`, `get_board`, `get_task`, `search_tasks`, `add_task`, `update_task`, `move_task`, `complete_task`, `delete_task` and `task_summary`. Boards, columns and lanes can be named by id or by name. They go through the same checks as the page, so the same limits and rules apply. A board already open in the browser shows Claude's changes on its next refresh. Claude only ever reaches the boards of the person who connected it, and needs the `tasks` permission.
+
+**Claude Code (or any MCP client that takes a header):** in **Connect Claude**, **Create token** (shown once), then run the command it gives you:
+
+```sh
+claude mcp add --transport http nanodash http://<host>:3000/api/mcp --header "Authorization: Bearer page_…"
+```
+
+**claude.ai, on the web and the phone apps:** claude.ai connects from Anthropic's servers, so NanoDash must be reachable from the internet over HTTPS (see below). Then:
+
+1. Set `auth.baseUrl` to the public address (e.g. `https://dash.example.com`). The OAuth addresses are built from it.
+2. In claude.ai, **Settings → Connectors → Add custom connector**, with the URL `https://dash.example.com/api/mcp`. Leave the OAuth fields empty.
+3. claude.ai sends you to NanoDash: sign in if needed, and **Allow**. The connector then works in every Claude app signed in to your account.
+
+Behind the scenes, NanoDash is a small OAuth 2.1 authorization server: `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server` for discovery, `/api/oauth/register` for dynamic client registration, the consent page at `/oauth/authorize`, and `/api/oauth/token`. Codes are used once, last 10 minutes and need PKCE (S256). The token an app receives is a tasks token like the ones above, named after the app. There are no refresh tokens: the token works until you revoke it.
+
+**Revoking:** in **Connect Claude**, or for admins, everyone's under **Settings → Monitoring & alerts → API tokens**. After a revoke, claude.ai has to be connected again. A Claude token can't read the Prometheus export, and a metrics token can't reach the boards. Registrations, approvals and refusals are in the audit log.
+
+#### Reaching NanoDash from the internet
+
+Any HTTPS reverse proxy works. Two that need no open port:
+
+- **Cloudflare Tunnel:** run `cloudflared` with a public hostname pointing at `http://localhost:3000` (or `http://page:3000` from another container).
+- **Tailscale Funnel:** `tailscale funnel --bg 3000` publishes it at `https://<machine>.<tailnet>.ts.net`.
+
+Exposing the whole dashboard means anyone can reach its sign-in page. Set `auth.publicView: false`, use strong passwords, and turn on two-factor sign-in. To publish only what claude.ai needs, limit the tunnel to these paths: `/api/mcp`, `/api/oauth/`, `/.well-known/oauth-`, `/oauth/authorize`, and for signing in `/login`, `/api/auth/` and `/_next/`. With `cloudflared`'s config file:
+
+```yaml
+ingress:
+  - hostname: dash.example.com
+    path: ^/(api/mcp|api/oauth/|\.well-known/oauth-|oauth/authorize|login|api/auth/|_next/)
+    service: http://localhost:3000
+  - service: http_status:404
+```
+
 ## Stocks
 
 **Stocks** (in the Apps menu) tracks share portfolios and looks companies up, for everyone with the `stocks` permission. Portfolios are private to the person who made them. Prices, dividends and company figures come from Yahoo Finance, without an account or a key.

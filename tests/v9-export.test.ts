@@ -21,19 +21,19 @@ describe("API tokens", () => {
     expect(list[0]).toMatchObject({ name: "Prometheus", prefix: token.slice(0, 10), owner: "root", last_used: null });
     expect(JSON.stringify(db().prepare("SELECT * FROM api_tokens").all())).not.toContain(token);
 
-    expect(verifyToken(`Bearer ${token}`)).toMatchObject({ username: "root" });
+    expect(verifyToken(`Bearer ${token}`, "metrics")).toMatchObject({ username: "root" });
     expect(listTokens()[0].last_used).not.toBeNull();
-    expect(verifyToken(`Bearer ${token}x`)).toBeUndefined();
-    expect(verifyToken(token)).toBeUndefined();
-    expect(verifyToken(null)).toBeUndefined();
+    expect(verifyToken(`Bearer ${token}x`, "metrics")).toBeUndefined();
+    expect(verifyToken(token, "metrics")).toBeUndefined();
+    expect(verifyToken(null, "metrics")).toBeUndefined();
 
     db().prepare("UPDATE users SET disabled = 1 WHERE id = ?").run(admin);
-    expect(verifyToken(`Bearer ${token}`)).toBeUndefined();
+    expect(verifyToken(`Bearer ${token}`, "metrics")).toBeUndefined();
     db().prepare("UPDATE users SET disabled = 0, role = 'user' WHERE id = ?").run(admin);
-    expect(verifyToken(`Bearer ${token}`)).toBeUndefined();
+    expect(verifyToken(`Bearer ${token}`, "metrics")).toBeUndefined();
     db().prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(admin);
     revokeToken(listTokens()[0].id);
-    expect(verifyToken(`Bearer ${token}`)).toBeUndefined();
+    expect(verifyToken(`Bearer ${token}`, "metrics")).toBeUndefined();
     expect(() => createToken(admin, " ")).toThrow(/name/);
   });
 });

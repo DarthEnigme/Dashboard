@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { loadConfig } from "@/lib/config/load";
-import { publicOrigin } from "@/lib/auth";
+import { publicOrigin, safeNext } from "@/lib/auth";
 import { resolveIdentity } from "@/lib/auth/identity";
-import { finishLogin, STATE_COOKIE } from "@/lib/auth/oauth";
+import { finishLogin, NEXT_COOKIE, STATE_COOKIE } from "@/lib/auth/oauth";
 import { startSession } from "@/lib/auth/sessions";
 import { syncSsoGroups } from "@/lib/auth/groups";
 import { audit } from "@/lib/auth/users";
@@ -19,6 +19,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const back = (error: string) => {
     const res = NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`);
     res.cookies.delete({ name: STATE_COOKIE, path: "/api/auth/oauth" });
+    res.cookies.delete({ name: NEXT_COOKIE, path: "/api/auth/oauth" });
     return res;
   };
   if (!provider) return back("Unknown login provider");
@@ -37,10 +38,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
     syncSsoGroups(result.user.id, identity.groups);
     audit(result.user.username, result.created ? "signup" : "login", { provider: id });
-    const res = NextResponse.redirect(`${origin}/`);
+    const res = NextResponse.redirect(`${origin}${safeNext((await cookies()).get(NEXT_COOKIE)?.value)}`);
     // The identity provider handles its own second factor.
     await startSession(res, req, result.user.id, id);
     res.cookies.delete({ name: STATE_COOKIE, path: "/api/auth/oauth" });
+    res.cookies.delete({ name: NEXT_COOKIE, path: "/api/auth/oauth" });
     return res;
   } catch (e) {
     return back(errorReason(e));

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { shot } from "./helpers";
 
@@ -137,5 +138,84 @@ test.describe.serial("tasks", () => {
     await expect(next).toContainText("0/2");
     await next.click();
     await expect(page.getByRole("dialog", { name: "Edit task" }).getByLabel("Due date")).toHaveValue("2099-01-19");
+  });
+  test("connect Claude: a token of your own, the command to add it, and revoking it", async ({ page, request }) => {
+    await page.goto("/tasks");
+    await page.getByRole("button", { name: "Connect Claude" }).click();
+    const dialog = page.getByRole("dialog", { name: "Connect Claude" });
+    await dialog.getByLabel("Token name").fill("Claude e2e");
+    await dialog.getByRole("button", { name: "Create token" }).click();
+    const token = (await dialog.getByLabel("Token", { exact: true }).textContent())!.trim();
+    expect(token).toMatch(/^page_/);
+    await expect(dialog.getByLabel("Command")).toContainText(`claude mcp add --transport http nanodash`);
+    await expect(dialog.getByLabel("Command")).toContainText(`/api/mcp --header "Authorization: Bearer ${token}"`);
+
+    // The token works on the MCP endpoint, as Claude would use it.
+    const rpc = (method: string, params: object = {}) =>
+      request.post("/api/mcp", { headers: { authorization: `Bearer ${token}`, accept: "application/json, text/event-stream" }, data: { jsonrpc: "2.0", id: 1, method, params } });
+    const listed = await (await rpc("tools/list")).json();
+    expect(listed.result.tools.map((t: { name: string }) => t.name)).toContain("add_task");
+
+    await dialog.getByRole("button", { name: "Revoke Claude e2e" }).click();
+    await dialog.getByRole("button", { name: "Confirm: Revoke Claude e2e" }).click();
+    await expect(dialog.getByRole("list", { name: "Your Claude tokens" })).toHaveCount(0);
+    expect((await rpc("tools/list")).status()).toBe(401);
+    await dialog.getByRole("button", { name: "Done" }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+  test("claude.ai connector: discover, sign in, approve, and use the token", async ({ browser, request, baseURL }) => {
+    // A loopback callback on the mock server: a redirect to a real site would leave the test machine.
+    const CALLBACK = "http://localhost:4010/oauth/callback";
+    // What claude.ai does: find the authorization server from /api/mcp's 401, then register.
+    const challenge401 = await request.post("/api/mcp", { data: {} });
+    expect(challenge401.status()).toBe(401);
+    const meta = /resource_metadata="([^"]+)"/.exec(challenge401.headers()["www-authenticate"])![1];
+    const [server] = (await (await request.get(meta)).json()).authorization_servers;
+    const as = await (await request.get(`${server}/.well-known/oauth-authorization-server`)).json();
+    const reg = await (await request.post(as.registration_endpoint, { data: { client_name: "Claude", redirect_uris: [CALLBACK] } })).json();
+
+    const verifier = crypto.randomBytes(32).toString("base64url");
+    const auth = new URL(as.authorization_endpoint);
+    Object.entries({ client_id: reg.client_id, redirect_uri: CALLBACK, response_type: "code", code_challenge: crypto.createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256", state: "st8", scope: "tasks" }).forEach(([k, v]) =>
+      auth.searchParams.set(k, v),
+    );
+
+    // A browser that isn't signed in: sign in first, then land on the consent page.
+    const ctx = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+    const page = await ctx.newPage();
+    await page.goto(auth.href);
+    await expect(page).toHaveURL(/\/login\?next=/);
+    await page.getByLabel("Username").fill("admin");
+    await page.getByLabel("Password").fill("e2e-admin-pw");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByRole("heading", { name: "Allow Claude to manage your tasks?" })).toBeVisible();
+    await expect(page.getByText("localhost:4010", { exact: true })).toBeVisible();
+    await shot(page, "oauth-consent");
+    await page.getByRole("button", { name: "Allow" }).click();
+    await page.waitForURL(/^http:\/\/localhost:4010\/oauth\/callback/);
+    const back = new URL(page.url());
+    expect(back.searchParams.get("state")).toBe("st8");
+    const code = back.searchParams.get("code")!;
+    await ctx.close();
+
+    const token = await (await request.post(as.token_endpoint, { form: { grant_type: "authorization_code", code, code_verifier: verifier, client_id: reg.client_id, redirect_uri: CALLBACK } })).json();
+    expect(token).toMatchObject({ token_type: "Bearer", scope: "tasks" });
+    const call = await request.post("/api/mcp", {
+      headers: { authorization: `Bearer ${token.access_token}`, accept: "application/json, text/event-stream" },
+      data: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "add_task", arguments: { title: "From claude.ai", column: "To do" } } },
+    });
+    expect(JSON.parse((await call.json()).result.content[0].text)).toMatchObject({ title: "From claude.ai", column: "To do" });
+  });
+
+  test("claude.ai connector: declining sends the app an error, not a code", async ({ page, request }) => {
+    // A loopback callback on the mock server: a redirect to a real site would leave the test machine.
+    const CALLBACK = "http://localhost:4010/oauth/callback";
+    const reg = await (await request.post("/api/oauth/register", { data: { client_name: "Claude", redirect_uris: [CALLBACK] } })).json();
+    const q = new URLSearchParams({ client_id: reg.client_id, redirect_uri: CALLBACK, response_type: "code", code_challenge: "x".repeat(43), code_challenge_method: "S256", state: "no" });
+    await page.goto(`/oauth/authorize?${q}`);
+    await page.getByRole("button", { name: "Deny" }).click();
+    await page.waitForURL(/^http:\/\/localhost:4010\/oauth\/callback/);
+    expect(new URL(page.url()).searchParams.get("error")).toBe("access_denied");
+    expect(new URL(page.url()).searchParams.get("code")).toBeNull();
   });
 });

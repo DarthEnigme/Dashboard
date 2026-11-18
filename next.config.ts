@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
         ],
       },
+      {
+        // The OAuth consent page: never inside a frame, not even ours (a framed "Allow" is clickjacking bait).
+        source: "/oauth/:path*",
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'none'" }],
+      },
     ];
   },
 };

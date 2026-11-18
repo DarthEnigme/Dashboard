@@ -10,7 +10,10 @@ import { useT } from "@/i18n/client";
 import { DeleteButton } from "../edit/controls";
 import { inputBase } from "../edit/FieldInput";
 
-/** Settings → Monitoring & alerts: tokens for Prometheus (or anything) to read /api/export/metrics. */
+/**
+ * Settings → Monitoring & alerts: tokens for Prometheus (or anything) to read /api/export/metrics.
+ * Lists everyone's tokens, the ones people made for Claude in the Tasks app too, so an admin can revoke any.
+ */
 export function TokensPanel() {
   const t = useT();
   const { data, mutate } = useSWR<ApiToken[]>("/api/tokens", fetcher);
@@ -23,7 +26,7 @@ export function TokensPanel() {
   const create = async () => {
     setError(undefined);
     try {
-      const r = await sendJson<{ token: string; list: ApiToken[] }>("/api/tokens", "POST", { name });
+      const r = await sendJson<{ token: string; list: ApiToken[] }>("/api/tokens", "POST", { name, scope: "metrics" });
       setFresh(r.token);
       setCopied(false);
       await mutate(r.list, { revalidate: false });
@@ -86,7 +89,10 @@ export function TokensPanel() {
             <li key={tok.id} className="flex items-center gap-3 px-3 py-2 text-sm">
               <KeyRound className="h-4 w-4 shrink-0 text-muted" />
               <span className="mr-auto min-w-0">
-                <span className="block truncate font-medium">{tok.name}</span>
+                <span className="flex items-center gap-2">
+                  <span className="truncate font-medium">{tok.name}</span>
+                  <span className="shrink-0 rounded-full bg-chip px-2 text-[11px] text-muted">{tok.scope === "tasks" ? t("Tasks (Claude)") : t("Metrics")}</span>
+                </span>
                 <span className="block truncate text-xs text-muted">
                   <code>{tok.prefix}…</code> · {tok.owner} · {tok.last_used ? t("used {when}", { when: dateTime(tok.last_used) }) : t("never used")}
                 </span>

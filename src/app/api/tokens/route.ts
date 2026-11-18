@@ -1,38 +1,53 @@
 import { NextResponse } from "next/server";
-import { requireAdmin, sameOrigin } from "@/lib/auth";
+import { requirePermission, requireUser, sameOrigin } from "@/lib/auth";
 import { audit } from "@/lib/auth/users";
-import { createToken, listTokens, revokeToken } from "@/lib/auth/tokens";
+import { createToken, isScope, listTokens, revokeToken } from "@/lib/auth/tokens";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const forbidden = () => NextResponse.json({ error: "Admins only" }, { status: 403 });
+const json = (error: string, status: number) => NextResponse.json({ error }, { status });
 
-export async function GET() {
-  if (!(await requireAdmin())) return forbidden();
-  return NextResponse.json(listTokens());
+/**
+ * Admins see every token; everyone else, and anyone asking with ?mine=1, sees only their own.
+ * Signed out: 401.
+ */
+export async function GET(req: Request) {
+  const user = await requireUser();
+  if (!user) return json("Sign in first", 401);
+  const mine = user.role !== "admin" || new URL(req.url).searchParams.has("mine");
+  return NextResponse.json(listTokens(mine ? user.id : undefined));
 }
 
-/** { name }: answers { token, list }; the token is shown this once. */
+/**
+ * { name, scope? }: answers { token, list }; the token is shown this once. A `metrics` token (the
+ * default) needs an admin, a `tasks` token the `tasks` permission. `list` is what GET would answer.
+ */
 export async function POST(req: Request) {
-  const admin = await requireAdmin();
-  if (!admin) return forbidden();
-  if (!sameOrigin(req)) return NextResponse.json({ error: "Cross-site request refused" }, { status: 403 });
-  const { name } = ((await req.json().catch(() => ({}))) ?? {}) as { name?: string };
+  if (!sameOrigin(req)) return json("Cross-site request refused", 403);
+  const { name, scope = "metrics" } = ((await req.json().catch(() => ({}))) ?? {}) as { name?: string; scope?: unknown };
+  if (!isScope(scope)) return json("Unknown token scope", 400);
+  const user = scope === "tasks" ? await requirePermission("tasks") : await requireUser();
+  if (!user || (scope === "metrics" && user.role !== "admin")) return json(scope === "metrics" ? "Admins only" : "You don't have access to the task boards", 403);
   try {
-    const r = createToken(admin.id, String(name ?? ""));
-    audit(admin.username, "token-create", { name });
-    return NextResponse.json(r, { status: 201 });
+    const { token } = createToken(user.id, String(name ?? ""), scope);
+    audit(user.username, "token-create", { name, scope });
+    return NextResponse.json({ token, list: listTokens(user.role === "admin" && scope === "metrics" ? undefined : user.id) }, { status: 201 });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    return json((e as Error).message, 400);
   }
 }
 
+/** ?id=: admins can revoke any token, everyone else only their own. */
 export async function DELETE(req: Request) {
-  const admin = await requireAdmin();
-  if (!admin) return forbidden();
-  if (!sameOrigin(req)) return NextResponse.json({ error: "Cross-site request refused" }, { status: 403 });
-  const id = Number(new URL(req.url).searchParams.get("id"));
-  audit(admin.username, "token-revoke", { id });
-  return NextResponse.json(revokeToken(id));
+  const user = await requireUser();
+  if (!user) return json("Sign in first", 401);
+  if (!sameOrigin(req)) return json("Cross-site request refused", 403);
+  const params = new URL(req.url).searchParams;
+  const id = Number(params.get("id"));
+  const mine = user.role !== "admin" || params.has("mine");
+  audit(user.username, "token-revoke", { id });
+  if (user.role === "admin") revokeToken(id);
+  else revokeToken(id, user.id);
+  return NextResponse.json(listTokens(mine ? user.id : undefined));
 }

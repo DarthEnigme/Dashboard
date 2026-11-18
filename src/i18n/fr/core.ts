@@ -848,6 +848,8 @@ export const core: Record<string, string> = {
   "Prometheus can scrape every service's status, latency and uptime, and the recorded widget values, from": "Prometheus peut collecter le statut, la latence et la disponibilité de chaque service, et les valeurs enregistrées des widgets, sur",
   "It needs one of these tokens.": "Il faut l’un de ces jetons.",
   "Token name": "Nom du jeton",
+  "Metrics": "Métriques",
+  "Tasks (Claude)": "Tâches (Claude)",
   "Create token": "Créer un jeton",
   "Copy it now: it won't be shown again.": "Copiez-le maintenant : il ne sera plus affiché.",
   Copied: "Copié",

@@ -5,6 +5,8 @@ import { taskProjects } from "./003-task-projects";
 import { stockAlertsAndBrokers } from "./004-stock-alerts-and-brokers";
 import { brokerSyncState } from "./005-broker-sync-state";
 import { recurringChecklistsTargets } from "./006-recurring-checklists-targets";
+import { tokenScopes } from "./007-token-scopes";
+import { oauth } from "./008-oauth";
 
 /**
  * Schema steps, in order: step i brings the database from user_version i to i + 1, in one transaction.
@@ -24,4 +26,8 @@ export const MIGRATIONS: ((d: DatabaseSync) => void)[] = [
   brokerSyncState,
   // 6: Tasks: repeating, checklists, links to services. Stocks: target weights.
   recurringChecklistsTargets,
+  // 7: API tokens get a scope (metrics, or a person's task boards over MCP).
+  tokenScopes,
+  // 8: OAuth for MCP clients: registered clients and one-time codes.
+  oauth,
 ];
